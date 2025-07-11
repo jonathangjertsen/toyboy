@@ -4,40 +4,67 @@ import (
 	"context"
 	"log/slog"
 	"time"
-
-	"github.com/jonathangjertsen/gameboy/util"
 )
 
 type Clock struct {
-	broker      *util.Broker[Tick]
-	ticker      *time.Ticker
-	SetDuration chan time.Duration
+	SetInterval chan time.Duration
+	AddCallback chan func(Cycle)
+	callbacks   []func(c Cycle)
 }
 
-type Tick struct {
+type Cycle struct {
+	T time.Time
+	C uint64
 }
 
-func NewClock(ctx context.Context, logger *slog.Logger, freq float64) *Clock {
-	interval := time.Duration(float64(time.Second) / freq)
-	ticker := time.NewTicker(interval)
+func NewClock(ctx context.Context, logger *slog.Logger, config ClockConfig) *Clock {
+	cycleInterval := time.Duration(float64(time.Second) / config.Frequency)
+	tickInterval := time.Millisecond * 16
+	ticker := time.NewTicker(tickInterval)
 	clock := &Clock{
-		broker:      util.NewBroker[Tick](ctx, logger, interval),
-		ticker:      ticker,
-		SetDuration: make(chan time.Duration, 1),
+		SetInterval: make(chan time.Duration, 1),
+		AddCallback: make(chan func(Cycle), 1),
 	}
-	go clock.worker(ctx)
+	go func() {
+		var cycle uint64
+		cyclesPerTick := tickInterval / cycleInterval
+		for {
+			select {
+			case t := <-ticker.C:
+				for range cyclesPerTick {
+					clock.cycle(t, cycle)
+					cycle++
+				}
+			case d := <-clock.SetInterval:
+				cyclesPerTick = tickInterval / d
+			case cb := <-clock.AddCallback:
+				clock.callbacks = append(clock.callbacks, cb)
+			}
+		}
+	}()
 	return clock
 }
 
-func (c *Clock) worker(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-c.ticker.C:
-			c.broker.In <- Tick{}
-		case d := <-c.SetDuration:
-			c.ticker.Reset(d)
+func (c *Clock) cycle(t time.Time, count uint64) {
+	for _, cb := range c.callbacks {
+		cb(Cycle{t, count})
+	}
+}
+
+func (c *Clock) Divide(ctx context.Context, logger *slog.Logger, div uint64, buffer int) *Clock {
+	child := &Clock{
+		AddCallback: make(chan func(Cycle), 1),
+	}
+	c.AddCallback <- func(cyc Cycle) {
+		d, m := cyc.C/div, cyc.C%div
+		if m == 0 {
+			child.cycle(cyc.T, d)
 		}
 	}
+	go func() {
+		for cb := range child.AddCallback {
+			child.callbacks = append(child.callbacks, cb)
+		}
+	}()
+	return child
 }

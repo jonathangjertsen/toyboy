@@ -1,5 +1,9 @@
 package model
 
 type HWConfig struct {
-	SystemClockFrequency float64
+	SystemClock ClockConfig
+}
+
+type ClockConfig struct {
+	Frequency float64
 }
