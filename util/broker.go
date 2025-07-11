@@ -11,17 +11,17 @@ type Broker[T any] struct {
 	subscribers *list.List
 	logger      *slog.Logger
 	timeout     time.Duration
-	in          chan T
+	In          chan T
 	sub         chan chan *Subscriber[T]
 	unsub       chan *Subscriber[T]
 }
 
-func New[T any](ctx context.Context, logger *slog.Logger, timeout time.Duration) *Broker[T] {
+func NewBroker[T any](ctx context.Context, logger *slog.Logger, timeout time.Duration) *Broker[T] {
 	b := &Broker[T]{
 		subscribers: list.New(),
 		logger:      logger,
 		timeout:     timeout,
-		in:          make(chan T),
+		In:          make(chan T, 1),
 		sub:         make(chan chan *Subscriber[T]),
 		unsub:       make(chan *Subscriber[T]),
 	}
@@ -32,7 +32,7 @@ func New[T any](ctx context.Context, logger *slog.Logger, timeout time.Duration)
 func (b *Broker[T]) worker(ctx context.Context) {
 	for {
 		select {
-		case v := <-b.in:
+		case v := <-b.In:
 			// handle incoming message
 			for e := b.subscribers.Front(); e.Next() != nil; e = e.Next() {
 				go func(sub *Subscriber[T], v T) {
