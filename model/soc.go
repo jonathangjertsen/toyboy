@@ -18,9 +18,7 @@ type SOC struct {
 func NewSOC(ctx context.Context, logger *slog.Logger, config HWConfig) *SOC {
 	clk := NewRootClock(config.SystemClock)
 	phi := clk.Divide(4)
-	data := NewBus[uint8](phi, "data")
-	address := NewBus[uint16](phi, "address")
-	core := NewCPUCore(phi, data, address)
+	core := NewCPUCore(phi)
 
 	bootROM := NewMemoryRegion("BOOTROM", 0x0000, 0x0100)
 	switch config.Model {
@@ -38,6 +36,9 @@ func NewSOC(ctx context.Context, logger *slog.Logger, config HWConfig) *SOC {
 
 	vram := NewMemoryRegion("VRAM", 0x8000, 0x2000)
 	core.AttachPeripheral(vram)
+
+	audio := NewAudio()
+	core.AttachPeripheral(audio)
 
 	soc := &SOC{}
 	soc.CLK = clk

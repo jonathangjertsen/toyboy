@@ -6,6 +6,10 @@ type MemoryRegion struct {
 	data   []uint8
 }
 
+func (mr *MemoryRegion) Name() string {
+	return mr.name
+}
+
 func (mr *MemoryRegion) Range() (uint16, uint16) {
 	return mr.offset, uint16(len(mr.data))
 }

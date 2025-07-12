@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -56,7 +55,7 @@ func (b *Bus[T]) Write(v T) {
 	b.writeValue = v
 	b.writeSync.L.Unlock()
 
-	fmt.Printf("wrote 0x%x to %s\n", v, b.name)
+	// fmt.Printf("wrote 0x%x to %s\n", v, b.name)
 }
 
 func (b *Bus[T]) Read() T {
@@ -67,7 +66,7 @@ func (b *Bus[T]) Read() T {
 	v := b.readValue
 	b.readSync.L.Unlock()
 
-	fmt.Printf("read 0x%x from %s\n", v, b.name)
+	// fmt.Printf("read 0x%x from %s\n", v, b.name)
 
 	return v
 }
