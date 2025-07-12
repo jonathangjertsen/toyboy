@@ -6,13 +6,14 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/jonathangjertsen/gameboy/model"
 	"github.com/lmittmann/tint"
 )
 
-var boost = 20.0
+var boost = 40.0
 var realFreq = 4194304.0
 
 var hwConfig = model.HWConfig{
@@ -31,10 +32,10 @@ func main() {
 	logger := slog.New(logHandler)
 
 	soc := model.NewSOC(ctx, logger, hwConfig)
-	i := 0
-	soc.CLK.AddCallback <- func(c model.Cycle) {
-		i += 1
-	}
+	i := atomic.Uint64{}
+	soc.PHI.AddRiseCallback(func(c model.Cycle) {
+		i.Add(4)
+	})
 	<-time.After(time.Second)
-	fmt.Printf("ran %v ticks in 1s (%.02f %% speed)\n", i, 100*float64(i)/realFreq)
+	fmt.Printf("ran %v ticks in 1s (%.02f %% speed)\n", i.Load(), 100*float64(i.Load())/realFreq)
 }
