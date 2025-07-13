@@ -24,8 +24,8 @@ func (mr *MemoryRegion) Write(addr uint16, v uint8) {
 	mr.data[addr-mr.offset] = v
 }
 
-func NewMemoryRegion(name string, start, size uint16) *MemoryRegion {
-	return &MemoryRegion{
+func NewMemoryRegion(name string, start, size uint16) MemoryRegion {
+	return MemoryRegion{
 		name:   name,
 		data:   make([]uint8, size),
 		offset: start,

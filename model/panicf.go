@@ -7,5 +7,5 @@ func panicf(s string, v ...any) {
 }
 
 func panicv(v any) {
-	panicf("%+v", v)
+	panicf("%#v", v)
 }

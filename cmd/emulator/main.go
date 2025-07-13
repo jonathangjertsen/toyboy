@@ -31,11 +31,12 @@ func main() {
 
 	logger := slog.New(logHandler)
 
-	soc := model.NewSOC(ctx, logger, hwConfig)
+	gb := model.NewGameboy(ctx, logger, hwConfig)
 	i := atomic.Uint64{}
-	soc.PHI.AddRiseCallback(func(c model.Cycle) {
+	gb.PHI.AddRiseCallback(func(c model.Cycle) {
 		i.Add(4)
 	})
+	gb.Boot()
 	<-time.After(time.Second)
 	fmt.Printf("ran %v ticks in 1s (%.02f %% speed)\n", i.Load(), 100*float64(i.Load())/realFreq)
 }

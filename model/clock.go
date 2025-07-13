@@ -14,66 +14,75 @@ type Clock struct {
 }
 
 type Cycle struct {
-	T      time.Time
 	C      uint64
 	Rising bool
 }
 
-func newClock() *Clock {
+func NewClock() *Clock {
 	clock := &Clock{
 		m: &sync.Mutex{},
 	}
 	return clock
 }
 
-type RootClock struct {
+type RealtimeClock struct {
 	Clock
-	freq chan float64
+	begin chan struct{}
+	freq  chan float64
 }
 
-func (r *RootClock) SetFrequency(f float64) {
+func (r *RealtimeClock) SetFrequency(f float64) {
 	r.freq <- f
 }
 
-func NewRootClock(config ClockConfig) *RootClock {
-	rootClock := RootClock{
-		Clock: *newClock(),
+func NewRealtimeClock(config ClockConfig) *RealtimeClock {
+	rtClock := RealtimeClock{
+		Clock: *NewClock(),
+		begin: make(chan struct{}),
 		freq:  make(chan float64, 1),
 	}
 	tickInterval := time.Millisecond
-	ticker := time.NewTicker(tickInterval)
 	cycleInterval := time.Duration(float64(time.Second) / config.Frequency)
-	cyclesPerTick := tickInterval / cycleInterval
+	cyclesPerTick := uint64(tickInterval / cycleInterval)
 	go func() {
 		var count uint64
-		for t := range ticker.C {
-			rootClock.m.Lock()
-			for range cyclesPerTick {
-				rootClock.cycle(t, count)
-				count++
-			}
-			rootClock.m.Unlock()
+		<-rtClock.begin
+		ticker := time.NewTicker(tickInterval)
+		for range ticker.C {
+			rtClock.m.Lock()
+			count = rtClock.Cycles(count, cyclesPerTick)
+			rtClock.m.Unlock()
 		}
 	}()
-
 	go func() {
-		for f := range rootClock.freq {
-			rootClock.m.Lock()
+		for f := range rtClock.freq {
+			rtClock.m.Lock()
 			cycleInterval = time.Duration(float64(time.Second) / f)
-			cyclesPerTick = tickInterval / cycleInterval
-			rootClock.m.Unlock()
+			cyclesPerTick = uint64(tickInterval / cycleInterval)
+			rtClock.m.Unlock()
 		}
 	}()
-	return &rootClock
+	return &rtClock
 }
 
-func (c *Clock) cycle(t time.Time, count uint64) {
+func (rtClock *RealtimeClock) Start() {
+	rtClock.begin <- struct{}{}
+}
+
+func (c *Clock) Cycle(currCycle uint64) {
 	for _, cb := range c.rising {
-		cb(Cycle{t, count, true})
+		cb(Cycle{currCycle, true})
 	}
 	for _, cb := range c.falling {
-		cb(Cycle{t, count, false})
+		cb(Cycle{currCycle, false})
 	}
+}
+
+func (c *Clock) Cycles(currCycle uint64, n uint64) uint64 {
+	for offs := range n {
+		c.Cycle(currCycle + offs)
+	}
+	return currCycle + n
 }
 
 func (c *Clock) AddRiseCallback(cb Callback) {
@@ -89,12 +98,12 @@ func (c *Clock) AddFallCallback(cb Callback) {
 }
 
 func (c *Clock) Divide(div uint64) *Clock {
-	child := newClock()
+	child := NewClock()
 	c.AddRiseCallback(func(cyc Cycle) {
 		d, m := cyc.C/div, cyc.C%div
 		if m == 0 {
 			child.m.Lock()
-			child.cycle(cyc.T, d)
+			child.Cycle(d)
 			child.m.Unlock()
 		}
 	})
@@ -102,10 +111,10 @@ func (c *Clock) Divide(div uint64) *Clock {
 }
 
 func (c *Clock) Invert(div uint64) *Clock {
-	child := newClock()
+	child := NewClock()
 	c.AddFallCallback(func(cyc Cycle) {
 		child.m.Lock()
-		child.cycle(cyc.T, cyc.C)
+		child.Cycle(cyc.C)
 		child.m.Unlock()
 	})
 	return child
