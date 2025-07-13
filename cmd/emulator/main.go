@@ -36,7 +36,10 @@ func main() {
 	gb.PHI.AddRiseCallback(func(c model.Cycle) {
 		i.Add(4)
 	})
-	gb.Boot()
-	<-time.After(time.Second)
-	fmt.Printf("ran %v ticks in 1s (%.02f %% speed)\n", i.Load(), 100*float64(i.Load())/realFreq)
+	gb.PowerOn()
+	nSeconds := 5.0
+	<-time.After(time.Second * time.Duration(nSeconds))
+	gb.PowerOff()
+	gb.CPUCore.Dump()
+	fmt.Printf("ran %v ticks in %f s (%.02f %% speed)\n", i.Load(), nSeconds, 100*float64(i.Load())/(nSeconds*realFreq))
 }

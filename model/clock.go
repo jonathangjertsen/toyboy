@@ -14,8 +14,8 @@ type Clock struct {
 }
 
 type Cycle struct {
-	C      uint64
-	Rising bool
+	C       uint64
+	Falling bool
 }
 
 func NewClock() *Clock {
@@ -27,8 +27,9 @@ func NewClock() *Clock {
 
 type RealtimeClock struct {
 	Clock
-	begin chan struct{}
-	freq  chan float64
+	resume chan struct{}
+	pause  chan struct{}
+	freq   chan float64
 }
 
 func (r *RealtimeClock) SetFrequency(f float64) {
@@ -37,21 +38,27 @@ func (r *RealtimeClock) SetFrequency(f float64) {
 
 func NewRealtimeClock(config ClockConfig) *RealtimeClock {
 	rtClock := RealtimeClock{
-		Clock: *NewClock(),
-		begin: make(chan struct{}),
-		freq:  make(chan float64, 1),
+		Clock:  *NewClock(),
+		resume: make(chan struct{}),
+		pause:  make(chan struct{}),
+		freq:   make(chan float64, 1),
 	}
 	tickInterval := time.Millisecond
 	cycleInterval := time.Duration(float64(time.Second) / config.Frequency)
 	cyclesPerTick := uint64(tickInterval / cycleInterval)
 	go func() {
 		var count uint64
-		<-rtClock.begin
+		<-rtClock.resume
 		ticker := time.NewTicker(tickInterval)
-		for range ticker.C {
-			rtClock.m.Lock()
-			count = rtClock.Cycles(count, cyclesPerTick)
-			rtClock.m.Unlock()
+		for {
+			select {
+			case <-ticker.C:
+				rtClock.m.Lock()
+				count = rtClock.Cycles(count, cyclesPerTick)
+				rtClock.m.Unlock()
+			case <-rtClock.pause:
+				<-rtClock.resume
+			}
 		}
 	}()
 	go func() {
@@ -65,16 +72,24 @@ func NewRealtimeClock(config ClockConfig) *RealtimeClock {
 	return &rtClock
 }
 
+// Start the clock
+// When this function returns, the clock has started
 func (rtClock *RealtimeClock) Start() {
-	rtClock.begin <- struct{}{}
+	rtClock.resume <- struct{}{}
+}
+
+// Stop the clock
+// When this function returns, the clock has stopped
+func (rtClock *RealtimeClock) Stop() {
+	rtClock.pause <- struct{}{}
 }
 
 func (c *Clock) Cycle(currCycle uint64) {
 	for _, cb := range c.rising {
-		cb(Cycle{currCycle, true})
+		cb(Cycle{currCycle, false})
 	}
 	for _, cb := range c.falling {
-		cb(Cycle{currCycle, false})
+		cb(Cycle{currCycle, true})
 	}
 }
 

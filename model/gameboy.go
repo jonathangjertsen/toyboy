@@ -9,12 +9,14 @@ type Gameboy struct {
 	CLK     *RealtimeClock
 	PHI     *Clock
 	CPUCore *CPUCore
-	Data    *Bus[uint8]
-	Address *Bus[uint16]
 }
 
-func (gb *Gameboy) Boot() {
+func (gb *Gameboy) PowerOn() {
 	gb.CLK.Start()
+}
+
+func (gb *Gameboy) PowerOff() {
+	gb.CLK.Stop()
 }
 
 func NewGameboy(ctx context.Context, logger *slog.Logger, config HWConfig) *Gameboy {

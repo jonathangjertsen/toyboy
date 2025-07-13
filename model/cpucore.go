@@ -11,19 +11,22 @@ import (
 var coreDebugEvents = []string{
 	// "NotImplemented",
 	"Panic",
+	// "PreFetch",
+	"ExecDone",
 	"ExecBegin",
-	//"SetPC",
+	//"SetBC",
+	// "Handler",
+	// "SetPC",
 	//"ExecBeginCPn",
 	//"GetHL",
-	//"IncPC",
+	// "IncPC",
 	//"SetFlagZ",
-	//"ExecDone",
-	//"WriteAddressBus",
+	// "WriteAddressBus",
 	//"PeriphRead",
 	//"GetFlagZ",
 	//"PeriphWrite",
 	//"ExecCBOp",
-	//"SetHL",
+	// "SetHL",
 	//"CPn",
 	//"SetA",
 	//"SetC",
@@ -188,29 +191,42 @@ type CPUCore struct {
 
 	machineCycle int
 
-	clockCycle   Cycle
-	debugDisable bool
+	clockCycle                 Cycle
+	inCoreDump                 bool
+	wroteToAddressBusThisCycle bool
 }
 
 func (core *CPUCore) SetHL(v uint16) {
+	if core.clockCycle.Falling {
+		panic("SetHL must be called on rising edge")
+	}
 	core.Debug("SetHL", "0x%04x", v)
 	core.Regs.H = uint8(v >> 8)
 	core.Regs.L = uint8(v)
 }
 
 func (core *CPUCore) SetBC(v uint16) {
+	if core.clockCycle.Falling {
+		panic("SetBC must be called on rising edge")
+	}
 	core.Debug("SetBC", "0x%04x", v)
 	core.Regs.B = uint8(v >> 8)
 	core.Regs.C = uint8(v)
 }
 
 func (core *CPUCore) SetDE(v uint16) {
+	if core.clockCycle.Falling {
+		panic("SetDE must be called on rising edge")
+	}
 	core.Debug("SetDE", "0x%04x", v)
 	core.Regs.D = uint8(v >> 8)
 	core.Regs.E = uint8(v)
 }
 
 func (core *CPUCore) SetSP(v uint16) {
+	if core.clockCycle.Falling {
+		panic("SetSP must be called on rising edge")
+	}
 	core.Debug("SetSP", "0x%04x", v)
 	core.Regs.SP = v
 }
@@ -340,23 +356,29 @@ func (core *CPUCore) SetFlagC(v bool) {
 }
 
 func (core *CPUCore) SetPC(pc uint16) {
+	if core.clockCycle.Falling {
+		panic("SetPC must be called on rising edge")
+	}
 	core.Debug("SetPC", "0x%04x", pc)
 	core.Regs.PC = pc
 }
 
 func (core *CPUCore) IncPC() {
+	if core.clockCycle.Falling {
+		panic("IncPC must be called on rising edge")
+	}
 	core.Regs.PC++
 	core.Debug("IncPC", "0x%04x", core.Regs.PC)
 }
 
 func (core *CPUCore) Debug(event string, f string, v ...any) {
-	if core.debugDisable {
+	if core.inCoreDump {
 		return
 	}
 	if slices.Contains(coreDebugEvents, event) || slices.Contains(coreDumpEvents, event) {
-		dir := "v"
-		if core.clockCycle.Rising {
-			dir = "^"
+		dir := "^"
+		if core.clockCycle.Falling {
+			dir = "v"
 		}
 		fmt.Printf("%d %s PC=0x%04x %v mcycle=%v | %s | ", core.clockCycle.C, dir, core.Regs.PC, core.Regs.IR, core.machineCycle, event)
 		fmt.Printf(f, v...)
@@ -438,7 +460,11 @@ type edge struct {
 type InstructionHandling func(c *CPUCore, e edge) bool
 
 var handlers = map[Opcode]InstructionHandling{
-	OpcodeNop:  singleCycle(func(core *CPUCore) {}),
+	OpcodeNop: singleCycle(func(core *CPUCore) {
+		if core.clockCycle.C > 0 {
+			panic("unexpected nop")
+		}
+	}),
 	OpcodeLDAA: singleCycle(func(core *CPUCore) {}),
 	OpcodeLDBB: singleCycle(func(core *CPUCore) {}),
 	OpcodeLDCC: singleCycle(func(core *CPUCore) {}),
@@ -531,17 +557,18 @@ var handlers = map[Opcode]InstructionHandling{
 	}),
 	OpcodeJRe: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
 		case edge{1, true}:
 			core.Z = core.readDataBus()
-			core.IncPC()
+		// TODO: this impl is not exactly correct
 		case edge{2, false}:
 		case edge{2, true}:
+		case edge{3, false}:
 			core.SetPC(uint16(int16(core.Regs.PC) + int16(int8(core.Z))))
+			return true
+		case edge{3, true}:
 			return true
 		default:
 			panicv(e)
@@ -562,16 +589,14 @@ var handlers = map[Opcode]InstructionHandling{
 	}),
 	OpcodeCALLnn: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
 		case edge{1, true}:
 			core.Z = core.readDataBus()
-			core.IncPC()
 		case edge{2, false}:
 			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
 		case edge{2, true}:
 			core.W = core.readDataBus()
 		case edge{3, false}:
@@ -586,7 +611,10 @@ var handlers = map[Opcode]InstructionHandling{
 			core.writeAddressBus(core.Regs.SP)
 		case edge{5, true}:
 			core.writeDataBus(lsb(core.Regs.PC))
+		case edge{6, false}:
 			core.SetPC(core.GetWZ())
+			return true
+		case edge{6, true}:
 			return true
 		default:
 			panicv(e)
@@ -595,9 +623,6 @@ var handlers = map[Opcode]InstructionHandling{
 	},
 	OpcodeRET: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.SP)
 			core.SetSP(core.Regs.SP + 1)
@@ -609,8 +634,9 @@ var handlers = map[Opcode]InstructionHandling{
 		case edge{2, true}:
 			core.W = core.readDataBus()
 		case edge{3, false}:
-		case edge{3, true}:
 			core.SetPC(core.GetWZ())
+		case edge{3, true}:
+		case edge{4, false}, edge{4, true}:
 			return true
 		default:
 			panicv(e)
@@ -619,9 +645,6 @@ var handlers = map[Opcode]InstructionHandling{
 	},
 	OpcodePUSHBC: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.SetSP(core.Regs.SP - 1)
 			core.writeAddressBus(core.Regs.SP)
@@ -632,6 +655,11 @@ var handlers = map[Opcode]InstructionHandling{
 			core.writeAddressBus(core.Regs.SP)
 		case edge{2, true}:
 			core.writeDataBus(core.Regs.C)
+		case edge{3, false}:
+		case edge{3, true}:
+		case edge{4, false}:
+			return true
+		case edge{4, true}:
 			return true
 		default:
 			panicv(e)
@@ -640,54 +668,40 @@ var handlers = map[Opcode]InstructionHandling{
 	},
 	OpcodePOPBC: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.SP)
+			core.SetSP(core.Regs.SP + 1)
 		case edge{1, true}:
 			core.Z = core.readDataBus()
-			core.SetSP(core.Regs.SP + 1)
 		case edge{2, false}:
 			core.writeAddressBus(core.Regs.SP)
+			core.SetSP(core.Regs.SP + 1)
 		case edge{2, true}:
 			core.W = core.readDataBus()
+		case edge{3, false}:
 			core.SetBC(core.GetWZ())
-			core.SetSP(core.Regs.SP + 1)
+			return true
+		case edge{3, true}:
 			return true
 		default:
 			panicv(e)
 		}
 		return false
 	},
-	OpcodeLDBCnn: ldxxnn(func(core *CPUCore, wz uint16) { core.SetBC(wz) }),
-	OpcodeLDDEnn: ldxxnn(func(core *CPUCore, wz uint16) { core.SetDE(wz) }),
-	OpcodeLDHLnn: ldxxnn(func(core *CPUCore, wz uint16) { core.SetHL(wz) }),
-	OpcodeLDSPnn: ldxxnn(func(core *CPUCore, wz uint16) { core.SetSP(wz) }),
-	OpcodeLDHLAInc: ldhla(func(core *CPUCore) {
-		hl := core.GetHL()
-		core.writeAddressBus(hl)
-		core.SetHL(hl + 1)
-	}),
-	OpcodeLDHLADec: ldhla(func(core *CPUCore) {
-		hl := core.GetHL()
-		core.writeAddressBus(hl)
-		core.SetHL(hl - 1)
-	}),
-	OpcodeLDHLA: ldhla(func(core *CPUCore) {
-		hl := core.GetHL()
-		core.writeAddressBus(hl)
-	}),
+	OpcodeLDBCnn:   ldxxnn(func(core *CPUCore, wz uint16) { core.SetBC(wz) }),
+	OpcodeLDDEnn:   ldxxnn(func(core *CPUCore, wz uint16) { core.SetDE(wz) }),
+	OpcodeLDHLnn:   ldxxnn(func(core *CPUCore, wz uint16) { core.SetHL(wz) }),
+	OpcodeLDSPnn:   ldxxnn(func(core *CPUCore, wz uint16) { core.SetSP(wz) }),
+	OpcodeLDHLAInc: ldhla(func(core *CPUCore) { core.SetHL(core.GetHL() + 1) }),
+	OpcodeLDHLADec: ldhla(func(core *CPUCore) { core.SetHL(core.GetHL() - 1) }),
+	OpcodeLDHLA:    ldhla(func(core *CPUCore) {}),
 	OpcodeLDHCA: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
-			c := core.Regs.C
-			core.writeAddressBus(join16(0xff, c))
+			core.writeAddressBus(join16(0xff, core.Regs.C))
 		case edge{1, true}:
 			core.writeDataBus(core.Regs.A)
+		case edge{2, false}, edge{2, true}:
 			return true
 		default:
 			panicv(e)
@@ -696,9 +710,6 @@ var handlers = map[Opcode]InstructionHandling{
 	},
 	OpcodeLDnnA: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
 			core.IncPC()
@@ -709,11 +720,11 @@ var handlers = map[Opcode]InstructionHandling{
 			core.IncPC()
 		case edge{2, true}:
 			core.W = core.readDataBus()
-			return true
 		case edge{3, false}:
 			core.writeAddressBus(core.GetWZ())
 		case edge{3, true}:
 			core.writeDataBus(core.Regs.A)
+		case edge{4, false}, edge{4, true}:
 			return true
 		default:
 			panicv(e)
@@ -722,15 +733,13 @@ var handlers = map[Opcode]InstructionHandling{
 	},
 	OpcodeCPn: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
 			core.IncPC()
 		case edge{1, true}:
 			core.Z = core.readDataBus()
 		case edge{2, false}:
+			return true
 		case edge{2, true}:
 			core.Debug("CPn", "A=%02x n=%02x", core.Regs.A, core.Z)
 			carry := core.Regs.A < core.Z
@@ -747,9 +756,6 @@ var handlers = map[Opcode]InstructionHandling{
 	},
 	OpcodeLDHnA: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
 		case edge{1, true}:
@@ -759,6 +765,7 @@ var handlers = map[Opcode]InstructionHandling{
 			core.IncPC()
 		case edge{2, true}:
 			core.writeDataBus(core.Regs.A)
+		case edge{3, false}, edge{3, true}:
 			return true
 		default:
 			panicv(e)
@@ -767,18 +774,19 @@ var handlers = map[Opcode]InstructionHandling{
 	},
 	OpcodeLDHAn: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
 		case edge{1, true}:
 			core.Z = core.readDataBus()
 		case edge{2, false}:
 			core.writeAddressBus(join16(0xff, core.Z))
-			core.IncPC()
 		case edge{2, true}:
-			core.Regs.A = core.readDataBus()
+			core.Z = core.readDataBus()
+		case edge{3, false}:
+			return true
+		case edge{3, true}:
+			core.Regs.A = core.Z
 			return true
 		default:
 			panicv(e)
@@ -787,13 +795,14 @@ var handlers = map[Opcode]InstructionHandling{
 	},
 	OpcodeLDADE: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(join16(core.Regs.D, core.Regs.E))
 		case edge{1, true}:
-			core.Regs.A = core.readDataBus()
+			core.Z = core.readDataBus()
+		case edge{2, false}:
+			return true
+		case edge{2, true}:
+			core.Regs.A = core.Z
 			return true
 		default:
 			panicv(e)
@@ -809,16 +818,14 @@ var handlers = map[Opcode]InstructionHandling{
 	OpcodeLDLn: ldrn(func(core *CPUCore, z uint8) { core.Regs.L = z }),
 	OpcodeCB: func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
 		case edge{1, true}:
 			opcode := core.readDataBus()
 			core.CBOp = CBOp{Op: cb((opcode & 0xf8) >> 3), Target: CBTarget(opcode & 0x7)}
-			core.IncPC()
 		case edge{2, false}:
+			return true
 		case edge{2, true}:
 			var val uint8
 			switch core.CBOp.Target {
@@ -903,10 +910,8 @@ var handlers = map[Opcode]InstructionHandling{
 func singleCycle(f func(core *CPUCore)) func(core *CPUCore, e edge) bool {
 	return func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
+			return true
 		case edge{1, true}:
 			f(core)
 			return true
@@ -920,15 +925,16 @@ func singleCycle(f func(core *CPUCore)) func(core *CPUCore, e edge) bool {
 func jrcce(f func(core *CPUCore) bool) func(core *CPUCore, e edge) bool {
 	return func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
 		case edge{1, true}:
 			core.Z = core.readDataBus()
-			core.IncPC()
 		case edge{2, false}:
+			if f(core) {
+			} else {
+				return true
+			}
 		case edge{2, true}:
 			if f(core) {
 				newPC := uint16(int16(core.Regs.PC) + int16(int8(core.Z)))
@@ -938,12 +944,13 @@ func jrcce(f func(core *CPUCore) bool) func(core *CPUCore, e edge) bool {
 			}
 		case edge{3, false}:
 			if f(core) {
+				core.SetPC(core.GetWZ())
+				return true
 			} else {
 				panicv(e)
 			}
 		case edge{3, true}:
 			if f(core) {
-				core.SetPC(core.GetWZ())
 				return true
 			} else {
 				panicv(e)
@@ -964,6 +971,7 @@ func decreg(f func(core *CPUCore) *uint8) func(core *CPUCore, e edge) bool {
 		core.TODOFlagH()
 	})
 }
+
 func increg(f func(core *CPUCore) *uint8) func(core *CPUCore, e edge) bool {
 	return singleCycle(func(core *CPUCore) {
 		reg := f(core)
@@ -977,12 +985,10 @@ func increg(f func(core *CPUCore) *uint8) func(core *CPUCore, e edge) bool {
 func iduOp(f func(core *CPUCore)) func(core *CPUCore, e edge) bool {
 	return func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
-		case edge{1, true}:
 			f(core)
+		case edge{1, true}:
+		case edge{2, false}, edge{2, true}:
 			return true
 		default:
 			panicv(e)
@@ -994,16 +1000,14 @@ func iduOp(f func(core *CPUCore)) func(core *CPUCore, e edge) bool {
 func ldrn(f func(core *CPUCore, z uint8)) func(core *CPUCore, e edge) bool {
 	return func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
 		case edge{1, true}:
 			core.Z = core.readDataBus()
 		case edge{2, false}:
-		case edge{2, true}:
 			core.IncPC()
+			return true
+		case edge{2, true}:
 			f(core, core.Z)
 			return true
 		default:
@@ -1016,13 +1020,14 @@ func ldrn(f func(core *CPUCore, z uint8)) func(core *CPUCore, e edge) bool {
 func ldhla(f func(core *CPUCore)) func(core *CPUCore, e edge) bool {
 	return func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
+			core.writeAddressBus(core.GetHL())
 			f(core)
 		case edge{1, true}:
 			core.writeDataBus(core.Regs.A)
+		case edge{2, false}:
+			return true
+		case edge{2, true}:
 			return true
 		default:
 			panicv(e)
@@ -1034,20 +1039,20 @@ func ldhla(f func(core *CPUCore)) func(core *CPUCore, e edge) bool {
 func ldxxnn(f func(core *CPUCore, wz uint16)) func(core *CPUCore, e edge) bool {
 	return func(core *CPUCore, e edge) bool {
 		switch e {
-		case edge{0, false}:
-			core.IncPC()
-		case edge{0, true}:
 		case edge{1, false}:
 			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
 		case edge{1, true}:
 			core.Z = core.readDataBus()
-			core.IncPC()
 		case edge{2, false}:
 			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
 		case edge{2, true}:
 			core.W = core.readDataBus()
+		case edge{3, false}:
 			f(core, join16(core.W, core.Z))
-			core.IncPC()
+			return true
+		case edge{3, true}:
 			return true
 		default:
 			panicv(e)
@@ -1081,8 +1086,8 @@ func (core *CPUCore) AttachPeripheral(p Peripheral) {
 }
 
 func (core *CPUCore) Dump() {
-	core.debugDisable = true
-	defer func() { core.debugDisable = false }()
+	core.inCoreDump = true
+	defer func() { core.inCoreDump = false }()
 
 	fmt.Printf("\n--------\nCore dump:\n")
 	fmt.Printf("PC = 0x%04x\n", core.Regs.PC)
@@ -1152,44 +1157,56 @@ func (core *CPUCore) fsm(c Cycle) {
 			panic(e)
 		}
 	}()
+	core.wroteToAddressBusThisCycle = false
 
 	core.clockCycle = c
 
 	core.applyPendingIME()
 
-	if core.machineCycle == 0 {
-		if c.Rising {
+	var fetch bool
+	if c.C > 0 {
+		opcode := core.Regs.IR
+		if handler, ok := handlers[opcode]; ok {
+			e := edge{core.machineCycle, c.Falling}
+			core.Debug("Handler", "e=%v", e)
+			fetch = handler(core, e)
+		} else {
+			panicf("not implemented opcode %v", opcode)
+		}
+	} else {
+		// initial instruction
+		fetch = true
+	}
+
+	if fetch {
+		if !c.Falling {
+			core.Debug("PreFetch", "PC=%04x", core.Regs.PC)
+			core.writeAddressBus(core.Regs.PC)
+			core.IncPC()
+		} else {
+			core.Debug("ExecDone", "")
 			core.W = 0
 			core.Z = 0
-			core.writeAddressBus(core.Regs.PC)
-		} else {
+			core.machineCycle = 1
 			core.Regs.IR = Opcode(core.DataBus)
 			core.Debug("ExecBegin", "%s", core.Regs.IR)
 			core.Debug(fmt.Sprintf("ExecBegin%s", core.Regs.IR), "")
 		}
-	}
-
-	opcode := core.Regs.IR
-	if handler, ok := handlers[opcode]; ok {
-		done := handler(core, edge{core.machineCycle, !c.Rising})
-		if c.Rising {
-			if done {
-				panic("can't be done on rising edge")
-			}
-		} else {
-			if done {
-				core.Debug("ExecDone", "")
-				core.machineCycle = 0
-			} else {
-				core.machineCycle++
-			}
-		}
-	} else {
-		panicf("not implemented opcode %v", opcode)
+	} else if c.Falling {
+		core.machineCycle++
 	}
 }
 
 func (core *CPUCore) writeAddressBus(addr uint16) {
+	if !core.inCoreDump {
+		if core.clockCycle.Falling {
+			panic("writeAddressBus must be called on rising edge")
+		}
+		if core.wroteToAddressBusThisCycle {
+			panic("more than one call to writeAddressBus this cycle")
+		}
+	}
+	core.wroteToAddressBusThisCycle = true
 	core.Debug("WriteAddressBus", "0x%04x", addr)
 	core.AddressBus = addr
 	for _, p := range core.Peripherals {
@@ -1209,6 +1226,9 @@ func (core *CPUCore) writeAddressBus(addr uint16) {
 }
 
 func (core *CPUCore) writeDataBus(v uint8) {
+	if !core.clockCycle.Falling {
+		panic("writeDataBus must be called on falling edge")
+	}
 	core.DataBus = v
 	addr := core.AddressBus
 	for _, p := range core.Peripherals {
@@ -1224,6 +1244,9 @@ func (core *CPUCore) writeDataBus(v uint8) {
 }
 
 func (core *CPUCore) readDataBus() uint8 {
+	if !core.clockCycle.Falling {
+		panic("readDataBus must be called on falling edge")
+	}
 	return core.DataBus
 }
 
