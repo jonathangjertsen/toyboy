@@ -4,7 +4,7 @@ all: emulator testrom
 
 emulator:
 	go generate ./...
-	go build -o bin/emulator github.com/jonathangjertsen/gameboy/cmd/emulator
+	go build -o bin/emulator github.com/jonathangjertsen/toyboy/cmd/emulator
 
 testrom:
 	cd assets/cartridges/asm;\
