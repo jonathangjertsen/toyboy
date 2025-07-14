@@ -22,6 +22,23 @@ var hwConfig = model.HWConfig{
 	},
 }
 
+type sysInterface struct {
+}
+
+func (si *sysInterface) FrameCompleted(vp model.ViewPort) {
+	if vp == (model.ViewPort{}) {
+		return
+	}
+
+	fmt.Printf("FRAME:\n")
+	for _, row := range vp {
+		for _, col := range row {
+			fmt.Printf("%d", int(col))
+		}
+		fmt.Printf("\n")
+	}
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -31,7 +48,7 @@ func main() {
 
 	logger := slog.New(logHandler)
 
-	gb := model.NewGameboy(ctx, logger, hwConfig)
+	gb := model.NewGameboy(ctx, logger, hwConfig, &sysInterface{})
 	i := atomic.Uint64{}
 	gb.PHI.AddRiseCallback(func(c model.Cycle) {
 		i.Add(4)
@@ -46,7 +63,7 @@ func main() {
 
 	gb.CartridgeSlot.InsertCartridge(f)
 	gb.PowerOn()
-	nSeconds := 50.0
+	nSeconds := 1.0
 	<-time.After(time.Second * time.Duration(nSeconds))
 	gb.PowerOff()
 	gb.CPU.Dump()

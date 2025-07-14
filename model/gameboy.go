@@ -20,7 +20,16 @@ func (gb *Gameboy) PowerOff() {
 	gb.CLK.Stop()
 }
 
-func NewGameboy(ctx context.Context, logger *slog.Logger, config HWConfig) *Gameboy {
+type SysInterface interface {
+	PPUHooks
+}
+
+func NewGameboy(
+	ctx context.Context,
+	logger *slog.Logger,
+	config HWConfig,
+	sysif SysInterface,
+) *Gameboy {
 	clk := NewRealtimeClock(config.SystemClock)
 	ppuClock := clk.Divide(2)
 	cpuClock := clk.Divide(4)
@@ -44,7 +53,7 @@ func NewGameboy(ctx context.Context, logger *slog.Logger, config HWConfig) *Game
 	oam := NewMemoryRegion("OAM", 0xfe00, 0xa0)
 	cpu.AttachPeripheral(&oam)
 
-	ppu := NewPPU(ppuClock, &oam, &vram)
+	ppu := NewPPU(ppuClock, &oam, &vram, sysif)
 	cpu.AttachPeripheral(ppu)
 
 	cartridgeSlot := NewCartridgeSlot(bootROMLock)

@@ -47,6 +47,10 @@ type Sprite struct {
 	Attributes uint8
 }
 
+type PPUHooks interface {
+	FrameCompleted(ViewPort)
+}
+
 type PPU struct {
 	RegLCDC uint8
 	RegSTAT uint8
@@ -59,6 +63,8 @@ type PPU struct {
 	RegBGP  uint8
 	RegOBP0 uint8
 	RegOBP1 uint8
+
+	Hooks PPUHooks
 
 	OAM  Peripheral
 	VRAM Peripheral
@@ -85,10 +91,14 @@ type PPU struct {
 
 	Palette [4]Color
 
-	FBBackground [256][256]Color
-	FBWindow     [256][256]Color
-	FBViewport   [144][160]Color
+	FBBackground FrameBuffer
+	FBWindow     FrameBuffer
+	FBViewport   ViewPort
 }
+
+type FrameBuffer [256][256]Color
+
+type ViewPort [144][160]Color
 
 type PixelFIFO struct {
 	Slots [8]Pixel
@@ -239,10 +249,11 @@ func (ppu *PPU) SetOBP1(v uint8) {
 	panic("not implemented: SetOBP1")
 }
 
-func NewPPU(clock *Clock, oam, vram Peripheral) *PPU {
+func NewPPU(clock *Clock, oam, vram Peripheral, hooks PPUHooks) *PPU {
 	ppu := &PPU{
-		OAM:  oam,
-		VRAM: vram,
+		OAM:   oam,
+		VRAM:  vram,
+		Hooks: hooks,
 	}
 	ppu.BackgroundFetcher.PPU = ppu
 	ppu.SpriteFetcher.PPU = ppu
@@ -699,6 +710,8 @@ func (ppu *PPU) fsmVBlank() {
 		ppu.VBlankLineRemainingCycles--
 		return
 	}
+
+	ppu.Hooks.FrameCompleted(ppu.FBViewport)
 
 	if ppu.RegLY == 153 {
 		ppu.RegLY = 0
