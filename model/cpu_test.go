@@ -3,7 +3,7 @@ package model_test
 import (
 	"testing"
 
-	"github.com/jonathangjertsen/gameboy/model"
+	"github.com/jonathangjertsen/toyboy/model"
 )
 
 func TestOpcodeLDAE(t *testing.T) {

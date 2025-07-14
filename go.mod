@@ -1,4 +1,4 @@
-module github.com/jonathangjertsen/gameboy
+module github.com/jonathangjertsen/toyboy
 
 go 1.23.2
 

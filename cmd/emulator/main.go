@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonathangjertsen/gameboy/model"
+	"github.com/jonathangjertsen/toyboy/model"
 	"github.com/lmittmann/tint"
 )
 
