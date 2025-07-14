@@ -39,3 +39,7 @@ func (cs *CartridgeSlot) Write(addr uint16, v uint8) {
 	}
 	cs.MemoryRegion.Write(addr, v)
 }
+
+func (cs *CartridgeSlot) InsertCartridge(data []uint8) {
+	copy(cs.MemoryRegion.data, data)
+}

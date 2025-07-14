@@ -7,7 +7,7 @@ import (
 )
 
 func TestOpcodeLDAE(t *testing.T) {
-	coreTest(func(core *model.CPUCore, mr *model.MemoryRegion, clock *model.Clock) {
+	coreTest(func(core *model.CPU, mr *model.MemoryRegion, clock *model.Clock) {
 		mr.Write(0x0000, uint8(model.OpcodeLDAE))
 		core.Regs.A = 0xff
 		core.Regs.E = 0x77
@@ -21,9 +21,9 @@ func TestOpcodeLDAE(t *testing.T) {
 	})
 }
 
-func coreTest(f func(core *model.CPUCore, mr *model.MemoryRegion, clock *model.Clock)) {
+func coreTest(f func(core *model.CPU, mr *model.MemoryRegion, clock *model.Clock)) {
 	phi := model.NewClock()
-	core := model.NewCPUCore(phi)
+	core := model.NewCPU(phi)
 	mr := model.NewMemoryRegion("PROGRAM", 0x0000, 0x10)
 	core.AttachPeripheral(&mr)
 	f(core, &mr, phi)

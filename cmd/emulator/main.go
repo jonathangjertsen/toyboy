@@ -36,10 +36,19 @@ func main() {
 	gb.PHI.AddRiseCallback(func(c model.Cycle) {
 		i.Add(4)
 	})
+
+	f, err := os.ReadFile("assets/cartridges/hello-world.gb")
+	if err != nil {
+		panic(fmt.Sprintf("failed to load cartridge: %v", err))
+	} else if len(f) != 0x8000 {
+		panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
+	}
+
+	gb.CartridgeSlot.InsertCartridge(f)
 	gb.PowerOn()
-	nSeconds := 5.0
+	nSeconds := 50.0
 	<-time.After(time.Second * time.Duration(nSeconds))
 	gb.PowerOff()
-	gb.CPUCore.Dump()
+	gb.CPU.Dump()
 	fmt.Printf("ran %v ticks in %f s (%.02f %% speed)\n", i.Load(), nSeconds, 100*float64(i.Load())/(nSeconds*realFreq))
 }

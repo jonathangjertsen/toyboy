@@ -74,14 +74,11 @@ func (brl *BootROM) Range() (uint16, uint16) {
 
 func (brl *BootROM) Read(addr uint16) uint8 {
 	if brl.lock.BootOff {
-		panic("Read from BootROM with bootrom locked")
+		panicf("Read from BootROM with bootrom locked (addr=0x%04x)", addr)
 	}
 	return brl.MemoryRegion.Read(addr)
 }
 
 func (brl *BootROM) Write(addr uint16, v uint8) {
-	if brl.lock.BootOff {
-		panic("Write to BootROM with bootrom locked")
-	}
-	brl.MemoryRegion.Write(addr, v)
+	panicf("Attempted write to bootrom (addr=0x%04x v=%02x)", addr, v)
 }
