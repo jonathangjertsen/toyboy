@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 	"slices"
-	"sync"
 )
 
 var coreDebugEvents = []string{
@@ -57,12 +56,9 @@ type Interrupts struct {
 }
 
 type CPU struct {
-	m *sync.Mutex
+	PHI *Clock
 
-	PHI         *Clock
-	DataBus     uint8
-	AddressBus  uint16
-	Peripherals []Peripheral
+	Bus *Bus
 
 	Regs       RegisterFile
 	Interrupts Interrupts
@@ -297,28 +293,16 @@ func (cpu *CPU) GetWZ() uint16 {
 	return wz
 }
 
-type Peripheral interface {
-	Name() string
-	Range() (start, size uint16)
-	Read(addr uint16) uint8
-	Write(addr uint16, value uint8)
-}
-
 func NewCPU(
 	phi *Clock,
+	bus *Bus,
 ) *CPU {
 	cpu := &CPU{
-		m:   &sync.Mutex{},
 		PHI: phi,
+		Bus: bus,
 	}
 	phi.AttachDevice(cpu.fsm)
 	return cpu
-}
-
-func (cpu *CPU) AttachPeripheral(p Peripheral) {
-	cpu.m.Lock()
-	cpu.Peripherals = append(cpu.Peripherals, p)
-	cpu.m.Unlock()
 }
 
 func (cpu *CPU) Dump() {
@@ -377,9 +361,9 @@ func (cpu *CPU) memdump(start, end, highlight uint16) {
 		}
 		cpu.writeAddressBus(addr)
 		if highlight == addr {
-			fmt.Printf("[%02x]", cpu.DataBus)
+			fmt.Printf("[%02x]", cpu.Bus.Data())
 		} else {
-			fmt.Printf(" %02x ", cpu.DataBus)
+			fmt.Printf(" %02x ", cpu.Bus.Data())
 		}
 	}
 
@@ -429,7 +413,7 @@ func (cpu *CPU) fsm(c Cycle) {
 			cpu.W = 0
 			cpu.Z = 0
 			cpu.machineCycle = 1
-			cpu.Regs.IR = Opcode(cpu.DataBus)
+			cpu.Regs.IR = Opcode(cpu.Bus.Data())
 			cpu.Debug("ExecBegin", "%s", cpu.Regs.IR)
 			cpu.Debug(fmt.Sprintf("ExecBegin%s", cpu.Regs.IR), "")
 
@@ -458,49 +442,21 @@ func (cpu *CPU) writeAddressBus(addr uint16) {
 	}
 	cpu.wroteToAddressBusThisCycle = true
 	cpu.Debug("WriteAddressBus", "0x%04x", addr)
-	cpu.AddressBus = addr
-	for _, p := range cpu.Peripherals {
-		start, size := p.Range()
-		if uint32(start)+uint32(size-1) > 0xffff {
-			panic("")
-		}
-		if size > 0 && addr >= start && addr <= start+(size-1) {
-			cpu.Debug("PeriphRead", "%s @ 0x%04x", p.Name(), addr)
-			v := p.Read(addr)
-			cpu.DataBus = v
-			return
-		}
-	}
-	for _, p := range cpu.Peripherals {
-		start, size := p.Range()
-		cpu.Debug("Panic", "start=%0x size=%0x last=%0x", start, size, start+(size-1))
-	}
-	panicf("no peripheral mapped to 0x%x", addr)
+	cpu.Bus.WriteAddress(addr)
 }
 
 func (cpu *CPU) writeDataBus(v uint8) {
 	if !cpu.clockCycle.Falling {
 		panic("writeDataBus must be called on falling edge")
 	}
-	cpu.DataBus = v
-	addr := cpu.AddressBus
-	for _, p := range cpu.Peripherals {
-		start, size := p.Range()
-		if size > 0 && addr >= start && addr <= start+(size-1) {
-			p.Write(addr, v)
-			cpu.Debug("PeriphWrite", "0x%02x to %s @ 0x%04x,", v, p.Name(), addr)
-			cpu.Debug(fmt.Sprintf("Watch%04x", addr), "wrote %02x", v)
-			cpu.DataBus = v
-			return
-		}
-	}
+	cpu.Bus.WriteData(v)
 }
 
 func (cpu *CPU) readDataBus() uint8 {
 	if !cpu.clockCycle.Falling {
 		panic("readDataBus must be called on falling edge")
 	}
-	return cpu.DataBus
+	return cpu.Bus.Data()
 }
 
 func (cpu *CPU) applyPendingIME() {

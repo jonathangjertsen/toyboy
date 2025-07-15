@@ -31,33 +31,30 @@ func NewGameboy(
 	sysif SysInterface,
 ) *Gameboy {
 	clk := NewRealtimeClock(config.SystemClock)
-	ppuClock := clk.Divide(2)
-	cpuClock := clk.Divide(4)
-	cpu := NewCPU(cpuClock)
+	ppuClock := clk.Divide(1)
+	cpuClock := clk.Divide(2)
 
 	bootROMLock := NewBootROMLock()
-	cpu.AttachPeripheral(bootROMLock)
-
 	bootROM := NewBootROM(bootROMLock, config.Model)
-	cpu.AttachPeripheral(bootROM)
-
 	vram := NewMemoryRegion("VRAM", 0x8000, 0x2000)
-	cpu.AttachPeripheral(&vram)
-
 	hram := NewMemoryRegion("HRAM", 0xff80, 0x007f)
-	cpu.AttachPeripheral(&hram)
-
 	apu := NewAPU()
-	cpu.AttachPeripheral(apu)
-
 	oam := NewMemoryRegion("OAM", 0xfe00, 0xa0)
-	cpu.AttachPeripheral(&oam)
-
-	ppu := NewPPU(ppuClock, &oam, &vram, sysif)
-	cpu.AttachPeripheral(ppu)
-
 	cartridgeSlot := NewCartridgeSlot(bootROMLock)
-	cpu.AttachPeripheral(cartridgeSlot)
+
+	bus := &Bus{}
+	ppu := NewPPU(ppuClock, bus, sysif)
+
+	bus.BootROMLock = bootROMLock
+	bus.BootROM = &bootROM
+	bus.VRAM = &vram
+	bus.HRAM = &hram
+	bus.APU = apu
+	bus.OAM = &oam
+	bus.PPU = ppu
+	bus.CartridgeSlot = cartridgeSlot
+
+	cpu := NewCPU(cpuClock, bus)
 
 	soc := &Gameboy{}
 	soc.CLK = clk

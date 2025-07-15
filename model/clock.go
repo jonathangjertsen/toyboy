@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"runtime"
 	"time"
 )
 
@@ -37,42 +38,45 @@ func NewRealtimeClock(config ClockConfig) *RealtimeClock {
 		pause:  make(chan struct{}),
 		freq:   make(chan float64, 1),
 	}
-	tickInterval := time.Millisecond
-	cycleInterval := time.Duration(float64(time.Second) / config.Frequency)
+	go rtClock.run(config.Frequency)
+	return &rtClock
+}
+
+func (rtClock *RealtimeClock) run(initFreq float64) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	tickInterval := time.Millisecond * 2
+	cycleInterval := time.Duration(float64(time.Second) / initFreq)
 	cyclesPerTick := uint64(tickInterval / cycleInterval)
-	go func() {
-		var count uint64
-		<-rtClock.resume
-		ticker := time.NewTicker(tickInterval)
-		for {
-			select {
-			case <-ticker.C:
-				count = rtClock.Cycles(count, cyclesPerTick)
-			case <-rtClock.resume:
-				fmt.Printf("Ignored resume\n")
-			case <-rtClock.pause:
-				for {
-					resumed := false
-					select {
-					case <-rtClock.pause:
-						fmt.Printf("Ignored pause\n")
-					case <-rtClock.resume:
-						resumed = true
-					}
-					if resumed {
-						break
-					}
+
+	var count uint64
+	<-rtClock.resume
+	ticker := time.NewTicker(tickInterval)
+	for {
+		select {
+		case <-ticker.C:
+			count = rtClock.Cycles(count, cyclesPerTick)
+		case <-rtClock.resume:
+			fmt.Printf("Ignored resume\n")
+		case <-rtClock.pause:
+			for {
+				resumed := false
+				select {
+				case <-rtClock.pause:
+					fmt.Printf("Ignored pause\n")
+				case <-rtClock.resume:
+					resumed = true
+				}
+				if resumed {
+					break
 				}
 			}
-		}
-	}()
-	go func() {
-		for f := range rtClock.freq {
+		case f := <-rtClock.freq:
 			cycleInterval = time.Duration(float64(time.Second) / f)
 			cyclesPerTick = uint64(tickInterval / cycleInterval)
 		}
-	}()
-	return &rtClock
+	}
 }
 
 // Start the clock
@@ -115,20 +119,22 @@ func (c *Clock) AttachDevice(dev func(c Cycle)) {
 	c.devices = append(c.devices, dev)
 }
 
-func (c *Clock) Divide(div uint64) *Clock {
-	if div == 0 {
-		panic("divide clock by 0?")
-	}
-	if div == 1 {
+func (c *Clock) Divide(pow uint64) *Clock {
+	if pow == 0 {
 		return c
 	}
+	if pow > 63 {
+		panic("too big division")
+	}
+	mask := uint64((1 << pow) - 1)
+	fallV := uint64(1 << (pow - 1))
 	child := NewClock()
 	c.AttachDevice(func(cyc Cycle) {
-		d, m := cyc.C/div, cyc.C%div
+		d, m := cyc.C>>pow, cyc.C&mask
 		if !cyc.Falling && m == 0 {
 			child.Rising(d)
 		}
-		if cyc.Falling && m == (div/2) {
+		if cyc.Falling && m == fallV {
 			child.Falling(d)
 		}
 	})

@@ -41,16 +41,8 @@ func (brl *BootROMLock) Write(addr uint16, v uint8) {
 	}
 }
 
-type BootROM struct {
-	MemoryRegion
-	lock *BootROMLock
-}
-
-func NewBootROM(lock *BootROMLock, model Model) *BootROM {
-	bootrom := &BootROM{
-		MemoryRegion: NewMemoryRegion("BOOTROM", 0x0000, 0x0100),
-		lock:         lock,
-	}
+func NewBootROM(lock *BootROMLock, model Model) MemoryRegion {
+	bootrom := NewMemoryRegion("BOOTROM", 0x0000, 0x0100)
 	switch model {
 	case DMG:
 		// todo: static fs
@@ -63,22 +55,4 @@ func NewBootROM(lock *BootROMLock, model Model) *BootROM {
 		copy(bootrom.data, f)
 	}
 	return bootrom
-}
-
-func (brl *BootROM) Range() (uint16, uint16) {
-	if brl.lock.BootOff {
-		return 0x0000, 0x0000
-	}
-	return brl.MemoryRegion.Range()
-}
-
-func (brl *BootROM) Read(addr uint16) uint8 {
-	if brl.lock.BootOff {
-		panicf("Read from BootROM with bootrom locked (addr=0x%04x)", addr)
-	}
-	return brl.MemoryRegion.Read(addr)
-}
-
-func (brl *BootROM) Write(addr uint16, v uint8) {
-	panicf("Attempted write to bootrom (addr=0x%04x v=%02x)", addr, v)
 }

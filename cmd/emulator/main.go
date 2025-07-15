@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
+
+	_ "net/http/pprof"
 
 	"github.com/jonathangjertsen/toyboy/gui"
 	"github.com/jonathangjertsen/toyboy/model"
@@ -42,6 +45,12 @@ func main() {
 	var logWriter io.Writer = os.Stdout
 	var logHandler slog.Handler = tint.NewHandler(logWriter, &tint.Options{})
 	logger := slog.New(logHandler)
+	if os.Getenv("APP_ENV") == "development" {
+		logger.Info("Enabling pprof for profiling")
+		go func() {
+			logger.Info("Exited", "err", http.ListenAndServe("localhost:6060", nil))
+		}()
+	}
 	gb := model.NewGameboy(ctx, logger, hwConfig, &sysInterface{})
 	f, err := os.ReadFile("assets/cartridges/hello-world.gb")
 	if err != nil {

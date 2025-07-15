@@ -66,8 +66,7 @@ type PPU struct {
 
 	Hooks PPUHooks
 
-	OAM  Peripheral
-	VRAM Peripheral
+	Bus  *Bus
 	Mode PPUMode
 
 	OAMBuffer      [10]Sprite
@@ -249,10 +248,9 @@ func (ppu *PPU) SetOBP1(v uint8) {
 	panic("not implemented: SetOBP1")
 }
 
-func NewPPU(clock *Clock, oam, vram Peripheral, hooks PPUHooks) *PPU {
+func NewPPU(clock *Clock, bus *Bus, hooks PPUHooks) *PPU {
 	ppu := &PPU{
-		OAM:   oam,
-		VRAM:  vram,
+		Bus:   bus,
 		Hooks: hooks,
 	}
 	ppu.BackgroundFetcher.PPU = ppu
@@ -365,10 +363,10 @@ func (ppu *PPU) fsmOAMScan() {
 
 	// Read sprite out of OAM
 	var sprite Sprite
-	sprite.Y = ppu.OAM.Read(0xfe00 + index*4 + 0)
-	sprite.X = ppu.OAM.Read(0xfe00 + index*4 + 1)
-	sprite.TileIndex = ppu.OAM.Read(0xfe00 + index*4 + 2)
-	sprite.Attributes = ppu.OAM.Read(0xfe00 + index*4 + 3)
+	sprite.Y = ppu.Bus.OAM.Read(0xfe00 + index*4 + 0)
+	sprite.X = ppu.Bus.OAM.Read(0xfe00 + index*4 + 1)
+	sprite.TileIndex = ppu.Bus.OAM.Read(0xfe00 + index*4 + 2)
+	sprite.Attributes = ppu.Bus.OAM.Read(0xfe00 + index*4 + 3)
 
 	// Check if sprite should be added to buffer
 	if len(ppu.OAMBuffer) >= 10 {
@@ -473,7 +471,7 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 	offsetY &= 0x3ff
 	addr += offsetY
 
-	bgf.TileIndex = bgf.PPU.VRAM.Read(addr)
+	bgf.TileIndex = bgf.PPU.Bus.VRAM.Read(addr)
 }
 
 func (bgf *BackgroundFetcher) fetchTileLSB() {
@@ -493,11 +491,11 @@ func (bgf *BackgroundFetcher) fetchTileLSB() {
 		addr += 2 * uint16((bgf.PPU.RegLY+bgf.PPU.RegSCY)%8)
 	}
 	bgf.TileLSBAddr = addr
-	bgf.TileLSB = bgf.PPU.VRAM.Read(addr)
+	bgf.TileLSB = bgf.PPU.Bus.VRAM.Read(addr)
 }
 
 func (bgf *BackgroundFetcher) fetchTileMSB() {
-	bgf.TileMSB = bgf.PPU.VRAM.Read(bgf.TileLSBAddr + 1)
+	bgf.TileMSB = bgf.PPU.Bus.VRAM.Read(bgf.TileLSBAddr + 1)
 }
 
 func (bgf *BackgroundFetcher) windowReached() bool {
@@ -601,11 +599,11 @@ func (sf *SpriteFetcher) fetchTileLSB() {
 	// TODO: what about window?
 	addr += 2 * uint16((sf.PPU.RegLY+sf.PPU.RegSCY)%8)
 	sf.TileLSBAddr = addr
-	sf.TileLSB = sf.PPU.VRAM.Read(addr)
+	sf.TileLSB = sf.PPU.Bus.VRAM.Read(addr)
 }
 
 func (sf *SpriteFetcher) fetchTileMSB() {
-	sf.TileMSB = sf.PPU.VRAM.Read(sf.TileLSBAddr + 1)
+	sf.TileMSB = sf.PPU.Bus.VRAM.Read(sf.TileLSBAddr + 1)
 }
 
 func (sf *SpriteFetcher) pushFIFO() bool {

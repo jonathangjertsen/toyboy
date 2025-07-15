@@ -60,6 +60,7 @@ func (gui *GUI) Run() {
 	window := new(app.Window)
 	window.Option(app.Title("toyboy"))
 	window.Option(app.Size(unit.Dp(1080), unit.Dp(720)))
+	gui.SpeedInput.SetText("999")
 	err := run(window, gui)
 	if err != nil {
 		log.Fatal(err)
