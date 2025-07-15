@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -56,8 +57,21 @@ func NewRealtimeClock(config ClockConfig) *RealtimeClock {
 				rtClock.m.Lock()
 				count = rtClock.Cycles(count, cyclesPerTick)
 				rtClock.m.Unlock()
+			case <-rtClock.resume:
+				fmt.Printf("Ignored resume\n")
 			case <-rtClock.pause:
-				<-rtClock.resume
+				for {
+					resumed := false
+					select {
+					case <-rtClock.pause:
+						fmt.Printf("Ignored pause\n")
+					case <-rtClock.resume:
+						resumed = true
+					}
+					if resumed {
+						break
+					}
+				}
 			}
 		}
 	}()

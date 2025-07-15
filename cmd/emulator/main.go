@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jonathangjertsen/toyboy/gui"
 	"github.com/jonathangjertsen/toyboy/model"
 	"github.com/lmittmann/tint"
 )
@@ -40,6 +41,7 @@ func (si *sysInterface) FrameCompleted(vp model.ViewPort) {
 }
 
 func main() {
+
 	ctx := context.Background()
 
 	var logWriter io.Writer = os.Stdout
@@ -62,6 +64,11 @@ func main() {
 	}
 
 	gb.CartridgeSlot.InsertCartridge(f)
+
+	g := gui.New(gb)
+	go g.Run()
+	gui.Main()
+
 	gb.PowerOn()
 	nSeconds := 1.0
 	<-time.After(time.Second * time.Duration(nSeconds))
