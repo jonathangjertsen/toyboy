@@ -15,14 +15,6 @@ func NewBootROMLock() *BootROMLock {
 	return &BootROMLock{}
 }
 
-func (brl *BootROMLock) Name() string {
-	return "BOOTROMLOCK"
-}
-
-func (brl *BootROMLock) Range() (uint16, uint16) {
-	return 0xff50, 0x0001
-}
-
 func (brl *BootROMLock) Read(addr uint16) uint8 {
 	if addr == 0xff50 {
 		return brl.RegBootROMLock
@@ -41,7 +33,7 @@ func (brl *BootROMLock) Write(addr uint16, v uint8) {
 	}
 }
 
-func NewBootROM(lock *BootROMLock, model Model) MemoryRegion {
+func NewBootROM(model Model) MemoryRegion {
 	bootrom := NewMemoryRegion("BOOTROM", 0x0000, 0x0100)
 	switch model {
 	case DMG:

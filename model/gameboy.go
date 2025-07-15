@@ -35,12 +35,12 @@ func NewGameboy(
 	cpuClock := clk.Divide(2)
 
 	bootROMLock := NewBootROMLock()
-	bootROM := NewBootROM(bootROMLock, config.Model)
+	bootROM := NewBootROM(config.Model)
 	vram := NewMemoryRegion("VRAM", 0x8000, 0x2000)
 	hram := NewMemoryRegion("HRAM", 0xff80, 0x007f)
 	apu := NewAPU()
 	oam := NewMemoryRegion("OAM", 0xfe00, 0xa0)
-	cartridgeSlot := NewCartridgeSlot(bootROMLock)
+	cartridgeSlot := NewCartridgeSlot()
 
 	bus := &Bus{}
 	ppu := NewPPU(ppuClock, bus, sysif)

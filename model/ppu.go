@@ -739,14 +739,6 @@ func (ppu *PPU) fsmHBlank() {
 	}
 }
 
-func (ppu *PPU) Name() string {
-	return "LCD"
-}
-
-func (ppu *PPU) Range() (uint16, uint16) {
-	return 0xff40, 0x000c
-}
-
 func (ppu *PPU) Read(addr uint16) uint8 {
 	switch addr {
 	case 0xff40:

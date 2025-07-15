@@ -219,14 +219,6 @@ func (apu *APU) Enabled() bool {
 	return apu.MasterCtl&0x80 != 0
 }
 
-func (apu *APU) Name() string {
-	return "AUDIO"
-}
-
-func (apu *APU) Range() (uint16, uint16) {
-	return 0xff10, 0x0017
-}
-
 func (apu *APU) Read(addr uint16) uint8 {
 	switch addr {
 	case 0xff10:
