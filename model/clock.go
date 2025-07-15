@@ -5,11 +5,8 @@ import (
 	"time"
 )
 
-type Callback func(c Cycle)
-
 type Clock struct {
-	rising  []Callback
-	falling []Callback
+	devices []func(c Cycle)
 }
 
 type Cycle struct {
@@ -91,11 +88,19 @@ func (rtClock *RealtimeClock) Stop() {
 }
 
 func (c *Clock) Cycle(currCycle uint64) {
-	for _, cb := range c.rising {
-		cb(Cycle{currCycle, false})
+	c.Rising(currCycle)
+	c.Falling(currCycle)
+}
+
+func (c *Clock) Rising(currCycle uint64) {
+	for _, dev := range c.devices {
+		dev(Cycle{currCycle, false})
 	}
-	for _, cb := range c.falling {
-		cb(Cycle{currCycle, true})
+}
+
+func (c *Clock) Falling(currCycle uint64) {
+	for _, dev := range c.devices {
+		dev(Cycle{currCycle, true})
 	}
 }
 
@@ -106,29 +111,26 @@ func (c *Clock) Cycles(currCycle uint64, n uint64) uint64 {
 	return currCycle + n
 }
 
-func (c *Clock) AddRiseCallback(cb Callback) {
-	c.rising = append(c.rising, cb)
-}
-
-func (c *Clock) AddFallCallback(cb Callback) {
-	c.falling = append(c.falling, cb)
+func (c *Clock) AttachDevice(dev func(c Cycle)) {
+	c.devices = append(c.devices, dev)
 }
 
 func (c *Clock) Divide(div uint64) *Clock {
+	if div == 0 {
+		panic("divide clock by 0?")
+	}
+	if div == 1 {
+		return c
+	}
 	child := NewClock()
-	c.AddRiseCallback(func(cyc Cycle) {
+	c.AttachDevice(func(cyc Cycle) {
 		d, m := cyc.C/div, cyc.C%div
-		if m == 0 {
-			child.Cycle(d)
+		if !cyc.Falling && m == 0 {
+			child.Rising(d)
 		}
-	})
-	return child
-}
-
-func (c *Clock) Invert(div uint64) *Clock {
-	child := NewClock()
-	c.AddFallCallback(func(cyc Cycle) {
-		child.Cycle(cyc.C)
+		if cyc.Falling && m == (div/2) {
+			child.Falling(d)
+		}
 	})
 	return child
 }

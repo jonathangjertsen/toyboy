@@ -38,8 +38,10 @@ type GUI struct {
 
 func New(gb *model.Gameboy) *GUI {
 	cm := plugin.NewClockMeasurement()
-	gb.PHI.AddRiseCallback(func(c model.Cycle) {
-		cm.Clocked()
+	gb.PHI.AttachDevice(func(c model.Cycle) {
+		if c.Falling {
+			cm.Clocked()
+		}
 	})
 	return &GUI{
 		GB:               gb,

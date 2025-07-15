@@ -259,7 +259,7 @@ func NewPPU(clock *Clock, oam, vram Peripheral, hooks PPUHooks) *PPU {
 	ppu.SpriteFetcher.PPU = ppu
 	ppu.PixelShifter.PPU = ppu
 	ppu.beginFrame()
-	clock.AddRiseCallback(ppu.fsm)
+	clock.AttachDevice(ppu.fsm)
 	return ppu
 }
 

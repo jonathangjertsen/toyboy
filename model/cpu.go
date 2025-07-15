@@ -311,8 +311,7 @@ func NewCPU(
 		m:   &sync.Mutex{},
 		PHI: phi,
 	}
-	phi.AddRiseCallback(cpu.fsm)
-	phi.AddFallCallback(cpu.fsm)
+	phi.AttachDevice(cpu.fsm)
 	return cpu
 }
 
