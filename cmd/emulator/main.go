@@ -58,7 +58,7 @@ func main() {
 	} else if len(f) != 0x8000 {
 		panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
 	}
-	gb.CartridgeSlot.InsertCartridge(f)
+	copy(gb.CartridgeSlot.Data, f)
 	g := gui.New(gb)
 	go g.Run()
 	gui.Main()

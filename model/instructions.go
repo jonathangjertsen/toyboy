@@ -305,13 +305,13 @@ var handlers = map[Opcode]InstructionHandling{
 		a := cpu.Regs.A
 		bit7 := a & 0x80
 		a <<= 1
-		if cpu.GetFlagC() {
+		if cpu.Regs.GetFlagC() {
 			a |= 0x01
 		}
-		cpu.SetFlagZ(false)
-		cpu.SetFlagN(false)
-		cpu.SetFlagH(false)
-		cpu.SetFlagC(bit7 != 0)
+		cpu.Regs.SetFlagZ(false)
+		cpu.Regs.SetFlagN(false)
+		cpu.Regs.SetFlagH(false)
+		cpu.Regs.SetFlagC(bit7 != 0)
 		cpu.Regs.A = a
 	}),
 	OpcodeORA:  orreg(func(cpu *CPU) uint8 { return cpu.Regs.A }),
@@ -376,12 +376,12 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		// TODO: this impl is not exactly correct
 		case edge{2, false}:
 		case edge{2, true}:
 		case edge{3, false}:
-			cpu.SetPC(uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Z))))
+			cpu.SetPC(uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ))))
 			return true
 		case edge{3, true}:
 			return true
@@ -396,16 +396,16 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{2, true}:
-			cpu.W = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
 		case edge{3, true}:
 		case edge{4, false}:
-			cpu.SetPC(cpu.GetWZ())
+			cpu.SetPC(cpu.Regs.GetWZ())
 			return true
 		case edge{4, true}:
 			return true
@@ -414,14 +414,14 @@ var handlers = map[Opcode]InstructionHandling{
 		}
 		return false
 	},
-	OpcodeJRZe:   jrcce(func(cpu *CPU) bool { return cpu.GetFlagZ() }),
-	OpcodeJRCe:   jrcce(func(cpu *CPU) bool { return cpu.GetFlagC() }),
-	OpcodeJRNZe:  jrcce(func(cpu *CPU) bool { return !cpu.GetFlagZ() }),
-	OpcodeJRNCe:  jrcce(func(cpu *CPU) bool { return !cpu.GetFlagC() }),
-	OpcodeJPCnn:  jpccnn(func(cpu *CPU) bool { return cpu.GetFlagC() }),
-	OpcodeJPNCnn: jpccnn(func(cpu *CPU) bool { return !cpu.GetFlagC() }),
-	OpcodeJPZnn:  jpccnn(func(cpu *CPU) bool { return cpu.GetFlagZ() }),
-	OpcodeJPNZnn: jpccnn(func(cpu *CPU) bool { return !cpu.GetFlagZ() }),
+	OpcodeJRZe:   jrcce(func(cpu *CPU) bool { return cpu.Regs.GetFlagZ() }),
+	OpcodeJRCe:   jrcce(func(cpu *CPU) bool { return cpu.Regs.GetFlagC() }),
+	OpcodeJRNZe:  jrcce(func(cpu *CPU) bool { return !cpu.Regs.GetFlagZ() }),
+	OpcodeJRNCe:  jrcce(func(cpu *CPU) bool { return !cpu.Regs.GetFlagC() }),
+	OpcodeJPCnn:  jpccnn(func(cpu *CPU) bool { return cpu.Regs.GetFlagC() }),
+	OpcodeJPNCnn: jpccnn(func(cpu *CPU) bool { return !cpu.Regs.GetFlagC() }),
+	OpcodeJPZnn:  jpccnn(func(cpu *CPU) bool { return cpu.Regs.GetFlagZ() }),
+	OpcodeJPNZnn: jpccnn(func(cpu *CPU) bool { return !cpu.Regs.GetFlagZ() }),
 	OpcodeINCBC:  iduOp(func(cpu *CPU) { cpu.SetBC(cpu.GetBC() + 1) }),
 	OpcodeINCDE:  iduOp(func(cpu *CPU) { cpu.SetDE(cpu.GetDE() + 1) }),
 	OpcodeINCHL:  iduOp(func(cpu *CPU) { cpu.SetHL(cpu.GetHL() + 1) }),
@@ -436,12 +436,12 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{2, true}:
-			cpu.W = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
 			cpu.SetSP(cpu.Regs.SP - 1)
 		case edge{3, true}:
@@ -455,7 +455,7 @@ var handlers = map[Opcode]InstructionHandling{
 		case edge{5, true}:
 			cpu.writeDataBus(lsb(cpu.Regs.PC))
 		case edge{6, false}:
-			cpu.SetPC(cpu.GetWZ())
+			cpu.SetPC(cpu.Regs.GetWZ())
 			return true
 		case edge{6, true}:
 			return true
@@ -470,14 +470,14 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
 		case edge{2, true}:
-			cpu.W = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
-			cpu.SetPC(cpu.GetWZ())
+			cpu.SetPC(cpu.Regs.GetWZ())
 		case edge{3, true}:
 		case edge{4, false}, edge{4, true}:
 			return true
@@ -515,14 +515,14 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
 		case edge{2, true}:
-			cpu.W = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
-			cpu.SetBC(cpu.GetWZ())
+			cpu.SetBC(cpu.Regs.GetWZ())
 			return true
 		case edge{3, true}:
 			return true
@@ -560,10 +560,10 @@ var handlers = map[Opcode]InstructionHandling{
 			carry := uint16(cpu.Regs.A)+uint16(data) > 256
 			result := cpu.Regs.A + data
 			cpu.Regs.A = result
-			cpu.SetFlagZ(result == 0)
-			cpu.SetFlagN(false)
-			cpu.TODOFlagH()
-			cpu.SetFlagC(carry)
+			cpu.Regs.SetFlagZ(result == 0)
+			cpu.Regs.SetFlagN(false)
+			cpu.Regs.TODOFlagH()
+			cpu.Regs.SetFlagC(carry)
 		case edge{2, false}, edge{2, true}:
 			return true
 		default:
@@ -579,10 +579,10 @@ var handlers = map[Opcode]InstructionHandling{
 			data := cpu.readDataBus()
 			carry := data > cpu.Regs.A
 			result := cpu.Regs.A - data
-			cpu.SetFlagZ(result == 0)
-			cpu.SetFlagN(true)
-			cpu.TODOFlagH()
-			cpu.SetFlagC(carry)
+			cpu.Regs.SetFlagZ(result == 0)
+			cpu.Regs.SetFlagN(true)
+			cpu.Regs.TODOFlagH()
+			cpu.Regs.SetFlagC(carry)
 		case edge{2, false}, edge{2, true}:
 			return true
 		default:
@@ -596,14 +596,14 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{2, true}:
-			cpu.W = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
-			cpu.writeAddressBus(cpu.GetWZ())
+			cpu.writeAddressBus(cpu.Regs.GetWZ())
 		case edge{3, true}:
 			cpu.writeDataBus(cpu.Regs.A)
 		case edge{4, false}, edge{4, true}:
@@ -619,14 +619,14 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{2, true}:
-			cpu.W = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
-			cpu.writeAddressBus(cpu.GetWZ())
+			cpu.writeAddressBus(cpu.Regs.GetWZ())
 		case edge{3, true}:
 			cpu.Regs.A = cpu.readDataBus()
 		case edge{4, false}, edge{4, true}:
@@ -642,17 +642,17 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			return true
 		case edge{2, true}:
-			cpu.Debug("CPn", "A=%02x n=%02x", cpu.Regs.A, cpu.Z)
-			carry := cpu.Regs.A < cpu.Z
-			result := cpu.Regs.A - cpu.Z
-			cpu.SetFlagZ(result == 0)
-			cpu.SetFlagN(true)
-			cpu.TODOFlagH()
-			cpu.SetFlagC(carry)
+			cpu.Debug("CPn", "A=%02x n=%02x", cpu.Regs.A, cpu.Regs.TempZ)
+			carry := cpu.Regs.A < cpu.Regs.TempZ
+			result := cpu.Regs.A - cpu.Regs.TempZ
+			cpu.Regs.SetFlagZ(result == 0)
+			cpu.Regs.SetFlagN(true)
+			cpu.Regs.TODOFlagH()
+			cpu.Regs.SetFlagC(carry)
 			return true
 		default:
 			panicv(e)
@@ -664,9 +664,9 @@ var handlers = map[Opcode]InstructionHandling{
 		case edge{1, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
-			cpu.writeAddressBus(join16(0xff, cpu.Z))
+			cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
 			cpu.IncPC()
 		case edge{2, true}:
 			cpu.writeDataBus(cpu.Regs.A)
@@ -683,15 +683,15 @@ var handlers = map[Opcode]InstructionHandling{
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
-			cpu.writeAddressBus(join16(0xff, cpu.Z))
+			cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
 		case edge{2, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{3, false}:
 			return true
 		case edge{3, true}:
-			cpu.Regs.A = cpu.Z
+			cpu.Regs.A = cpu.Regs.TempZ
 			return true
 		default:
 			panicv(e)
@@ -703,11 +703,11 @@ var handlers = map[Opcode]InstructionHandling{
 		case edge{1, false}:
 			cpu.writeAddressBus(join16(cpu.Regs.D, cpu.Regs.E))
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			return true
 		case edge{2, true}:
-			cpu.Regs.A = cpu.Z
+			cpu.Regs.A = cpu.Regs.TempZ
 			return true
 		default:
 			panicv(e)
@@ -758,13 +758,13 @@ var handlers = map[Opcode]InstructionHandling{
 			case CbRL:
 				bit7 := val & 0x80
 				val <<= 1
-				if cpu.GetFlagC() {
+				if cpu.Regs.GetFlagC() {
 					val |= 0x01
 				}
-				cpu.SetFlagZ(val == 0)
-				cpu.SetFlagN(false)
-				cpu.SetFlagH(false)
-				cpu.SetFlagC(bit7 != 0)
+				cpu.Regs.SetFlagZ(val == 0)
+				cpu.Regs.SetFlagN(false)
+				cpu.Regs.SetFlagH(false)
+				cpu.Regs.SetFlagC(bit7 != 0)
 			case CbBit0:
 				cbbit(cpu, val, 0x01)
 			case CbBit1:
@@ -834,7 +834,7 @@ func jrcce(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			if f(cpu) {
 			} else {
@@ -842,14 +842,14 @@ func jrcce(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
 			}
 		case edge{2, true}:
 			if f(cpu) {
-				newPC := uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Z)))
-				cpu.SetWZ(newPC)
+				newPC := uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ)))
+				cpu.Regs.SetWZ(newPC)
 			} else {
 				return true
 			}
 		case edge{3, false}:
 			if f(cpu) {
-				cpu.SetPC(cpu.GetWZ())
+				cpu.SetPC(cpu.Regs.GetWZ())
 				return true
 			} else {
 				panicv(e)
@@ -874,15 +874,15 @@ func jpccnn(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{2, true}:
-			cpu.W = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
 			if f(cpu) {
-				cpu.SetPC(cpu.GetWZ())
+				cpu.SetPC(cpu.Regs.GetWZ())
 			} else {
 				return true
 			}
@@ -914,10 +914,10 @@ func andreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 	return singleCycle(func(cpu *CPU) {
 		reg := f(cpu)
 		cpu.Regs.A &= reg
-		cpu.SetFlagZ(cpu.Regs.A == 0)
-		cpu.SetFlagN(false)
-		cpu.SetFlagH(true)
-		cpu.SetFlagC(false)
+		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
+		cpu.Regs.SetFlagN(false)
+		cpu.Regs.SetFlagH(true)
+		cpu.Regs.SetFlagC(false)
 	})
 }
 
@@ -925,10 +925,10 @@ func xorreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 	return singleCycle(func(cpu *CPU) {
 		reg := f(cpu)
 		cpu.Regs.A ^= reg
-		cpu.SetFlagZ(cpu.Regs.A == 0)
-		cpu.SetFlagN(false)
-		cpu.SetFlagH(false)
-		cpu.SetFlagC(false)
+		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
+		cpu.Regs.SetFlagN(false)
+		cpu.Regs.SetFlagH(false)
+		cpu.Regs.SetFlagC(false)
 	})
 }
 
@@ -936,10 +936,10 @@ func orreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 	return singleCycle(func(cpu *CPU) {
 		reg := f(cpu)
 		cpu.Regs.A |= reg
-		cpu.SetFlagZ(cpu.Regs.A == 0)
-		cpu.SetFlagN(false)
-		cpu.SetFlagH(false)
-		cpu.SetFlagC(false)
+		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
+		cpu.Regs.SetFlagN(false)
+		cpu.Regs.SetFlagH(false)
+		cpu.Regs.SetFlagC(false)
 	})
 }
 
@@ -948,10 +948,10 @@ func addreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 		reg := f(cpu)
 		carry := uint16(reg)+uint16(cpu.Regs.A) > 256
 		cpu.Regs.A += reg
-		cpu.SetFlagZ(cpu.Regs.A == 0)
-		cpu.SetFlagN(false)
-		cpu.TODOFlagH()
-		cpu.SetFlagC(carry)
+		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
+		cpu.Regs.SetFlagN(false)
+		cpu.Regs.TODOFlagH()
+		cpu.Regs.SetFlagC(carry)
 	})
 }
 
@@ -960,10 +960,10 @@ func subreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 		reg := f(cpu)
 		carry := reg > cpu.Regs.A
 		cpu.Regs.A -= reg
-		cpu.SetFlagZ(cpu.Regs.A == 0)
-		cpu.SetFlagN(true)
-		cpu.TODOFlagH()
-		cpu.SetFlagC(carry)
+		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
+		cpu.Regs.SetFlagN(true)
+		cpu.Regs.TODOFlagH()
+		cpu.Regs.SetFlagC(carry)
 	})
 }
 
@@ -971,9 +971,9 @@ func decreg(f func(cpu *CPU) *uint8) func(cpu *CPU, e edge) bool {
 	return singleCycle(func(cpu *CPU) {
 		reg := f(cpu)
 		*reg -= 1
-		cpu.SetFlagZ(*reg == 0)
-		cpu.SetFlagN(true)
-		cpu.TODOFlagH()
+		cpu.Regs.SetFlagZ(*reg == 0)
+		cpu.Regs.SetFlagN(true)
+		cpu.Regs.TODOFlagH()
 	})
 }
 
@@ -981,9 +981,9 @@ func increg(f func(cpu *CPU) *uint8) func(cpu *CPU, e edge) bool {
 	return singleCycle(func(cpu *CPU) {
 		reg := f(cpu)
 		*reg += 1
-		cpu.SetFlagZ(*reg == 0)
-		cpu.SetFlagN(false)
-		cpu.TODOFlagH()
+		cpu.Regs.SetFlagZ(*reg == 0)
+		cpu.Regs.SetFlagN(false)
+		cpu.Regs.TODOFlagH()
 	})
 }
 
@@ -1008,12 +1008,12 @@ func ldrn(f func(cpu *CPU, z uint8)) func(cpu *CPU, e edge) bool {
 		case edge{1, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.IncPC()
 			return true
 		case edge{2, true}:
-			f(cpu, cpu.Z)
+			f(cpu, cpu.Regs.TempZ)
 			return true
 		default:
 			panicv(e)
@@ -1048,14 +1048,14 @@ func ldxxnn(f func(cpu *CPU, wz uint16)) func(cpu *CPU, e edge) bool {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Z = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{2, true}:
-			cpu.W = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
-			f(cpu, join16(cpu.W, cpu.Z))
+			f(cpu, join16(cpu.Regs.TempW, cpu.Regs.TempZ))
 			return true
 		case edge{3, true}:
 			return true
@@ -1067,7 +1067,7 @@ func ldxxnn(f func(cpu *CPU, wz uint16)) func(cpu *CPU, e edge) bool {
 }
 
 func cbbit(cpu *CPU, val, mask uint8) {
-	cpu.SetFlagZ(val&mask == 0)
-	cpu.SetFlagN(false)
-	cpu.SetFlagH(true)
+	cpu.Regs.SetFlagZ(val&mask == 0)
+	cpu.Regs.SetFlagN(false)
+	cpu.Regs.SetFlagH(true)
 }

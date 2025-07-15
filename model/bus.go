@@ -11,7 +11,7 @@ type Bus struct {
 	APU           *APU
 	OAM           *MemoryRegion
 	PPU           *PPU
-	CartridgeSlot *CartridgeSlot
+	CartridgeSlot *MemoryRegion
 }
 
 func (b *Bus) WriteAddress(addr uint16) {

@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"os"
 	"slices"
 )
 
@@ -34,20 +35,6 @@ var coreDumpEvents = []string{
 	// "Watchfffc",
 }
 
-type RegisterFile struct {
-	A  uint8
-	F  uint8
-	B  uint8
-	C  uint8
-	D  uint8
-	E  uint8
-	H  uint8
-	L  uint8
-	PC uint16
-	SP uint16
-	IR Opcode
-}
-
 type Interrupts struct {
 	IF              uint8
 	IE              uint8
@@ -63,8 +50,6 @@ type CPU struct {
 	Regs       RegisterFile
 	Interrupts Interrupts
 
-	Z    uint8
-	W    uint8
 	CBOp CBOp
 
 	machineCycle int
@@ -188,65 +173,6 @@ func msb(w uint16) uint8 {
 func lsb(w uint16) uint8 {
 	return uint8(w & 0xff)
 }
-
-func (cpu *CPU) setFlag(mask uint8, v bool) {
-	if v {
-		cpu.Regs.F |= mask
-	} else {
-		cpu.Regs.F &= ^mask
-	}
-}
-
-func (cpu *CPU) getFlag(mask uint8) bool {
-	return (cpu.Regs.F & mask) == mask
-}
-
-func (cpu *CPU) GetFlagZ() bool {
-	v := cpu.getFlag(0x80)
-	cpu.Debug("GetFlagZ", "F=%x Z=%v", cpu.Regs.F, v)
-	return v
-}
-
-func (cpu *CPU) SetFlagZ(v bool) {
-	cpu.setFlag(0x80, v)
-	cpu.Debug("SetFlagZ", "F=%x Z=%v", cpu.Regs.F, v)
-}
-
-func (cpu *CPU) GetFlagN() bool {
-	return cpu.getFlag(0x40)
-}
-
-func (cpu *CPU) SetFlagN(v bool) {
-	cpu.Debug("SetFlagN", "%v", v)
-	cpu.setFlag(0x40, v)
-}
-
-func (cpu *CPU) GetFlagH() bool {
-	return cpu.getFlag(0x20)
-}
-
-func (cpu *CPU) SetFlagH(v bool) {
-	cpu.Debug("SetFlagH", "%v", v)
-	cpu.setFlag(0x20, v)
-}
-
-func (cpu *CPU) TODOFlagN() {
-	cpu.Debug("NotImplemented", "Set BCD subtraction flag")
-}
-
-func (cpu *CPU) TODOFlagH() {
-	cpu.Debug("NotImplemented", "Set BCD half-carry flag")
-}
-
-func (cpu *CPU) GetFlagC() bool {
-	return cpu.getFlag(0x10)
-}
-
-func (cpu *CPU) SetFlagC(v bool) {
-	cpu.Debug("SetFlagC", "%v", v)
-	cpu.setFlag(0x10, v)
-}
-
 func (cpu *CPU) SetPC(pc uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetPC must be called on rising edge")
@@ -281,18 +207,6 @@ func (cpu *CPU) Debug(event string, f string, v ...any) {
 	}
 }
 
-func (cpu *CPU) SetWZ(v uint16) {
-	cpu.W = uint8(v >> 8)
-	cpu.Z = uint8(v)
-	wz := (uint16(cpu.W) << 8) | uint16(cpu.Z)
-	cpu.Debug("SetWZ", "%v", wz)
-}
-
-func (cpu *CPU) GetWZ() uint16 {
-	wz := (uint16(cpu.W) << 8) | uint16(cpu.Z)
-	return wz
-}
-
 func NewCPU(
 	phi *Clock,
 	bus *Bus,
@@ -309,35 +223,9 @@ func (cpu *CPU) Dump() {
 	cpu.inCoreDump = true
 	defer func() { cpu.inCoreDump = false }()
 
-	fmt.Printf("\n--------\nCore dump:\n")
-	fmt.Printf("PC = 0x%04x\n", cpu.Regs.PC)
-	fmt.Printf("SP = 0x%04x\n", cpu.Regs.SP)
-	fmt.Printf("A  =   0x%02x\n", cpu.Regs.A)
-	fmt.Printf("F  =   0x%02x (Z=%v, H=%v, N=%v C=%v)\n", cpu.Regs.F, cpu.GetFlagZ(), cpu.GetFlagH(), cpu.GetFlagN(), cpu.GetFlagC())
-	fmt.Printf("B  =   0x%02x\n", cpu.Regs.B)
-	fmt.Printf("C  =   0x%02x\n", cpu.Regs.C)
-	fmt.Printf("D  =   0x%02x\n", cpu.Regs.D)
-	fmt.Printf("E  =   0x%02x\n", cpu.Regs.E)
-	fmt.Printf("H  =   0x%02x\n", cpu.Regs.H)
-	fmt.Printf("L  =   0x%02x\n", cpu.Regs.L)
-	fmt.Printf("W  =   0x%02x\n", cpu.W)
-	fmt.Printf("Z  =   0x%02x\n", cpu.Z)
-	fmt.Printf("IR =   0x%02x\n", uint8(cpu.Regs.IR))
-	fmt.Printf("--------\n")
-	fmt.Printf("Code (PC highlighted)\n")
-	start := uint16(0)
-	if cpu.Regs.PC > 0x40 {
-		start = cpu.Regs.PC - 0x40
-	}
-	end := uint16(0xffff)
-	if cpu.Regs.PC < 0xffff-0x40 {
-		end = cpu.Regs.PC + 0x40
-	}
-	cpu.memdump(start, end, cpu.Regs.PC-1)
-	fmt.Printf("--------\n")
-	fmt.Printf("HRAM (SP highlighted):\n")
-	cpu.memdump(0xff80, 0xfffe, cpu.Regs.SP)
-	fmt.Printf("--------\n")
+	cd := cpu.GetCoreDump()
+	cd.Print(os.Stdout)
+
 	fmt.Printf("Last executed instructions:\n")
 	for i := (cpu.rewindBufferIdx + 1) % len(cpu.rewindBuffer); i != cpu.rewindBufferIdx; i = (i + 1) % len(cpu.rewindBuffer) {
 		fmt.Printf("[PC=%04x] %s\n", cpu.rewindBuffer[i].PC, cpu.rewindBuffer[i].Opcode)
@@ -345,33 +233,34 @@ func (cpu *CPU) Dump() {
 	fmt.Printf("--------\n")
 }
 
-func (cpu *CPU) memdump(start, end, highlight uint16) {
-	alignedStart := (start / 0x10) * 0x10
-	for addr := alignedStart; addr < start; addr++ {
-		if addr%0x10 == 0 {
-			fmt.Printf("\n %04x |", addr)
-		}
-
-		fmt.Printf(" .. ")
+func (cpu *CPU) GetCoreDump() CoreDump {
+	var cd CoreDump
+	cd.Regs = cpu.Regs
+	cd.ProgramStart = uint16(0)
+	if cpu.Regs.PC > 0x40 {
+		cd.ProgramStart = cpu.Regs.PC - 0x40
 	}
+	cd.ProgramStart = (cd.ProgramStart / 0x10) * 0x10
 
+	cd.ProgramEnd = uint16(0xffff)
+	if cpu.Regs.PC < 0xffff-0x40 {
+		cd.ProgramEnd = cpu.Regs.PC + 0x40
+	}
+	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
+	cd.Program = cpu.getmem(cd.ProgramStart, cd.ProgramEnd)
+	cd.HRAM = cpu.getmem(0xff80, 0xfffe)
+	cd.OAM = cpu.getmem(0xfe00, 0xfe99)
+	cd.VRAM = cpu.getmem(0x8000, 0x9fff)
+	return cd
+}
+
+func (cpu *CPU) getmem(start, end uint16) []uint8 {
+	out := make([]uint8, end-start+1)
 	for addr := start; addr <= end; addr++ {
-		if addr%0x10 == 0 {
-			fmt.Printf("\n %04x |", addr)
-		}
-		cpu.writeAddressBus(addr)
-		if highlight == addr {
-			fmt.Printf("[%02x]", cpu.Bus.Data())
-		} else {
-			fmt.Printf(" %02x ", cpu.Bus.Data())
-		}
+		cpu.Bus.WriteAddress(addr)
+		out[addr-start] = cpu.Bus.Data()
 	}
-
-	alignedEnd := (end/0x10)*0x10 + 0x10 - 1
-	for addr := end; addr < alignedEnd; addr++ {
-		fmt.Printf(" .. ")
-	}
-	fmt.Printf("\n")
+	return out
 }
 
 func (cpu *CPU) fsm(c Cycle) {
@@ -410,8 +299,7 @@ func (cpu *CPU) fsm(c Cycle) {
 			cpu.IncPC()
 		} else {
 			cpu.Debug("ExecDone", "")
-			cpu.W = 0
-			cpu.Z = 0
+			cpu.Regs.SetWZ(0)
 			cpu.machineCycle = 1
 			cpu.Regs.IR = Opcode(cpu.Bus.Data())
 			cpu.Debug("ExecBegin", "%s", cpu.Regs.IR)

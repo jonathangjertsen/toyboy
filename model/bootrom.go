@@ -34,7 +34,7 @@ func (brl *BootROMLock) Write(addr uint16, v uint8) {
 }
 
 func NewBootROM(model Model) MemoryRegion {
-	bootrom := NewMemoryRegion("BOOTROM", 0x0000, 0x0100)
+	bootrom := NewMemoryRegion(0x0000, 0x0100)
 	switch model {
 	case DMG:
 		// todo: static fs
@@ -44,7 +44,7 @@ func NewBootROM(model Model) MemoryRegion {
 		} else if len(f) != 256 {
 			panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
 		}
-		copy(bootrom.data, f)
+		copy(bootrom.Data, f)
 	}
 	return bootrom
 }

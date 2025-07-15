@@ -9,7 +9,7 @@ type Gameboy struct {
 	CLK           *RealtimeClock
 	PHI           *Clock
 	CPU           *CPU
-	CartridgeSlot *CartridgeSlot
+	CartridgeSlot *MemoryRegion
 }
 
 func (gb *Gameboy) PowerOn() {
@@ -18,6 +18,14 @@ func (gb *Gameboy) PowerOn() {
 
 func (gb *Gameboy) PowerOff() {
 	gb.CLK.Stop()
+}
+
+func (gb *Gameboy) GetCoreDump() CoreDump {
+	var cd CoreDump
+	gb.CLK.Sync(func() {
+		cd = gb.CPU.GetCoreDump()
+	})
+	return cd
 }
 
 type SysInterface interface {
@@ -36,11 +44,11 @@ func NewGameboy(
 
 	bootROMLock := NewBootROMLock()
 	bootROM := NewBootROM(config.Model)
-	vram := NewMemoryRegion("VRAM", 0x8000, 0x2000)
-	hram := NewMemoryRegion("HRAM", 0xff80, 0x007f)
+	vram := NewMemoryRegion(0x8000, 0x2000)
+	hram := NewMemoryRegion(0xff80, 0x007f)
 	apu := NewAPU()
-	oam := NewMemoryRegion("OAM", 0xfe00, 0xa0)
-	cartridgeSlot := NewCartridgeSlot()
+	oam := NewMemoryRegion(0xfe00, 0xa0)
+	cartridgeSlot := NewMemoryRegion(0x0000, 0x4000)
 
 	bus := &Bus{}
 	ppu := NewPPU(ppuClock, bus, sysif)
@@ -52,7 +60,7 @@ func NewGameboy(
 	bus.APU = apu
 	bus.OAM = &oam
 	bus.PPU = ppu
-	bus.CartridgeSlot = cartridgeSlot
+	bus.CartridgeSlot = &cartridgeSlot
 
 	cpu := NewCPU(cpuClock, bus)
 
@@ -60,7 +68,7 @@ func NewGameboy(
 	soc.CLK = clk
 	soc.PHI = cpuClock
 	soc.CPU = cpu
-	soc.CartridgeSlot = cartridgeSlot
+	soc.CartridgeSlot = &cartridgeSlot
 
 	return soc
 }

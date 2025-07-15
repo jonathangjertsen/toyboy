@@ -1,12 +1,14 @@
 package gui
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"gioui.org/app"
@@ -31,6 +33,8 @@ type GUI struct {
 	StartButton widget.Clickable
 	PauseButton widget.Clickable
 	TimingGrid  component.GridState
+	Registers   widget.Label
+	VRAMScroll  widget.List
 
 	TargetPercent uint64
 	LastFrameCPS  uint64
@@ -59,8 +63,9 @@ func New(gb *model.Gameboy) *GUI {
 func (gui *GUI) Run() {
 	window := new(app.Window)
 	window.Option(app.Title("toyboy"))
-	window.Option(app.Size(unit.Dp(1080), unit.Dp(720)))
+	window.Option(app.Size(unit.Dp(1440), unit.Dp(1080)))
 	gui.SpeedInput.SetText("999")
+	gui.VRAMScroll.List = layout.List{Axis: layout.Vertical}
 	err := run(window, gui)
 	if err != nil {
 		log.Fatal(err)
@@ -118,6 +123,112 @@ func (gui *GUI) Render(gtx C) {
 	Column(
 		gtx,
 		Spacer(25, 0),
+		Rigid(func(gtx C) D {
+			cd := gui.GB.GetCoreDump()
+			return Row(
+				gtx,
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
+						Rigid(func(gtx C) D {
+							lbl := material.Label(&gui.Theme, unit.Sp(14), "OAM")
+							lbl.Font.Typeface = "monospace"
+							lbl.Font.Weight = font.Black
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+						Rigid(func(gtx C) D {
+							buf := bytes.Buffer{}
+							cd.PrintOAM(&buf)
+							lbl := material.Label(&gui.Theme, unit.Sp(14), buf.String())
+							lbl.Font.Typeface = "monospace"
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+						Rigid(func(gtx C) D {
+							lbl := material.Label(&gui.Theme, unit.Sp(14), "VRAM")
+							lbl.Font.Typeface = "monospace"
+							lbl.Font.Weight = font.Black
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+						Rigid(func(gtx C) D {
+							buf := bytes.Buffer{}
+							cd.PrintVRAM(&buf)
+							txt := buf.String()
+							lines := strings.Split(txt, "\n")
+							return layout.Stack{}.Layout(
+								gtx,
+								layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+									gtx.Constraints.Max.Y = int(unit.Dp(300))
+									return material.List(&gui.Theme, &gui.VRAMScroll).Layout(gtx, len(lines), func(gtx layout.Context, index int) layout.Dimensions {
+										lbl := material.Label(&gui.Theme, unit.Sp(14), lines[index])
+										lbl.Font.Typeface = "monospace"
+										lbl.Alignment = text.Start
+										return lbl.Layout(gtx)
+									})
+								}),
+							)
+						}),
+					)
+				}),
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
+						Rigid(func(gtx C) D {
+							lbl := material.Label(&gui.Theme, unit.Sp(14), "Program")
+							lbl.Font.Typeface = "monospace"
+							lbl.Font.Weight = font.Black
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+						Rigid(func(gtx C) D {
+							buf := bytes.Buffer{}
+							cd.PrintProgram(&buf)
+							lbl := material.Label(&gui.Theme, unit.Sp(14), buf.String())
+							lbl.Font.Typeface = "monospace"
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+						Rigid(func(gtx C) D {
+							lbl := material.Label(&gui.Theme, unit.Sp(14), "HRAM")
+							lbl.Font.Typeface = "monospace"
+							lbl.Font.Weight = font.Black
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+						Rigid(func(gtx C) D {
+							buf := bytes.Buffer{}
+							cd.PrintHRAM(&buf)
+							lbl := material.Label(&gui.Theme, unit.Sp(14), buf.String())
+							lbl.Font.Typeface = "monospace"
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+					)
+				}),
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
+						Rigid(func(gtx C) D {
+							lbl := material.Label(&gui.Theme, unit.Sp(14), "Registers")
+							lbl.Font.Typeface = "monospace"
+							lbl.Font.Weight = font.Black
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+						Rigid(func(gtx C) D {
+							buf := bytes.Buffer{}
+							cd.PrintRegs(&buf)
+							lbl := material.Label(&gui.Theme, unit.Sp(14), buf.String())
+							lbl.Font.Typeface = "monospace"
+							lbl.Alignment = text.Start
+							return lbl.Layout(gtx)
+						}),
+					)
+				}),
+			)
+		}),
 		Rigid(func(gtx C) D {
 			return Row(
 				gtx,
@@ -250,17 +361,4 @@ func (gui *GUI) Render(gtx C) {
 
 func (gui *GUI) Button(gtx C, clickable *widget.Clickable, text string) D {
 	return material.Button(&gui.Theme, clickable, text).Layout(gtx)
-}
-
-func fmtClockSpeed(hz uint64) string {
-	if hz == 0 {
-		return "0"
-	}
-	if hz < 1200 {
-		return fmt.Sprintf("%d Hz", hz)
-	}
-	if hz < 1_200_000 {
-		return fmt.Sprintf("%.1f KHz", float64(hz)/1_000)
-	}
-	return fmt.Sprintf("%.1f MHz", float64(hz)/1_000_000)
 }

@@ -22,13 +22,27 @@ func NewClock() *Clock {
 
 type RealtimeClock struct {
 	Clock
-	resume chan struct{}
-	pause  chan struct{}
-	freq   chan float64
+	tickInterval  time.Duration
+	cyclesPerTick uint64
+	resume        chan struct{}
+	pause         chan struct{}
+	jobs          chan func()
+}
+
+// Executes the function in the clocks' goroutine
+func (r *RealtimeClock) Sync(f func()) {
+	done := make(chan struct{})
+	r.jobs <- func() {
+		f()
+		done <- struct{}{}
+	}
+	<-done
 }
 
 func (r *RealtimeClock) SetFrequency(f float64) {
-	r.freq <- f
+	r.Sync(func() {
+		r.setFreq(f)
+	})
 }
 
 func NewRealtimeClock(config ClockConfig) *RealtimeClock {
@@ -36,45 +50,53 @@ func NewRealtimeClock(config ClockConfig) *RealtimeClock {
 		Clock:  *NewClock(),
 		resume: make(chan struct{}),
 		pause:  make(chan struct{}),
-		freq:   make(chan float64, 1),
+		jobs:   make(chan func()),
 	}
 	go rtClock.run(config.Frequency)
 	return &rtClock
+}
+
+func (rtClock *RealtimeClock) wait() {
+	for {
+		resumed := false
+		select {
+		case <-rtClock.pause:
+			fmt.Printf("Ignored pause\n")
+		case <-rtClock.resume:
+			resumed = true
+		case job := <-rtClock.jobs:
+			job()
+		}
+		if resumed {
+			break
+		}
+	}
+}
+func (rtClock *RealtimeClock) setFreq(f float64) {
+	rtClock.tickInterval = time.Millisecond * 2
+	cycleInterval := time.Duration(float64(time.Second) / f)
+	rtClock.cyclesPerTick = uint64(rtClock.tickInterval / cycleInterval)
 }
 
 func (rtClock *RealtimeClock) run(initFreq float64) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	tickInterval := time.Millisecond * 2
-	cycleInterval := time.Duration(float64(time.Second) / initFreq)
-	cyclesPerTick := uint64(tickInterval / cycleInterval)
+	rtClock.setFreq(initFreq)
 
 	var count uint64
-	<-rtClock.resume
-	ticker := time.NewTicker(tickInterval)
+	rtClock.wait()
+	ticker := time.NewTicker(rtClock.tickInterval)
 	for {
 		select {
 		case <-ticker.C:
-			count = rtClock.Cycles(count, cyclesPerTick)
+			count = rtClock.Cycles(count, rtClock.cyclesPerTick)
 		case <-rtClock.resume:
 			fmt.Printf("Ignored resume\n")
 		case <-rtClock.pause:
-			for {
-				resumed := false
-				select {
-				case <-rtClock.pause:
-					fmt.Printf("Ignored pause\n")
-				case <-rtClock.resume:
-					resumed = true
-				}
-				if resumed {
-					break
-				}
-			}
-		case f := <-rtClock.freq:
-			cycleInterval = time.Duration(float64(time.Second) / f)
-			cyclesPerTick = uint64(tickInterval / cycleInterval)
+			rtClock.wait()
+		case job := <-rtClock.jobs:
+			job()
 		}
 	}
 }
