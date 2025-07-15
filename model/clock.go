@@ -2,14 +2,12 @@ package model
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
 
 type Callback func(c Cycle)
 
 type Clock struct {
-	m       *sync.Mutex
 	rising  []Callback
 	falling []Callback
 }
@@ -20,9 +18,7 @@ type Cycle struct {
 }
 
 func NewClock() *Clock {
-	clock := &Clock{
-		m: &sync.Mutex{},
-	}
+	clock := &Clock{}
 	return clock
 }
 
@@ -54,9 +50,7 @@ func NewRealtimeClock(config ClockConfig) *RealtimeClock {
 		for {
 			select {
 			case <-ticker.C:
-				rtClock.m.Lock()
 				count = rtClock.Cycles(count, cyclesPerTick)
-				rtClock.m.Unlock()
 			case <-rtClock.resume:
 				fmt.Printf("Ignored resume\n")
 			case <-rtClock.pause:
@@ -77,10 +71,8 @@ func NewRealtimeClock(config ClockConfig) *RealtimeClock {
 	}()
 	go func() {
 		for f := range rtClock.freq {
-			rtClock.m.Lock()
 			cycleInterval = time.Duration(float64(time.Second) / f)
 			cyclesPerTick = uint64(tickInterval / cycleInterval)
-			rtClock.m.Unlock()
 		}
 	}()
 	return &rtClock
@@ -115,15 +107,11 @@ func (c *Clock) Cycles(currCycle uint64, n uint64) uint64 {
 }
 
 func (c *Clock) AddRiseCallback(cb Callback) {
-	c.m.Lock()
 	c.rising = append(c.rising, cb)
-	c.m.Unlock()
 }
 
 func (c *Clock) AddFallCallback(cb Callback) {
-	c.m.Lock()
 	c.falling = append(c.falling, cb)
-	c.m.Unlock()
 }
 
 func (c *Clock) Divide(div uint64) *Clock {
@@ -131,9 +119,7 @@ func (c *Clock) Divide(div uint64) *Clock {
 	c.AddRiseCallback(func(cyc Cycle) {
 		d, m := cyc.C/div, cyc.C%div
 		if m == 0 {
-			child.m.Lock()
 			child.Cycle(d)
-			child.m.Unlock()
 		}
 	})
 	return child
@@ -142,9 +128,7 @@ func (c *Clock) Divide(div uint64) *Clock {
 func (c *Clock) Invert(div uint64) *Clock {
 	child := NewClock()
 	c.AddFallCallback(func(cyc Cycle) {
-		child.m.Lock()
 		child.Cycle(cyc.C)
-		child.m.Unlock()
 	})
 	return child
 }
