@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -29,15 +30,18 @@ type GUI struct {
 	ClockMeasurement *plugin.ClockMeasurement
 	Theme            material.Theme
 
-	SpeedInput  widget.Editor
-	StartButton widget.Clickable
-	PauseButton widget.Clickable
-	TimingGrid  component.GridState
-	Registers   widget.Label
-	VRAMScroll  widget.List
+	SpeedInput    widget.Editor
+	StartButton   widget.Clickable
+	PauseButton   widget.Clickable
+	TimingGrid    component.GridState
+	Registers     widget.Label
+	VRAMScroll    widget.List
+	HRAMScroll    widget.List
+	OAMScroll     widget.List
+	ProgramScroll widget.List
 
-	TargetPercent uint64
-	LastFrameCPS  uint64
+	TargetPercent float64
+	LastFrameCPS  float64
 }
 
 func New(gb *model.Gameboy) *GUI {
@@ -66,6 +70,9 @@ func (gui *GUI) Run() {
 	window.Option(app.Size(unit.Dp(1440), unit.Dp(1080)))
 	gui.SpeedInput.SetText("999")
 	gui.VRAMScroll.List = layout.List{Axis: layout.Vertical}
+	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
+	gui.ProgramScroll.List = layout.List{Axis: layout.Vertical}
+	gui.OAMScroll.List = layout.List{Axis: layout.Vertical}
 	err := run(window, gui)
 	if err != nil {
 		log.Fatal(err)
@@ -106,7 +113,7 @@ func (gui *GUI) Interactions(gtx C) {
 	us := uint64(duration / time.Microsecond)
 
 	if us > 0 {
-		gui.LastFrameCPS = cycles * 1_000_000 / us
+		gui.LastFrameCPS = float64(cycles) * 1_000_000 / float64(us)
 	} else {
 		gui.LastFrameCPS = 0
 	}
@@ -116,6 +123,38 @@ func (gui *GUI) Interactions(gtx C) {
 	}
 	if gui.PauseButton.Clicked(gtx) {
 		gui.GB.PowerOff()
+	}
+}
+
+func (gui *GUI) memHead(name string) func(gtx C) D {
+	return func(gtx C) D {
+		lbl := material.Label(&gui.Theme, unit.Sp(14), name)
+		lbl.Font.Typeface = "monospace"
+		lbl.Font.Weight = font.Black
+		lbl.Alignment = text.Start
+		return lbl.Layout(gtx)
+	}
+}
+
+func (gui *GUI) mem(f func(io.Writer), list *widget.List, height unit.Dp) func(gtx C) D {
+	return func(gtx C) D {
+		buf := bytes.Buffer{}
+		f(&buf)
+		txt := buf.String()
+		lines := strings.Split(txt, "\n")
+		return layout.Stack{}.Layout(
+			gtx,
+			layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+				gtx.Constraints.Min.Y = int(height)
+				gtx.Constraints.Max.Y = int(height)
+				return material.List(&gui.Theme, list).Layout(gtx, len(lines), func(gtx layout.Context, index int) layout.Dimensions {
+					lbl := material.Label(&gui.Theme, unit.Sp(14), lines[index])
+					lbl.Font.Typeface = "monospace"
+					lbl.Alignment = text.Start
+					return lbl.Layout(gtx)
+				})
+			}),
+		)
 	}
 }
 
@@ -130,81 +169,19 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(func(gtx C) D {
-							lbl := material.Label(&gui.Theme, unit.Sp(14), "OAM")
-							lbl.Font.Typeface = "monospace"
-							lbl.Font.Weight = font.Black
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
-						Rigid(func(gtx C) D {
-							buf := bytes.Buffer{}
-							cd.PrintOAM(&buf)
-							lbl := material.Label(&gui.Theme, unit.Sp(14), buf.String())
-							lbl.Font.Typeface = "monospace"
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
-						Rigid(func(gtx C) D {
-							lbl := material.Label(&gui.Theme, unit.Sp(14), "VRAM")
-							lbl.Font.Typeface = "monospace"
-							lbl.Font.Weight = font.Black
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
-						Rigid(func(gtx C) D {
-							buf := bytes.Buffer{}
-							cd.PrintVRAM(&buf)
-							txt := buf.String()
-							lines := strings.Split(txt, "\n")
-							return layout.Stack{}.Layout(
-								gtx,
-								layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-									gtx.Constraints.Max.Y = int(unit.Dp(300))
-									return material.List(&gui.Theme, &gui.VRAMScroll).Layout(gtx, len(lines), func(gtx layout.Context, index int) layout.Dimensions {
-										lbl := material.Label(&gui.Theme, unit.Sp(14), lines[index])
-										lbl.Font.Typeface = "monospace"
-										lbl.Alignment = text.Start
-										return lbl.Layout(gtx)
-									})
-								}),
-							)
-						}),
+						Rigid(gui.memHead("VRAM")),
+						Rigid(gui.mem(cd.PrintVRAM, &gui.VRAMScroll, unit.Dp(660))),
 					)
 				}),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(func(gtx C) D {
-							lbl := material.Label(&gui.Theme, unit.Sp(14), "Program")
-							lbl.Font.Typeface = "monospace"
-							lbl.Font.Weight = font.Black
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
-						Rigid(func(gtx C) D {
-							buf := bytes.Buffer{}
-							cd.PrintProgram(&buf)
-							lbl := material.Label(&gui.Theme, unit.Sp(14), buf.String())
-							lbl.Font.Typeface = "monospace"
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
-						Rigid(func(gtx C) D {
-							lbl := material.Label(&gui.Theme, unit.Sp(14), "HRAM")
-							lbl.Font.Typeface = "monospace"
-							lbl.Font.Weight = font.Black
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
-						Rigid(func(gtx C) D {
-							buf := bytes.Buffer{}
-							cd.PrintHRAM(&buf)
-							lbl := material.Label(&gui.Theme, unit.Sp(14), buf.String())
-							lbl.Font.Typeface = "monospace"
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
+						Rigid(gui.memHead("Program")),
+						Rigid(gui.mem(cd.PrintProgram, &gui.ProgramScroll, unit.Dp(200))),
+						Rigid(gui.memHead("HRAM")),
+						Rigid(gui.mem(cd.PrintHRAM, &gui.HRAMScroll, unit.Dp(200))),
+						Rigid(gui.memHead("OAM")),
+						Rigid(gui.mem(cd.PrintOAM, &gui.OAMScroll, unit.Dp(220))),
 					)
 				}),
 				Rigid(func(gtx C) D {
@@ -229,6 +206,7 @@ func (gui *GUI) Render(gtx C) {
 				}),
 			)
 		}),
+		Spacer(25, 0),
 		Rigid(func(gtx C) D {
 			return Row(
 				gtx,
@@ -299,28 +277,28 @@ func (gui *GUI) Render(gtx C) {
 								case 0:
 									dataLabel.Text = "System clock"
 								case 1:
-									dataLabel.Text = fmt.Sprintf("%d", 4*gui.LastFrameCPS)
+									dataLabel.Text = fmt.Sprintf("%.0f", 4*gui.LastFrameCPS)
 								}
 							case 1:
 								switch col {
 								case 0:
 									dataLabel.Text = "CPU clock"
 								case 1:
-									dataLabel.Text = fmt.Sprintf("%d", gui.LastFrameCPS)
+									dataLabel.Text = fmt.Sprintf("%.0f", gui.LastFrameCPS)
 								}
 							case 2:
 								switch col {
 								case 0:
 									dataLabel.Text = "Target emulation speed"
 								case 1:
-									dataLabel.Text = fmt.Sprintf("%d%%", gui.TargetPercent)
+									dataLabel.Text = fmt.Sprintf("%.2f%%", gui.TargetPercent)
 								}
 							case 3:
 								switch col {
 								case 0:
 									dataLabel.Text = "Actual emulation speed"
 								case 1:
-									dataLabel.Text = fmt.Sprintf("%d%%", (100*4*gui.LastFrameCPS)/4194304)
+									dataLabel.Text = fmt.Sprintf("%.2f%%", (100*4*gui.LastFrameCPS)/4194304)
 								}
 							}
 							return dataLabel.Layout(gtx)
@@ -336,11 +314,11 @@ func (gui *GUI) Render(gtx C) {
 					gui.SpeedInput.SingleLine = true
 					gui.SpeedInput.Alignment = text.Middle
 					text := gui.SpeedInput.Text()
-					targetPercent, err := strconv.ParseUint(text, 10, 64)
+					targetPercent, err := strconv.ParseFloat(text, 64)
 					if err == nil && targetPercent > 0 && targetPercent < 1000 {
 						if gui.TargetPercent != targetPercent {
 							gui.TargetPercent = targetPercent
-							gui.GB.CLK.SetFrequency(float64(targetPercent) * 4194304.0 / 100)
+							gui.GB.CLK.SetFrequency(targetPercent * 4194304.0 / 100)
 						}
 					} else {
 						// Ignore

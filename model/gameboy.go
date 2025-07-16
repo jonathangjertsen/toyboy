@@ -6,7 +6,7 @@ import (
 )
 
 type Gameboy struct {
-	CLK           *RealtimeClock
+	CLK           *ClockRT
 	PHI           *Clock
 	CPU           *CPU
 	CartridgeSlot *MemoryRegion
@@ -39,19 +39,19 @@ func NewGameboy(
 	sysif SysInterface,
 ) *Gameboy {
 	clk := NewRealtimeClock(config.SystemClock)
-	ppuClock := clk.Divide(1)
-	cpuClock := clk.Divide(2)
+	ppuClock := clk.Divide(2)
+	cpuClock := clk.Divide(4)
 
-	bootROMLock := NewBootROMLock()
-	bootROM := NewBootROM(config.Model)
-	vram := NewMemoryRegion(0x8000, 0x2000)
-	hram := NewMemoryRegion(0xff80, 0x007f)
-	apu := NewAPU()
-	oam := NewMemoryRegion(0xfe00, 0xa0)
-	cartridgeSlot := NewMemoryRegion(0x0000, 0x4000)
+	bootROMLock := NewBootROMLock(clk)
+	bootROM := NewBootROM(clk, config.Model)
+	vram := NewMemoryRegion(clk, 0x8000, 0x2000)
+	hram := NewMemoryRegion(clk, 0xff80, 0x007f)
+	apu := NewAPU(clk)
+	oam := NewMemoryRegion(clk, 0xfe00, 0xa0)
+	cartridgeSlot := NewMemoryRegion(clk, 0x0000, 0x4000)
 
 	bus := &Bus{}
-	ppu := NewPPU(ppuClock, bus, sysif)
+	ppu := NewPPU(clk, ppuClock, bus, sysif)
 
 	bus.BootROMLock = bootROMLock
 	bus.BootROM = &bootROM

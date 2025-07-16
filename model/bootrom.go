@@ -6,16 +6,21 @@ import (
 )
 
 type BootROMLock struct {
+	MemoryRegion
 	RegBootROMLock uint8
 
 	BootOff bool
 }
 
-func NewBootROMLock() *BootROMLock {
-	return &BootROMLock{}
+func NewBootROMLock(clock *ClockRT) *BootROMLock {
+	return &BootROMLock{
+		MemoryRegion: NewMemoryRegion(clock, 0xff50, 0x0001),
+	}
 }
 
 func (brl *BootROMLock) Read(addr uint16) uint8 {
+	_ = brl.MemoryRegion.Read(addr)
+
 	if addr == 0xff50 {
 		return brl.RegBootROMLock
 	}
@@ -27,14 +32,17 @@ func (brl *BootROMLock) Write(addr uint16, v uint8) {
 	if brl.BootOff {
 		return
 	}
+
+	brl.MemoryRegion.Write(addr, v)
+
 	if v&1 == 1 {
 		brl.RegBootROMLock = 0x01
 		brl.BootOff = true
 	}
 }
 
-func NewBootROM(model Model) MemoryRegion {
-	bootrom := NewMemoryRegion(0x0000, 0x0100)
+func NewBootROM(clk *ClockRT, model Model) MemoryRegion {
+	bootrom := NewMemoryRegion(clk, 0x0000, 0x0100)
 	switch model {
 	case DMG:
 		// todo: static fs

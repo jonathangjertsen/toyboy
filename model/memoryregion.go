@@ -1,21 +1,59 @@
 package model
 
+const (
+	ReadCountdown  = 100
+	WriteCountdown = 100
+)
+
 type MemoryRegion struct {
 	Offset uint16
 	Data   []uint8
+
+	WriteCountdowns  []uint64
+	ReadCountdowns   []uint64
+	CountdownDisable bool
+}
+
+func (mr *MemoryRegion) GetCounters(addr uint16) (uint64, uint64) {
+	return mr.ReadCountdowns[addr-mr.Offset], mr.WriteCountdowns[addr-mr.Offset]
 }
 
 func (mr *MemoryRegion) Read(addr uint16) uint8 {
-	return mr.Data[addr-mr.Offset]
+	idx := addr - mr.Offset
+	if !mr.CountdownDisable {
+		mr.ReadCountdowns[idx] = ReadCountdown
+	}
+	return mr.Data[idx]
 }
 
 func (mr *MemoryRegion) Write(addr uint16, v uint8) {
-	mr.Data[addr-mr.Offset] = v
+	idx := addr - mr.Offset
+	if !mr.CountdownDisable {
+		mr.WriteCountdowns[idx] = WriteCountdown
+	}
+	mr.Data[idx] = v
 }
 
-func NewMemoryRegion(start, size uint16) MemoryRegion {
-	return MemoryRegion{
-		Data:   make([]uint8, size),
-		Offset: start,
+func (mr *MemoryRegion) DecrementCounters() {
+	for i, c := range mr.WriteCountdowns {
+		if c > 0 {
+			mr.WriteCountdowns[i]--
+		}
 	}
+	for i, c := range mr.ReadCountdowns {
+		if c > 0 {
+			mr.ReadCountdowns[i]--
+		}
+	}
+}
+
+func NewMemoryRegion(clock *ClockRT, start, size uint16) MemoryRegion {
+	mr := MemoryRegion{
+		Data:            make([]uint8, size),
+		WriteCountdowns: make([]uint64, size),
+		ReadCountdowns:  make([]uint64, size),
+		Offset:          start,
+	}
+	clock.AttachUIDevice(mr.DecrementCounters)
+	return mr
 }

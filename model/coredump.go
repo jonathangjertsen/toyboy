@@ -9,10 +9,10 @@ type CoreDump struct {
 	Regs         RegisterFile
 	ProgramStart uint16
 	ProgramEnd   uint16
-	Program      []uint8
-	HRAM         []uint8
-	OAM          []uint8
-	VRAM         []uint8
+	Program      []MemInfo
+	HRAM         []MemInfo
+	OAM          []MemInfo
+	VRAM         []MemInfo
 }
 
 func (cd *CoreDump) PrintRegs(f io.Writer) {
@@ -62,24 +62,7 @@ func (cd *CoreDump) PrintVRAM(f io.Writer) {
 	memdump(f, cd.VRAM, 0x8000, 0x9fff, 0)
 }
 
-func (cd *CoreDump) Print(f io.Writer) {
-	fmt.Fprintf(f, "\n--------\nCore dump:\n")
-	cd.PrintRegs(f)
-	fmt.Fprintf(f, "--------\n")
-	fmt.Fprintf(f, "Code (PC highlighted)\n")
-	cd.PrintProgram(f)
-	fmt.Fprintf(f, "--------\n")
-	fmt.Fprintf(f, "HRAM (SP highlighted):\n")
-	cd.PrintHRAM(f)
-	fmt.Fprintf(f, "--------\n")
-	fmt.Fprintf(f, "OAM:\n")
-	cd.PrintOAM(f)
-	fmt.Fprintf(f, "VRAM:\n")
-	cd.PrintVRAM(f)
-	fmt.Fprintf(f, "--------\n")
-}
-
-func memdump(f io.Writer, mem []uint8, start, end, highlight uint16) {
+func memdump(f io.Writer, mem []MemInfo, start, end, highlight uint16) {
 	alignedStart := (start / 0x10) * 0x10
 	for addr := alignedStart; addr < start; addr++ {
 		if addr%0x10 == 0 {
@@ -93,10 +76,17 @@ func memdump(f io.Writer, mem []uint8, start, end, highlight uint16) {
 			fmt.Fprintf(f, "\n %04x |", addr)
 		}
 		if highlight == addr {
-			fmt.Fprintf(f, "[%02x]", mem[addr-start])
+			fmt.Fprintf(f, "[%02x]", mem[addr-start].Value)
 		} else {
-			fmt.Fprintf(f, " %02x ", mem[addr-start])
+			pre := " "
+			if mem[addr-start].WriteCounter > 0 {
+				pre = "w"
+			} else if mem[addr-start].ReadCounter > 0 {
+				pre = "r"
+			}
+			fmt.Fprintf(f, "%s%02x ", pre, mem[addr-start].Value)
 		}
+
 	}
 
 	alignedEnd := (end/0x10)*0x10 + 0x10 - 1

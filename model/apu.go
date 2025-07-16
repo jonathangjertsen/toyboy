@@ -30,6 +30,7 @@ var audioDebugEvents = []string{
 }
 
 type APU struct {
+	MemoryRegion
 	MasterCtl uint8
 
 	Pulse1 PulseChannelWithSweep
@@ -201,8 +202,9 @@ func (nc *NoiseChannel) SetCtl(v uint8) {
 	fmt.Printf("not implemented: SetCtl\n")
 }
 
-func NewAPU() *APU {
+func NewAPU(clock *ClockRT) *APU {
 	return &APU{
+		MemoryRegion:                   NewMemoryRegion(clock, 0xff10, 0xff28),
 		canWriteLengthTimersWithAPUOff: true, // on monochrome models
 	}
 }
@@ -220,6 +222,8 @@ func (apu *APU) Enabled() bool {
 }
 
 func (apu *APU) Read(addr uint16) uint8 {
+	_ = apu.MemoryRegion.Read(addr)
+
 	switch addr {
 	case 0xff10:
 		return apu.Pulse1.RegSweep
@@ -273,6 +277,8 @@ func (apu *APU) Read(addr uint16) uint8 {
 }
 
 func (apu *APU) Write(addr uint16, v uint8) {
+	apu.MemoryRegion.Write(addr, v)
+
 	switch addr {
 	case 0xff10:
 		apu.SetPulse1Sweep(v)

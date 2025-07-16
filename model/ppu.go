@@ -52,6 +52,8 @@ type PPUHooks interface {
 }
 
 type PPU struct {
+	MemoryRegion
+
 	RegLCDC uint8
 	RegSTAT uint8
 	RegSCY  uint8
@@ -248,10 +250,11 @@ func (ppu *PPU) SetOBP1(v uint8) {
 	panic("not implemented: SetOBP1")
 }
 
-func NewPPU(clock *Clock, bus *Bus, hooks PPUHooks) *PPU {
+func NewPPU(rtClock *ClockRT, clock *Clock, bus *Bus, hooks PPUHooks) *PPU {
 	ppu := &PPU{
-		Bus:   bus,
-		Hooks: hooks,
+		MemoryRegion: NewMemoryRegion(rtClock, 0xff40, 0xff4c),
+		Bus:          bus,
+		Hooks:        hooks,
 	}
 	ppu.BackgroundFetcher.PPU = ppu
 	ppu.SpriteFetcher.PPU = ppu

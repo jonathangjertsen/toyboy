@@ -1,7 +1,7 @@
 package model
 
 type Bus struct {
-	data    uint8
+	Data    uint8
 	Address uint16
 
 	BootROMLock   *BootROMLock
@@ -19,24 +19,24 @@ func (b *Bus) WriteAddress(addr uint16) {
 
 	if addr < 0x100 {
 		if b.BootROMLock.BootOff {
-			b.data = b.CartridgeSlot.Read(addr)
+			b.Data = b.CartridgeSlot.Read(addr)
 		} else {
-			b.data = b.BootROM.Read(addr)
+			b.Data = b.BootROM.Read(addr)
 		}
 	} else if addr <= 0x4000 {
-		b.data = b.CartridgeSlot.Read(addr)
+		b.Data = b.CartridgeSlot.Read(addr)
 	} else if addr >= 0x8000 && addr < 0xa000 {
-		b.data = b.VRAM.Read(addr)
+		b.Data = b.VRAM.Read(addr)
 	} else if addr >= 0xff80 && addr < 0xffff {
-		b.data = b.HRAM.Read(addr)
+		b.Data = b.HRAM.Read(addr)
 	} else if addr >= 0xff10 && addr < 0xff28 {
-		b.data = b.APU.Read(addr)
+		b.Data = b.APU.Read(addr)
 	} else if addr >= 0xfe00 && addr < 0xfea0 {
-		b.data = b.OAM.Read(addr)
+		b.Data = b.OAM.Read(addr)
 	} else if addr >= 0xff40 && addr < 0xff4c {
-		b.data = b.PPU.Read(addr)
+		b.Data = b.PPU.Read(addr)
 	} else if addr == 0xff50 {
-		b.data = b.BootROMLock.Read(addr)
+		b.Data = b.BootROMLock.Read(addr)
 		return
 	} else {
 		panicf("read from unknown peripheral at 0x%x", addr)
@@ -44,12 +44,16 @@ func (b *Bus) WriteAddress(addr uint16) {
 }
 
 func (b *Bus) WriteData(v uint8) {
-	b.data = v
+	b.Data = v
 	addr := b.Address
-	if addr <= 0x4000 {
-		if addr < 0x100 {
+	if addr < 0x100 {
+		if b.BootROMLock.BootOff {
+			panicf("Attempted write to cartridge (addr=0x%04x v=%02x)", addr, v)
+		} else {
 			panicf("Attempted write to bootrom (addr=0x%04x v=%02x)", addr, v)
 		}
+	} else if addr <= 0x4000 {
+		b.Data = b.CartridgeSlot.Read(addr)
 		panicf("Attempted write to cartridge (addr=0x%04x v=%02x)", addr, v)
 	} else if addr == 0xff50 {
 		b.BootROMLock.Write(addr, v)
@@ -68,6 +72,50 @@ func (b *Bus) WriteData(v uint8) {
 	}
 }
 
-func (b *Bus) Data() uint8 {
-	return b.data
+func (b *Bus) CountdownDisable() {
+	b.BootROMLock.CountdownDisable = true
+	b.BootROM.CountdownDisable = true
+	b.VRAM.CountdownDisable = true
+	b.HRAM.CountdownDisable = true
+	b.APU.CountdownDisable = true
+	b.OAM.CountdownDisable = true
+	b.PPU.CountdownDisable = true
+	b.CartridgeSlot.CountdownDisable = true
+}
+
+func (b *Bus) CountdownEnable() {
+	b.BootROMLock.CountdownDisable = false
+	b.BootROM.CountdownDisable = false
+	b.VRAM.CountdownDisable = false
+	b.HRAM.CountdownDisable = false
+	b.APU.CountdownDisable = false
+	b.OAM.CountdownDisable = false
+	b.PPU.CountdownDisable = false
+	b.CartridgeSlot.CountdownDisable = false
+}
+
+func (b *Bus) GetCounters(addr uint16) (uint64, uint64) {
+	if addr < 0x100 {
+		if b.BootROMLock.BootOff {
+			return b.CartridgeSlot.GetCounters(addr)
+		} else {
+			return b.BootROM.GetCounters(addr)
+		}
+	} else if addr <= 0x4000 {
+		return b.CartridgeSlot.GetCounters(addr)
+	} else if addr == 0xff50 {
+		return b.BootROMLock.GetCounters(addr)
+	} else if addr >= 0x8000 && addr < 0xa000 {
+		return b.VRAM.GetCounters(addr)
+	} else if addr >= 0xff80 && addr < 0xffff {
+		return b.HRAM.GetCounters(addr)
+	} else if addr >= 0xff10 && addr < 0xff28 {
+		return b.APU.GetCounters(addr)
+	} else if addr >= 0xfe00 && addr < 0xfea0 {
+		return b.OAM.GetCounters(addr)
+	} else if addr >= 0xff40 && addr < 0xff4c {
+		return b.PPU.GetCounters(addr)
+	}
+	panicf("GetCounters from unknown peripheral at 0x%x", addr)
+	return 0, 0
 }
