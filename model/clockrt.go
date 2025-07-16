@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"runtime"
 	"time"
 )
 
@@ -90,9 +89,6 @@ func (clockRT *ClockRT) setFreq(f float64) {
 }
 
 func (clockRT *ClockRT) run(initFreq float64) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
 	clockRT.setFreq(initFreq)
 
 	var count uint64
@@ -150,8 +146,9 @@ func (clockRT *ClockRT) Cycle(currCycle uint64) {
 }
 
 func (clockRT *ClockRT) Cycles(currCycle uint64, n uint64) uint64 {
-	for offs := range n {
-		clockRT.Cycle(currCycle + offs)
+	for range n {
+		clockRT.Cycle(currCycle)
+		currCycle++
 	}
-	return currCycle + n
+	return currCycle
 }

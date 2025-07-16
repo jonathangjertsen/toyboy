@@ -58,6 +58,8 @@ type CPU struct {
 	inCoreDump                 bool
 	wroteToAddressBusThisCycle bool
 
+	handlers [256]InstructionHandling
+
 	rewindBuffer    [16]ExecLogEntry
 	rewindBufferIdx int
 }
@@ -215,6 +217,7 @@ func NewCPU(
 		PHI: phi,
 		Bus: bus,
 	}
+	cpu.handlers = handlers(cpu)
 	phi.AttachDevice(cpu.fsm)
 	return cpu
 }
@@ -313,10 +316,10 @@ func (cpu *CPU) fsm(c Cycle) {
 	var fetch bool
 	if c.C > 0 {
 		opcode := cpu.Regs.IR
-		if handler, ok := handlers[opcode]; ok {
+		if handler := cpu.handlers[opcode]; handler != nil {
 			e := edge{cpu.machineCycle, c.Falling}
 			cpu.Debug("Handler", "e=%v", e)
-			fetch = handler(cpu, e)
+			fetch = handler(e)
 		} else {
 			panicf("not implemented opcode %v", opcode)
 		}

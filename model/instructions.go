@@ -244,581 +244,583 @@ type edge struct {
 	Falling bool
 }
 
-type InstructionHandling func(c *CPU, e edge) bool
+type InstructionHandling func(e edge) bool
 
-var handlers = map[Opcode]InstructionHandling{
-	OpcodeNop: singleCycle(func(cpu *CPU) {
-		if cpu.clockCycle.C > 0 {
-			panic("unexpected nop")
-		}
-	}),
-	OpcodeLDAA: singleCycle(func(cpu *CPU) {}),
-	OpcodeLDBB: singleCycle(func(cpu *CPU) {}),
-	OpcodeLDCC: singleCycle(func(cpu *CPU) {}),
-	OpcodeLDDD: singleCycle(func(cpu *CPU) {}),
-	OpcodeLDEE: singleCycle(func(cpu *CPU) {}),
-	OpcodeLDHH: singleCycle(func(cpu *CPU) {}),
-	OpcodeLDLL: singleCycle(func(cpu *CPU) {}),
-	OpcodeLDAB: singleCycle(func(cpu *CPU) { cpu.Regs.A = cpu.Regs.B }),
-	OpcodeLDAC: singleCycle(func(cpu *CPU) { cpu.Regs.A = cpu.Regs.C }),
-	OpcodeLDAD: singleCycle(func(cpu *CPU) { cpu.Regs.A = cpu.Regs.D }),
-	OpcodeLDAE: singleCycle(func(cpu *CPU) { cpu.Regs.A = cpu.Regs.E }),
-	OpcodeLDAH: singleCycle(func(cpu *CPU) { cpu.Regs.A = cpu.Regs.H }),
-	OpcodeLDAL: singleCycle(func(cpu *CPU) { cpu.Regs.A = cpu.Regs.L }),
-	OpcodeLDBA: singleCycle(func(cpu *CPU) { cpu.Regs.B = cpu.Regs.A }),
-	OpcodeLDBC: singleCycle(func(cpu *CPU) { cpu.Regs.B = cpu.Regs.C }),
-	OpcodeLDBD: singleCycle(func(cpu *CPU) { cpu.Regs.B = cpu.Regs.D }),
-	OpcodeLDBE: singleCycle(func(cpu *CPU) { cpu.Regs.B = cpu.Regs.E }),
-	OpcodeLDBH: singleCycle(func(cpu *CPU) { cpu.Regs.B = cpu.Regs.H }),
-	OpcodeLDBL: singleCycle(func(cpu *CPU) { cpu.Regs.B = cpu.Regs.L }),
-	OpcodeLDCA: singleCycle(func(cpu *CPU) { cpu.Regs.C = cpu.Regs.A }),
-	OpcodeLDCB: singleCycle(func(cpu *CPU) { cpu.Regs.C = cpu.Regs.B }),
-	OpcodeLDCD: singleCycle(func(cpu *CPU) { cpu.Regs.C = cpu.Regs.D }),
-	OpcodeLDCE: singleCycle(func(cpu *CPU) { cpu.Regs.C = cpu.Regs.E }),
-	OpcodeLDCH: singleCycle(func(cpu *CPU) { cpu.Regs.C = cpu.Regs.H }),
-	OpcodeLDCL: singleCycle(func(cpu *CPU) { cpu.Regs.C = cpu.Regs.L }),
-	OpcodeLDDA: singleCycle(func(cpu *CPU) { cpu.Regs.D = cpu.Regs.A }),
-	OpcodeLDDB: singleCycle(func(cpu *CPU) { cpu.Regs.D = cpu.Regs.B }),
-	OpcodeLDDC: singleCycle(func(cpu *CPU) { cpu.Regs.D = cpu.Regs.C }),
-	OpcodeLDDE: singleCycle(func(cpu *CPU) { cpu.Regs.D = cpu.Regs.E }),
-	OpcodeLDDH: singleCycle(func(cpu *CPU) { cpu.Regs.D = cpu.Regs.H }),
-	OpcodeLDDL: singleCycle(func(cpu *CPU) { cpu.Regs.D = cpu.Regs.L }),
-	OpcodeLDEA: singleCycle(func(cpu *CPU) { cpu.Regs.E = cpu.Regs.A }),
-	OpcodeLDEB: singleCycle(func(cpu *CPU) { cpu.Regs.E = cpu.Regs.B }),
-	OpcodeLDEC: singleCycle(func(cpu *CPU) { cpu.Regs.E = cpu.Regs.C }),
-	OpcodeLDED: singleCycle(func(cpu *CPU) { cpu.Regs.E = cpu.Regs.D }),
-	OpcodeLDEH: singleCycle(func(cpu *CPU) { cpu.Regs.E = cpu.Regs.H }),
-	OpcodeLDEL: singleCycle(func(cpu *CPU) { cpu.Regs.E = cpu.Regs.L }),
-	OpcodeLDHA: singleCycle(func(cpu *CPU) { cpu.Regs.H = cpu.Regs.A }),
-	OpcodeLDHB: singleCycle(func(cpu *CPU) { cpu.Regs.H = cpu.Regs.B }),
-	OpcodeLDHC: singleCycle(func(cpu *CPU) { cpu.Regs.H = cpu.Regs.C }),
-	OpcodeLDHD: singleCycle(func(cpu *CPU) { cpu.Regs.H = cpu.Regs.D }),
-	OpcodeLDHE: singleCycle(func(cpu *CPU) { cpu.Regs.H = cpu.Regs.E }),
-	OpcodeLDHL: singleCycle(func(cpu *CPU) { cpu.Regs.H = cpu.Regs.L }),
-	OpcodeLDLA: singleCycle(func(cpu *CPU) { cpu.Regs.L = cpu.Regs.A }),
-	OpcodeLDLB: singleCycle(func(cpu *CPU) { cpu.Regs.L = cpu.Regs.B }),
-	OpcodeLDLC: singleCycle(func(cpu *CPU) { cpu.Regs.L = cpu.Regs.C }),
-	OpcodeLDLD: singleCycle(func(cpu *CPU) { cpu.Regs.L = cpu.Regs.D }),
-	OpcodeLDLE: singleCycle(func(cpu *CPU) { cpu.Regs.L = cpu.Regs.E }),
-	OpcodeLDLH: singleCycle(func(cpu *CPU) { cpu.Regs.L = cpu.Regs.H }),
-	OpcodeRLA: singleCycle(func(cpu *CPU) {
-		a := cpu.Regs.A
-		bit7 := a & 0x80
-		a <<= 1
-		if cpu.Regs.GetFlagC() {
-			a |= 0x01
-		}
-		cpu.Regs.SetFlagZ(false)
-		cpu.Regs.SetFlagN(false)
-		cpu.Regs.SetFlagH(false)
-		cpu.Regs.SetFlagC(bit7 != 0)
-		cpu.Regs.A = a
-	}),
-	OpcodeORA:  orreg(func(cpu *CPU) uint8 { return cpu.Regs.A }),
-	OpcodeORB:  orreg(func(cpu *CPU) uint8 { return cpu.Regs.B }),
-	OpcodeORC:  orreg(func(cpu *CPU) uint8 { return cpu.Regs.C }),
-	OpcodeORD:  orreg(func(cpu *CPU) uint8 { return cpu.Regs.D }),
-	OpcodeORE:  orreg(func(cpu *CPU) uint8 { return cpu.Regs.E }),
-	OpcodeORH:  orreg(func(cpu *CPU) uint8 { return cpu.Regs.H }),
-	OpcodeORL:  orreg(func(cpu *CPU) uint8 { return cpu.Regs.L }),
-	OpcodeANDA: andreg(func(cpu *CPU) uint8 { return cpu.Regs.A }),
-	OpcodeANDB: andreg(func(cpu *CPU) uint8 { return cpu.Regs.B }),
-	OpcodeANDC: andreg(func(cpu *CPU) uint8 { return cpu.Regs.C }),
-	OpcodeANDD: andreg(func(cpu *CPU) uint8 { return cpu.Regs.D }),
-	OpcodeANDE: andreg(func(cpu *CPU) uint8 { return cpu.Regs.E }),
-	OpcodeANDH: andreg(func(cpu *CPU) uint8 { return cpu.Regs.H }),
-	OpcodeANDL: andreg(func(cpu *CPU) uint8 { return cpu.Regs.L }),
-	OpcodeXORA: xorreg(func(cpu *CPU) uint8 { return cpu.Regs.A }),
-	OpcodeXORB: xorreg(func(cpu *CPU) uint8 { return cpu.Regs.B }),
-	OpcodeXORC: xorreg(func(cpu *CPU) uint8 { return cpu.Regs.C }),
-	OpcodeXORD: xorreg(func(cpu *CPU) uint8 { return cpu.Regs.D }),
-	OpcodeXORE: xorreg(func(cpu *CPU) uint8 { return cpu.Regs.E }),
-	OpcodeXORH: xorreg(func(cpu *CPU) uint8 { return cpu.Regs.H }),
-	OpcodeXORL: xorreg(func(cpu *CPU) uint8 { return cpu.Regs.L }),
-	OpcodeSUBA: subreg(func(cpu *CPU) uint8 { return cpu.Regs.A }),
-	OpcodeSUBB: subreg(func(cpu *CPU) uint8 { return cpu.Regs.B }),
-	OpcodeSUBC: subreg(func(cpu *CPU) uint8 { return cpu.Regs.C }),
-	OpcodeSUBD: subreg(func(cpu *CPU) uint8 { return cpu.Regs.D }),
-	OpcodeSUBE: subreg(func(cpu *CPU) uint8 { return cpu.Regs.E }),
-	OpcodeSUBH: subreg(func(cpu *CPU) uint8 { return cpu.Regs.H }),
-	OpcodeSUBL: subreg(func(cpu *CPU) uint8 { return cpu.Regs.L }),
-	OpcodeADDA: addreg(func(cpu *CPU) uint8 { return cpu.Regs.A }),
-	OpcodeADDB: addreg(func(cpu *CPU) uint8 { return cpu.Regs.B }),
-	OpcodeADDC: addreg(func(cpu *CPU) uint8 { return cpu.Regs.C }),
-	OpcodeADDD: addreg(func(cpu *CPU) uint8 { return cpu.Regs.D }),
-	OpcodeADDE: addreg(func(cpu *CPU) uint8 { return cpu.Regs.E }),
-	OpcodeADDH: addreg(func(cpu *CPU) uint8 { return cpu.Regs.H }),
-	OpcodeADDL: addreg(func(cpu *CPU) uint8 { return cpu.Regs.L }),
-	OpcodeDECA: decreg(func(cpu *CPU) *uint8 { return &cpu.Regs.A }),
-	OpcodeDECB: decreg(func(cpu *CPU) *uint8 { return &cpu.Regs.B }),
-	OpcodeDECC: decreg(func(cpu *CPU) *uint8 { return &cpu.Regs.C }),
-	OpcodeDECD: decreg(func(cpu *CPU) *uint8 { return &cpu.Regs.D }),
-	OpcodeDECE: decreg(func(cpu *CPU) *uint8 { return &cpu.Regs.E }),
-	OpcodeDECH: decreg(func(cpu *CPU) *uint8 { return &cpu.Regs.H }),
-	OpcodeDECL: decreg(func(cpu *CPU) *uint8 { return &cpu.Regs.L }),
-	OpcodeINCA: increg(func(cpu *CPU) *uint8 { return &cpu.Regs.A }),
-	OpcodeINCB: increg(func(cpu *CPU) *uint8 { return &cpu.Regs.B }),
-	OpcodeINCC: increg(func(cpu *CPU) *uint8 { return &cpu.Regs.C }),
-	OpcodeINCD: increg(func(cpu *CPU) *uint8 { return &cpu.Regs.D }),
-	OpcodeINCE: increg(func(cpu *CPU) *uint8 { return &cpu.Regs.E }),
-	OpcodeINCH: increg(func(cpu *CPU) *uint8 { return &cpu.Regs.H }),
-	OpcodeINCL: increg(func(cpu *CPU) *uint8 { return &cpu.Regs.L }),
-	OpcodeDI: singleCycle(func(cpu *CPU) {
-		cpu.Interrupts.setIMENextCycle = false
-		cpu.Interrupts.IME = false
-	}),
-	OpcodeEI: singleCycle(func(cpu *CPU) {
-		cpu.Interrupts.setIMENextCycle = true
-	}),
-	OpcodeJRe: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		// TODO: this impl is not exactly correct
-		case edge{2, false}:
-		case edge{2, true}:
-		case edge{3, false}:
-			cpu.SetPC(uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ))))
-			return true
-		case edge{3, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeJPnn: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{2, true}:
-			cpu.Regs.TempW = cpu.readDataBus()
-		case edge{3, false}:
-		case edge{3, true}:
-		case edge{4, false}:
-			cpu.SetPC(cpu.Regs.GetWZ())
-			return true
-		case edge{4, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeJRZe:   jrcce(func(cpu *CPU) bool { return cpu.Regs.GetFlagZ() }),
-	OpcodeJRCe:   jrcce(func(cpu *CPU) bool { return cpu.Regs.GetFlagC() }),
-	OpcodeJRNZe:  jrcce(func(cpu *CPU) bool { return !cpu.Regs.GetFlagZ() }),
-	OpcodeJRNCe:  jrcce(func(cpu *CPU) bool { return !cpu.Regs.GetFlagC() }),
-	OpcodeJPCnn:  jpccnn(func(cpu *CPU) bool { return cpu.Regs.GetFlagC() }),
-	OpcodeJPNCnn: jpccnn(func(cpu *CPU) bool { return !cpu.Regs.GetFlagC() }),
-	OpcodeJPZnn:  jpccnn(func(cpu *CPU) bool { return cpu.Regs.GetFlagZ() }),
-	OpcodeJPNZnn: jpccnn(func(cpu *CPU) bool { return !cpu.Regs.GetFlagZ() }),
-	OpcodeINCBC:  iduOp(func(cpu *CPU) { cpu.SetBC(cpu.GetBC() + 1) }),
-	OpcodeINCDE:  iduOp(func(cpu *CPU) { cpu.SetDE(cpu.GetDE() + 1) }),
-	OpcodeINCHL:  iduOp(func(cpu *CPU) { cpu.SetHL(cpu.GetHL() + 1) }),
-	OpcodeINCSP:  iduOp(func(cpu *CPU) { cpu.Regs.SP++ }),
-	OpcodeDECBC:  iduOp(func(cpu *CPU) { cpu.SetBC(cpu.GetBC() - 1) }),
-	OpcodeDECDE:  iduOp(func(cpu *CPU) { cpu.SetDE(cpu.GetDE() - 1) }),
-	OpcodeDECHL:  iduOp(func(cpu *CPU) { cpu.SetHL(cpu.GetHL() - 1) }),
-	OpcodeDECSP:  iduOp(func(cpu *CPU) { cpu.Regs.SP-- }),
-	OpcodeCALLnn: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{2, true}:
-			cpu.Regs.TempW = cpu.readDataBus()
-		case edge{3, false}:
-			cpu.SetSP(cpu.Regs.SP - 1)
-		case edge{3, true}:
-		case edge{4, false}:
-			cpu.writeAddressBus(cpu.Regs.SP)
-			cpu.SetSP(cpu.Regs.SP - 1)
-		case edge{4, true}:
-			cpu.writeDataBus(msb(cpu.Regs.PC))
-		case edge{5, false}:
-			cpu.writeAddressBus(cpu.Regs.SP)
-		case edge{5, true}:
-			cpu.writeDataBus(lsb(cpu.Regs.PC))
-		case edge{6, false}:
-			cpu.SetPC(cpu.Regs.GetWZ())
-			return true
-		case edge{6, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeRET: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.SP)
-			cpu.SetSP(cpu.Regs.SP + 1)
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			cpu.writeAddressBus(cpu.Regs.SP)
-			cpu.SetSP(cpu.Regs.SP + 1)
-		case edge{2, true}:
-			cpu.Regs.TempW = cpu.readDataBus()
-		case edge{3, false}:
-			cpu.SetPC(cpu.Regs.GetWZ())
-		case edge{3, true}:
-		case edge{4, false}, edge{4, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodePUSHBC: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.SetSP(cpu.Regs.SP - 1)
-			cpu.writeAddressBus(cpu.Regs.SP)
-		case edge{1, true}:
-			cpu.writeDataBus(cpu.Regs.B)
-		case edge{2, false}:
-			cpu.SetSP(cpu.Regs.SP - 1)
-			cpu.writeAddressBus(cpu.Regs.SP)
-		case edge{2, true}:
-			cpu.writeDataBus(cpu.Regs.C)
-		case edge{3, false}:
-		case edge{3, true}:
-		case edge{4, false}:
-			return true
-		case edge{4, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodePOPBC: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.SP)
-			cpu.SetSP(cpu.Regs.SP + 1)
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			cpu.writeAddressBus(cpu.Regs.SP)
-			cpu.SetSP(cpu.Regs.SP + 1)
-		case edge{2, true}:
-			cpu.Regs.TempW = cpu.readDataBus()
-		case edge{3, false}:
-			cpu.SetBC(cpu.Regs.GetWZ())
-			return true
-		case edge{3, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeLDBCnn:   ldxxnn(func(cpu *CPU, wz uint16) { cpu.SetBC(wz) }),
-	OpcodeLDDEnn:   ldxxnn(func(cpu *CPU, wz uint16) { cpu.SetDE(wz) }),
-	OpcodeLDHLnn:   ldxxnn(func(cpu *CPU, wz uint16) { cpu.SetHL(wz) }),
-	OpcodeLDSPnn:   ldxxnn(func(cpu *CPU, wz uint16) { cpu.SetSP(wz) }),
-	OpcodeLDHLAInc: ldhla(func(cpu *CPU) { cpu.SetHL(cpu.GetHL() + 1) }),
-	OpcodeLDHLADec: ldhla(func(cpu *CPU) { cpu.SetHL(cpu.GetHL() - 1) }),
-	OpcodeLDHLA:    ldhla(func(cpu *CPU) {}),
-	OpcodeLDHCA: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(join16(0xff, cpu.Regs.C))
-		case edge{1, true}:
-			cpu.writeDataBus(cpu.Regs.A)
-		case edge{2, false}, edge{2, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeADDHL: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.GetHL())
-		case edge{1, true}:
-			data := cpu.readDataBus()
-			carry := uint16(cpu.Regs.A)+uint16(data) > 256
-			result := cpu.Regs.A + data
-			cpu.Regs.A = result
-			cpu.Regs.SetFlagZ(result == 0)
+func handlers(cpu *CPU) [256]InstructionHandling {
+	return [256]InstructionHandling{
+		OpcodeNop: cpu.singleCycle(func() {
+			if cpu.clockCycle.C > 0 {
+				panic("unexpected nop") // TODO remove
+			}
+		}),
+		OpcodeLDAA: cpu.ld(&cpu.Regs.A, &cpu.Regs.A),
+		OpcodeLDAB: cpu.ld(&cpu.Regs.A, &cpu.Regs.B),
+		OpcodeLDAC: cpu.ld(&cpu.Regs.A, &cpu.Regs.C),
+		OpcodeLDAD: cpu.ld(&cpu.Regs.A, &cpu.Regs.D),
+		OpcodeLDAE: cpu.ld(&cpu.Regs.A, &cpu.Regs.E),
+		OpcodeLDAH: cpu.ld(&cpu.Regs.A, &cpu.Regs.H),
+		OpcodeLDAL: cpu.ld(&cpu.Regs.A, &cpu.Regs.L),
+		OpcodeLDBA: cpu.ld(&cpu.Regs.B, &cpu.Regs.A),
+		OpcodeLDBB: cpu.ld(&cpu.Regs.B, &cpu.Regs.B),
+		OpcodeLDBC: cpu.ld(&cpu.Regs.B, &cpu.Regs.C),
+		OpcodeLDBD: cpu.ld(&cpu.Regs.B, &cpu.Regs.D),
+		OpcodeLDBE: cpu.ld(&cpu.Regs.B, &cpu.Regs.E),
+		OpcodeLDBH: cpu.ld(&cpu.Regs.B, &cpu.Regs.H),
+		OpcodeLDBL: cpu.ld(&cpu.Regs.B, &cpu.Regs.L),
+		OpcodeLDCA: cpu.ld(&cpu.Regs.C, &cpu.Regs.A),
+		OpcodeLDCB: cpu.ld(&cpu.Regs.C, &cpu.Regs.B),
+		OpcodeLDCC: cpu.ld(&cpu.Regs.C, &cpu.Regs.C),
+		OpcodeLDCD: cpu.ld(&cpu.Regs.C, &cpu.Regs.D),
+		OpcodeLDCE: cpu.ld(&cpu.Regs.C, &cpu.Regs.E),
+		OpcodeLDCH: cpu.ld(&cpu.Regs.C, &cpu.Regs.H),
+		OpcodeLDCL: cpu.ld(&cpu.Regs.C, &cpu.Regs.L),
+		OpcodeLDDA: cpu.ld(&cpu.Regs.D, &cpu.Regs.A),
+		OpcodeLDDB: cpu.ld(&cpu.Regs.D, &cpu.Regs.B),
+		OpcodeLDDC: cpu.ld(&cpu.Regs.D, &cpu.Regs.C),
+		OpcodeLDDD: cpu.ld(&cpu.Regs.D, &cpu.Regs.D),
+		OpcodeLDDE: cpu.ld(&cpu.Regs.D, &cpu.Regs.E),
+		OpcodeLDDH: cpu.ld(&cpu.Regs.D, &cpu.Regs.H),
+		OpcodeLDDL: cpu.ld(&cpu.Regs.D, &cpu.Regs.L),
+		OpcodeLDEA: cpu.ld(&cpu.Regs.E, &cpu.Regs.A),
+		OpcodeLDEB: cpu.ld(&cpu.Regs.E, &cpu.Regs.B),
+		OpcodeLDEC: cpu.ld(&cpu.Regs.E, &cpu.Regs.C),
+		OpcodeLDED: cpu.ld(&cpu.Regs.E, &cpu.Regs.D),
+		OpcodeLDEE: cpu.ld(&cpu.Regs.E, &cpu.Regs.E),
+		OpcodeLDEH: cpu.ld(&cpu.Regs.E, &cpu.Regs.H),
+		OpcodeLDEL: cpu.ld(&cpu.Regs.E, &cpu.Regs.L),
+		OpcodeLDHA: cpu.ld(&cpu.Regs.H, &cpu.Regs.A),
+		OpcodeLDHB: cpu.ld(&cpu.Regs.H, &cpu.Regs.B),
+		OpcodeLDHC: cpu.ld(&cpu.Regs.H, &cpu.Regs.C),
+		OpcodeLDHD: cpu.ld(&cpu.Regs.H, &cpu.Regs.D),
+		OpcodeLDHE: cpu.ld(&cpu.Regs.H, &cpu.Regs.E),
+		OpcodeLDHH: cpu.ld(&cpu.Regs.H, &cpu.Regs.H),
+		OpcodeLDHL: cpu.ld(&cpu.Regs.H, &cpu.Regs.L),
+		OpcodeLDLA: cpu.ld(&cpu.Regs.L, &cpu.Regs.A),
+		OpcodeLDLB: cpu.ld(&cpu.Regs.L, &cpu.Regs.B),
+		OpcodeLDLC: cpu.ld(&cpu.Regs.L, &cpu.Regs.C),
+		OpcodeLDLD: cpu.ld(&cpu.Regs.L, &cpu.Regs.D),
+		OpcodeLDLE: cpu.ld(&cpu.Regs.L, &cpu.Regs.E),
+		OpcodeLDLH: cpu.ld(&cpu.Regs.L, &cpu.Regs.H),
+		OpcodeLDLL: cpu.ld(&cpu.Regs.L, &cpu.Regs.L),
+		OpcodeRLA: cpu.singleCycle(func() {
+			a := cpu.Regs.A
+			bit7 := a & 0x80
+			a <<= 1
+			if cpu.Regs.GetFlagC() {
+				a |= 0x01
+			}
+			cpu.Regs.SetFlagZ(false)
 			cpu.Regs.SetFlagN(false)
-			cpu.Regs.TODOFlagH()
-			cpu.Regs.SetFlagC(carry)
-		case edge{2, false}, edge{2, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeCPHL: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.GetHL())
-		case edge{1, true}:
-			data := cpu.readDataBus()
-			carry := data > cpu.Regs.A
-			result := cpu.Regs.A - data
-			cpu.Regs.SetFlagZ(result == 0)
-			cpu.Regs.SetFlagN(true)
-			cpu.Regs.TODOFlagH()
-			cpu.Regs.SetFlagC(carry)
-		case edge{2, false}, edge{2, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeLDnnA: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{2, true}:
-			cpu.Regs.TempW = cpu.readDataBus()
-		case edge{3, false}:
-			cpu.writeAddressBus(cpu.Regs.GetWZ())
-		case edge{3, true}:
-			cpu.writeDataBus(cpu.Regs.A)
-		case edge{4, false}, edge{4, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeLDAnn: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{2, true}:
-			cpu.Regs.TempW = cpu.readDataBus()
-		case edge{3, false}:
-			cpu.writeAddressBus(cpu.Regs.GetWZ())
-		case edge{3, true}:
-			cpu.Regs.A = cpu.readDataBus()
-		case edge{4, false}, edge{4, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeCPn: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			return true
-		case edge{2, true}:
-			cpu.Debug("CPn", "A=%02x n=%02x", cpu.Regs.A, cpu.Regs.TempZ)
-			carry := cpu.Regs.A < cpu.Regs.TempZ
-			result := cpu.Regs.A - cpu.Regs.TempZ
-			cpu.Regs.SetFlagZ(result == 0)
-			cpu.Regs.SetFlagN(true)
-			cpu.Regs.TODOFlagH()
-			cpu.Regs.SetFlagC(carry)
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeLDHnA: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
-			cpu.IncPC()
-		case edge{2, true}:
-			cpu.writeDataBus(cpu.Regs.A)
-		case edge{3, false}, edge{3, true}:
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeLDHAn: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
-		case edge{2, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{3, false}:
-			return true
-		case edge{3, true}:
-			cpu.Regs.A = cpu.Regs.TempZ
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeLDADE: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(join16(cpu.Regs.D, cpu.Regs.E))
-		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
-		case edge{2, false}:
-			return true
-		case edge{2, true}:
-			cpu.Regs.A = cpu.Regs.TempZ
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
-	OpcodeLDAn: ldrn(func(cpu *CPU, z uint8) { cpu.Regs.A = z }),
-	OpcodeLDBn: ldrn(func(cpu *CPU, z uint8) { cpu.Regs.B = z }),
-	OpcodeLDCn: ldrn(func(cpu *CPU, z uint8) { cpu.Regs.C = z }),
-	OpcodeLDDn: ldrn(func(cpu *CPU, z uint8) { cpu.Regs.D = z }),
-	OpcodeLDEn: ldrn(func(cpu *CPU, z uint8) { cpu.Regs.E = z }),
-	OpcodeLDHn: ldrn(func(cpu *CPU, z uint8) { cpu.Regs.H = z }),
-	OpcodeLDLn: ldrn(func(cpu *CPU, z uint8) { cpu.Regs.L = z }),
-	OpcodeCB: func(cpu *CPU, e edge) bool {
-		switch e {
-		case edge{1, false}:
-			cpu.writeAddressBus(cpu.Regs.PC)
-			cpu.IncPC()
-		case edge{1, true}:
-			opcode := cpu.readDataBus()
-			cpu.CBOp = CBOp{Op: cb((opcode & 0xf8) >> 3), Target: CBTarget(opcode & 0x7)}
-		case edge{2, false}:
-			return true
-		case edge{2, true}:
-			var val uint8
-			switch cpu.CBOp.Target {
-			case CBTargetB:
-				val = cpu.Regs.B
-			case CBTargetC:
-				val = cpu.Regs.C
-			case CBTargetD:
-				val = cpu.Regs.D
-			case CBTargetE:
-				val = cpu.Regs.E
-			case CBTargetH:
-				val = cpu.Regs.H
-			case CBTargetL:
-				val = cpu.Regs.L
-			case CBTargetIndirectHL:
-				panic("indirect thru HL not implemented")
-			case CBTargetA:
-				val = cpu.Regs.A
+			cpu.Regs.SetFlagH(false)
+			cpu.Regs.SetFlagC(bit7 != 0)
+			cpu.Regs.A = a
+		}),
+		OpcodeORA:  cpu.orreg(&cpu.Regs.A),
+		OpcodeORB:  cpu.orreg(&cpu.Regs.B),
+		OpcodeORC:  cpu.orreg(&cpu.Regs.C),
+		OpcodeORD:  cpu.orreg(&cpu.Regs.D),
+		OpcodeORE:  cpu.orreg(&cpu.Regs.E),
+		OpcodeORH:  cpu.orreg(&cpu.Regs.H),
+		OpcodeORL:  cpu.orreg(&cpu.Regs.L),
+		OpcodeANDA: cpu.andreg(&cpu.Regs.A),
+		OpcodeANDB: cpu.andreg(&cpu.Regs.B),
+		OpcodeANDC: cpu.andreg(&cpu.Regs.C),
+		OpcodeANDD: cpu.andreg(&cpu.Regs.D),
+		OpcodeANDE: cpu.andreg(&cpu.Regs.E),
+		OpcodeANDH: cpu.andreg(&cpu.Regs.H),
+		OpcodeANDL: cpu.andreg(&cpu.Regs.L),
+		OpcodeXORA: cpu.xorreg(&cpu.Regs.A),
+		OpcodeXORB: cpu.xorreg(&cpu.Regs.B),
+		OpcodeXORC: cpu.xorreg(&cpu.Regs.C),
+		OpcodeXORD: cpu.xorreg(&cpu.Regs.D),
+		OpcodeXORE: cpu.xorreg(&cpu.Regs.E),
+		OpcodeXORH: cpu.xorreg(&cpu.Regs.H),
+		OpcodeXORL: cpu.xorreg(&cpu.Regs.L),
+		OpcodeSUBA: cpu.subreg(&cpu.Regs.A),
+		OpcodeSUBB: cpu.subreg(&cpu.Regs.B),
+		OpcodeSUBC: cpu.subreg(&cpu.Regs.C),
+		OpcodeSUBD: cpu.subreg(&cpu.Regs.D),
+		OpcodeSUBE: cpu.subreg(&cpu.Regs.E),
+		OpcodeSUBH: cpu.subreg(&cpu.Regs.H),
+		OpcodeSUBL: cpu.subreg(&cpu.Regs.L),
+		OpcodeADDA: cpu.andreg(&cpu.Regs.A),
+		OpcodeADDB: cpu.andreg(&cpu.Regs.B),
+		OpcodeADDC: cpu.andreg(&cpu.Regs.C),
+		OpcodeADDD: cpu.andreg(&cpu.Regs.D),
+		OpcodeADDE: cpu.andreg(&cpu.Regs.E),
+		OpcodeADDH: cpu.andreg(&cpu.Regs.H),
+		OpcodeADDL: cpu.andreg(&cpu.Regs.L),
+		OpcodeDECA: cpu.decreg(&cpu.Regs.A),
+		OpcodeDECB: cpu.decreg(&cpu.Regs.B),
+		OpcodeDECC: cpu.decreg(&cpu.Regs.C),
+		OpcodeDECD: cpu.decreg(&cpu.Regs.D),
+		OpcodeDECE: cpu.decreg(&cpu.Regs.E),
+		OpcodeDECH: cpu.decreg(&cpu.Regs.H),
+		OpcodeDECL: cpu.decreg(&cpu.Regs.L),
+		OpcodeINCA: cpu.increg(&cpu.Regs.A),
+		OpcodeINCB: cpu.increg(&cpu.Regs.B),
+		OpcodeINCC: cpu.increg(&cpu.Regs.C),
+		OpcodeINCD: cpu.increg(&cpu.Regs.D),
+		OpcodeINCE: cpu.increg(&cpu.Regs.E),
+		OpcodeINCH: cpu.increg(&cpu.Regs.H),
+		OpcodeINCL: cpu.increg(&cpu.Regs.L),
+		OpcodeDI: cpu.singleCycle(func() {
+			cpu.Interrupts.setIMENextCycle = false
+			cpu.Interrupts.IME = false
+		}),
+		OpcodeEI: cpu.singleCycle(func() {
+			cpu.Interrupts.setIMENextCycle = true
+		}),
+		OpcodeJRe: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			// TODO: this impl is not exactly correct
+			case edge{2, false}:
+			case edge{2, true}:
+			case edge{3, false}:
+				cpu.SetPC(uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ))))
+				return true
+			case edge{3, true}:
+				return true
 			default:
-				panic("unknown CBOp target")
+				panicv(e)
 			}
-			cpu.Debug("ExecCBOp", "op=%v target=%v", cpu.CBOp.Op, cpu.CBOp.Target)
-			switch cpu.CBOp.Op {
-			case CbRL:
-				bit7 := val & 0x80
-				val <<= 1
-				if cpu.Regs.GetFlagC() {
-					val |= 0x01
-				}
-				cpu.Regs.SetFlagZ(val == 0)
+			return false
+		},
+		OpcodeJPnn: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{2, true}:
+				cpu.Regs.TempW = cpu.readDataBus()
+			case edge{3, false}:
+			case edge{3, true}:
+			case edge{4, false}:
+				cpu.SetPC(cpu.Regs.GetWZ())
+				return true
+			case edge{4, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeJRZe:   cpu.jrcce(func() bool { return cpu.Regs.GetFlagZ() }),
+		OpcodeJRCe:   cpu.jrcce(func() bool { return cpu.Regs.GetFlagC() }),
+		OpcodeJRNZe:  cpu.jrcce(func() bool { return !cpu.Regs.GetFlagZ() }),
+		OpcodeJRNCe:  cpu.jrcce(func() bool { return !cpu.Regs.GetFlagC() }),
+		OpcodeJPCnn:  cpu.jpccnn(func() bool { return cpu.Regs.GetFlagC() }),
+		OpcodeJPNCnn: cpu.jpccnn(func() bool { return !cpu.Regs.GetFlagC() }),
+		OpcodeJPZnn:  cpu.jpccnn(func() bool { return cpu.Regs.GetFlagZ() }),
+		OpcodeJPNZnn: cpu.jpccnn(func() bool { return !cpu.Regs.GetFlagZ() }),
+		OpcodeINCBC:  cpu.iduOp(func() { cpu.SetBC(cpu.GetBC() + 1) }),
+		OpcodeINCDE:  cpu.iduOp(func() { cpu.SetDE(cpu.GetDE() + 1) }),
+		OpcodeINCHL:  cpu.iduOp(func() { cpu.SetHL(cpu.GetHL() + 1) }),
+		OpcodeINCSP:  cpu.iduOp(func() { cpu.Regs.SP++ }),
+		OpcodeDECBC:  cpu.iduOp(func() { cpu.SetBC(cpu.GetBC() - 1) }),
+		OpcodeDECDE:  cpu.iduOp(func() { cpu.SetDE(cpu.GetDE() - 1) }),
+		OpcodeDECHL:  cpu.iduOp(func() { cpu.SetHL(cpu.GetHL() - 1) }),
+		OpcodeDECSP:  cpu.iduOp(func() { cpu.Regs.SP-- }),
+		OpcodeCALLnn: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{2, true}:
+				cpu.Regs.TempW = cpu.readDataBus()
+			case edge{3, false}:
+				cpu.SetSP(cpu.Regs.SP - 1)
+			case edge{3, true}:
+			case edge{4, false}:
+				cpu.writeAddressBus(cpu.Regs.SP)
+				cpu.SetSP(cpu.Regs.SP - 1)
+			case edge{4, true}:
+				cpu.writeDataBus(msb(cpu.Regs.PC))
+			case edge{5, false}:
+				cpu.writeAddressBus(cpu.Regs.SP)
+			case edge{5, true}:
+				cpu.writeDataBus(lsb(cpu.Regs.PC))
+			case edge{6, false}:
+				cpu.SetPC(cpu.Regs.GetWZ())
+				return true
+			case edge{6, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeRET: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.SP)
+				cpu.SetSP(cpu.Regs.SP + 1)
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				cpu.writeAddressBus(cpu.Regs.SP)
+				cpu.SetSP(cpu.Regs.SP + 1)
+			case edge{2, true}:
+				cpu.Regs.TempW = cpu.readDataBus()
+			case edge{3, false}:
+				cpu.SetPC(cpu.Regs.GetWZ())
+			case edge{3, true}:
+			case edge{4, false}, edge{4, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodePUSHBC: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.SetSP(cpu.Regs.SP - 1)
+				cpu.writeAddressBus(cpu.Regs.SP)
+			case edge{1, true}:
+				cpu.writeDataBus(cpu.Regs.B)
+			case edge{2, false}:
+				cpu.SetSP(cpu.Regs.SP - 1)
+				cpu.writeAddressBus(cpu.Regs.SP)
+			case edge{2, true}:
+				cpu.writeDataBus(cpu.Regs.C)
+			case edge{3, false}:
+			case edge{3, true}:
+			case edge{4, false}:
+				return true
+			case edge{4, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodePOPBC: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.SP)
+				cpu.SetSP(cpu.Regs.SP + 1)
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				cpu.writeAddressBus(cpu.Regs.SP)
+				cpu.SetSP(cpu.Regs.SP + 1)
+			case edge{2, true}:
+				cpu.Regs.TempW = cpu.readDataBus()
+			case edge{3, false}:
+				cpu.SetBC(cpu.Regs.GetWZ())
+				return true
+			case edge{3, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDBCnn:   cpu.ldxxnn(func(wz uint16) { cpu.SetBC(wz) }),
+		OpcodeLDDEnn:   cpu.ldxxnn(func(wz uint16) { cpu.SetDE(wz) }),
+		OpcodeLDHLnn:   cpu.ldxxnn(func(wz uint16) { cpu.SetHL(wz) }),
+		OpcodeLDSPnn:   cpu.ldxxnn(func(wz uint16) { cpu.SetSP(wz) }),
+		OpcodeLDHLAInc: cpu.ldhla(func() { cpu.SetHL(cpu.GetHL() + 1) }),
+		OpcodeLDHLADec: cpu.ldhla(func() { cpu.SetHL(cpu.GetHL() - 1) }),
+		OpcodeLDHLA:    cpu.ldhla(func() {}),
+		OpcodeLDHCA: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(join16(0xff, cpu.Regs.C))
+			case edge{1, true}:
+				cpu.writeDataBus(cpu.Regs.A)
+			case edge{2, false}, edge{2, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeADDHL: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.GetHL())
+			case edge{1, true}:
+				data := cpu.readDataBus()
+				carry := uint16(cpu.Regs.A)+uint16(data) > 256
+				result := cpu.Regs.A + data
+				cpu.Regs.A = result
+				cpu.Regs.SetFlagZ(result == 0)
 				cpu.Regs.SetFlagN(false)
-				cpu.Regs.SetFlagH(false)
-				cpu.Regs.SetFlagC(bit7 != 0)
-			case CbBit0:
-				cbbit(cpu, val, 0x01)
-			case CbBit1:
-				cbbit(cpu, val, 0x02)
-			case CbBit2:
-				cbbit(cpu, val, 0x04)
-			case CbBit3:
-				cbbit(cpu, val, 0x08)
-			case CbBit4:
-				cbbit(cpu, val, 0x10)
-			case CbBit5:
-				cbbit(cpu, val, 0x20)
-			case CbBit6:
-				cbbit(cpu, val, 0x40)
-			case CbBit7:
-				cbbit(cpu, val, 0x80)
+				cpu.Regs.TODOFlagH()
+				cpu.Regs.SetFlagC(carry)
+			case edge{2, false}, edge{2, true}:
+				return true
 			default:
-				panicf("unknown op = %+v", cpu.CBOp)
+				panicv(e)
 			}
-			switch cpu.CBOp.Target {
-			case CBTargetB:
-				cpu.Regs.B = val
-			case CBTargetC:
-				cpu.Regs.C = val
-			case CBTargetD:
-				cpu.Regs.D = val
-			case CBTargetE:
-				cpu.Regs.E = val
-			case CBTargetH:
-				cpu.Regs.H = val
-			case CBTargetL:
-				cpu.Regs.L = val
-			case CBTargetIndirectHL:
-				panic("indirect thru HL not implemented")
-			case CBTargetA:
-				cpu.Regs.A = val
+			return false
+		},
+		OpcodeCPHL: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.GetHL())
+			case edge{1, true}:
+				data := cpu.readDataBus()
+				carry := data > cpu.Regs.A
+				result := cpu.Regs.A - data
+				cpu.Regs.SetFlagZ(result == 0)
+				cpu.Regs.SetFlagN(true)
+				cpu.Regs.TODOFlagH()
+				cpu.Regs.SetFlagC(carry)
+			case edge{2, false}, edge{2, true}:
+				return true
 			default:
-				panic("unknown CBOp target")
+				panicv(e)
 			}
-			return true
-		default:
-			panicv(e)
-		}
-		return false
-	},
+			return false
+		},
+		OpcodeLDnnA: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{2, true}:
+				cpu.Regs.TempW = cpu.readDataBus()
+			case edge{3, false}:
+				cpu.writeAddressBus(cpu.Regs.GetWZ())
+			case edge{3, true}:
+				cpu.writeDataBus(cpu.Regs.A)
+			case edge{4, false}, edge{4, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDAnn: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{2, true}:
+				cpu.Regs.TempW = cpu.readDataBus()
+			case edge{3, false}:
+				cpu.writeAddressBus(cpu.Regs.GetWZ())
+			case edge{3, true}:
+				cpu.Regs.A = cpu.readDataBus()
+			case edge{4, false}, edge{4, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeCPn: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				return true
+			case edge{2, true}:
+				cpu.Debug("CPn", "A=%02x n=%02x", cpu.Regs.A, cpu.Regs.TempZ)
+				carry := cpu.Regs.A < cpu.Regs.TempZ
+				result := cpu.Regs.A - cpu.Regs.TempZ
+				cpu.Regs.SetFlagZ(result == 0)
+				cpu.Regs.SetFlagN(true)
+				cpu.Regs.TODOFlagH()
+				cpu.Regs.SetFlagC(carry)
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDHnA: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
+				cpu.IncPC()
+			case edge{2, true}:
+				cpu.writeDataBus(cpu.Regs.A)
+			case edge{3, false}, edge{3, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDHAn: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
+			case edge{2, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{3, false}:
+				return true
+			case edge{3, true}:
+				cpu.Regs.A = cpu.Regs.TempZ
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDADE: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(join16(cpu.Regs.D, cpu.Regs.E))
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.readDataBus()
+			case edge{2, false}:
+				return true
+			case edge{2, true}:
+				cpu.Regs.A = cpu.Regs.TempZ
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDAn: cpu.ldrn(&cpu.Regs.A),
+		OpcodeLDBn: cpu.ldrn(&cpu.Regs.B),
+		OpcodeLDCn: cpu.ldrn(&cpu.Regs.C),
+		OpcodeLDDn: cpu.ldrn(&cpu.Regs.D),
+		OpcodeLDEn: cpu.ldrn(&cpu.Regs.E),
+		OpcodeLDHn: cpu.ldrn(&cpu.Regs.H),
+		OpcodeLDLn: cpu.ldrn(&cpu.Regs.L),
+		OpcodeCB: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				opcode := cpu.readDataBus()
+				cpu.CBOp = CBOp{Op: cb((opcode & 0xf8) >> 3), Target: CBTarget(opcode & 0x7)}
+			case edge{2, false}:
+				return true
+			case edge{2, true}:
+				var val uint8
+				switch cpu.CBOp.Target {
+				case CBTargetB:
+					val = cpu.Regs.B
+				case CBTargetC:
+					val = cpu.Regs.C
+				case CBTargetD:
+					val = cpu.Regs.D
+				case CBTargetE:
+					val = cpu.Regs.E
+				case CBTargetH:
+					val = cpu.Regs.H
+				case CBTargetL:
+					val = cpu.Regs.L
+				case CBTargetIndirectHL:
+					panic("indirect thru HL not implemented")
+				case CBTargetA:
+					val = cpu.Regs.A
+				default:
+					panic("unknown CBOp target")
+				}
+				cpu.Debug("ExecCBOp", "op=%v target=%v", cpu.CBOp.Op, cpu.CBOp.Target)
+				switch cpu.CBOp.Op {
+				case CbRL:
+					bit7 := val & 0x80
+					val <<= 1
+					if cpu.Regs.GetFlagC() {
+						val |= 0x01
+					}
+					cpu.Regs.SetFlagZ(val == 0)
+					cpu.Regs.SetFlagN(false)
+					cpu.Regs.SetFlagH(false)
+					cpu.Regs.SetFlagC(bit7 != 0)
+				case CbBit0:
+					cbbit(cpu, val, 0x01)
+				case CbBit1:
+					cbbit(cpu, val, 0x02)
+				case CbBit2:
+					cbbit(cpu, val, 0x04)
+				case CbBit3:
+					cbbit(cpu, val, 0x08)
+				case CbBit4:
+					cbbit(cpu, val, 0x10)
+				case CbBit5:
+					cbbit(cpu, val, 0x20)
+				case CbBit6:
+					cbbit(cpu, val, 0x40)
+				case CbBit7:
+					cbbit(cpu, val, 0x80)
+				default:
+					panicf("unknown op = %+v", cpu.CBOp)
+				}
+				switch cpu.CBOp.Target {
+				case CBTargetB:
+					cpu.Regs.B = val
+				case CBTargetC:
+					cpu.Regs.C = val
+				case CBTargetD:
+					cpu.Regs.D = val
+				case CBTargetE:
+					cpu.Regs.E = val
+				case CBTargetH:
+					cpu.Regs.H = val
+				case CBTargetL:
+					cpu.Regs.L = val
+				case CBTargetIndirectHL:
+					panic("indirect thru HL not implemented")
+				case CBTargetA:
+					cpu.Regs.A = val
+				default:
+					panic("unknown CBOp target")
+				}
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+	}
 }
 
-func singleCycle(f func(cpu *CPU)) func(cpu *CPU, e edge) bool {
-	return func(cpu *CPU, e edge) bool {
+func (cpu *CPU) singleCycle(f func()) func(e edge) bool {
+	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
 			return true
 		case edge{1, true}:
-			f(cpu)
+			f()
 			return true
 		default:
 			panicv(e)
@@ -827,8 +829,8 @@ func singleCycle(f func(cpu *CPU)) func(cpu *CPU, e edge) bool {
 	}
 }
 
-func jrcce(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
-	return func(cpu *CPU, e edge) bool {
+func (cpu *CPU) jrcce(f func() bool) func(e edge) bool {
+	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -836,26 +838,26 @@ func jrcce(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
 		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.readDataBus()
 		case edge{2, false}:
-			if f(cpu) {
+			if f() {
 			} else {
 				return true
 			}
 		case edge{2, true}:
-			if f(cpu) {
+			if f() {
 				newPC := uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ)))
 				cpu.Regs.SetWZ(newPC)
 			} else {
 				return true
 			}
 		case edge{3, false}:
-			if f(cpu) {
+			if f() {
 				cpu.SetPC(cpu.Regs.GetWZ())
 				return true
 			} else {
 				panicv(e)
 			}
 		case edge{3, true}:
-			if f(cpu) {
+			if f() {
 				return true
 			} else {
 				panicv(e)
@@ -867,8 +869,8 @@ func jrcce(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
 	}
 }
 
-func jpccnn(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
-	return func(cpu *CPU, e edge) bool {
+func (cpu *CPU) jpccnn(f func() bool) func(e edge) bool {
+	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -881,24 +883,24 @@ func jpccnn(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
 		case edge{2, true}:
 			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
-			if f(cpu) {
+			if f() {
 				cpu.SetPC(cpu.Regs.GetWZ())
 			} else {
 				return true
 			}
 		case edge{3, true}:
-			if f(cpu) {
+			if f() {
 			} else {
 				return true
 			}
 		case edge{4, false}:
-			if f(cpu) {
+			if f() {
 				return true
 			} else {
 				panicv(e)
 			}
 		case edge{4, true}:
-			if f(cpu) {
+			if f() {
 				return true
 			} else {
 				panicv(e)
@@ -910,10 +912,15 @@ func jpccnn(f func(cpu *CPU) bool) func(cpu *CPU, e edge) bool {
 	}
 }
 
-func andreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
-	return singleCycle(func(cpu *CPU) {
-		reg := f(cpu)
-		cpu.Regs.A &= reg
+func (cpu *CPU) ld(dst, src *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
+		*dst = *src
+	})
+}
+
+func (cpu *CPU) andreg(reg *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
+		cpu.Regs.A &= *reg
 		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
 		cpu.Regs.SetFlagN(false)
 		cpu.Regs.SetFlagH(true)
@@ -921,10 +928,9 @@ func andreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 	})
 }
 
-func xorreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
-	return singleCycle(func(cpu *CPU) {
-		reg := f(cpu)
-		cpu.Regs.A ^= reg
+func (cpu *CPU) xorreg(reg *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
+		cpu.Regs.A ^= *reg
 		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
 		cpu.Regs.SetFlagN(false)
 		cpu.Regs.SetFlagH(false)
@@ -932,10 +938,9 @@ func xorreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 	})
 }
 
-func orreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
-	return singleCycle(func(cpu *CPU) {
-		reg := f(cpu)
-		cpu.Regs.A |= reg
+func (cpu *CPU) orreg(reg *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
+		cpu.Regs.A |= *reg
 		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
 		cpu.Regs.SetFlagN(false)
 		cpu.Regs.SetFlagH(false)
@@ -943,11 +948,10 @@ func orreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 	})
 }
 
-func addreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
-	return singleCycle(func(cpu *CPU) {
-		reg := f(cpu)
-		carry := uint16(reg)+uint16(cpu.Regs.A) > 256
-		cpu.Regs.A += reg
+func (cpu *CPU) addreg(reg *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
+		carry := uint16(*reg)+uint16(cpu.Regs.A) > 256
+		cpu.Regs.A += *reg
 		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
 		cpu.Regs.SetFlagN(false)
 		cpu.Regs.TODOFlagH()
@@ -955,11 +959,10 @@ func addreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 	})
 }
 
-func subreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
-	return singleCycle(func(cpu *CPU) {
-		reg := f(cpu)
-		carry := reg > cpu.Regs.A
-		cpu.Regs.A -= reg
+func (cpu *CPU) subreg(reg *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
+		carry := *reg > cpu.Regs.A
+		cpu.Regs.A -= *reg
 		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
 		cpu.Regs.SetFlagN(true)
 		cpu.Regs.TODOFlagH()
@@ -967,9 +970,8 @@ func subreg(f func(cpu *CPU) uint8) func(cpu *CPU, e edge) bool {
 	})
 }
 
-func decreg(f func(cpu *CPU) *uint8) func(cpu *CPU, e edge) bool {
-	return singleCycle(func(cpu *CPU) {
-		reg := f(cpu)
+func (cpu *CPU) decreg(reg *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
 		*reg -= 1
 		cpu.Regs.SetFlagZ(*reg == 0)
 		cpu.Regs.SetFlagN(true)
@@ -977,9 +979,8 @@ func decreg(f func(cpu *CPU) *uint8) func(cpu *CPU, e edge) bool {
 	})
 }
 
-func increg(f func(cpu *CPU) *uint8) func(cpu *CPU, e edge) bool {
-	return singleCycle(func(cpu *CPU) {
-		reg := f(cpu)
+func (cpu *CPU) increg(reg *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
 		*reg += 1
 		cpu.Regs.SetFlagZ(*reg == 0)
 		cpu.Regs.SetFlagN(false)
@@ -987,11 +988,11 @@ func increg(f func(cpu *CPU) *uint8) func(cpu *CPU, e edge) bool {
 	})
 }
 
-func iduOp(f func(cpu *CPU)) func(cpu *CPU, e edge) bool {
-	return func(cpu *CPU, e edge) bool {
+func (cpu *CPU) iduOp(f func()) func(e edge) bool {
+	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
-			f(cpu)
+			f()
 		case edge{1, true}:
 		case edge{2, false}, edge{2, true}:
 			return true
@@ -1002,8 +1003,8 @@ func iduOp(f func(cpu *CPU)) func(cpu *CPU, e edge) bool {
 	}
 }
 
-func ldrn(f func(cpu *CPU, z uint8)) func(cpu *CPU, e edge) bool {
-	return func(cpu *CPU, e edge) bool {
+func (cpu *CPU) ldrn(reg *uint8) func(e edge) bool {
+	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -1013,7 +1014,7 @@ func ldrn(f func(cpu *CPU, z uint8)) func(cpu *CPU, e edge) bool {
 			cpu.IncPC()
 			return true
 		case edge{2, true}:
-			f(cpu, cpu.Regs.TempZ)
+			*reg = cpu.Regs.TempZ
 			return true
 		default:
 			panicv(e)
@@ -1022,12 +1023,12 @@ func ldrn(f func(cpu *CPU, z uint8)) func(cpu *CPU, e edge) bool {
 	}
 }
 
-func ldhla(f func(cpu *CPU)) func(cpu *CPU, e edge) bool {
-	return func(cpu *CPU, e edge) bool {
+func (cpu *CPU) ldhla(f func()) func(e edge) bool {
+	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
 			cpu.writeAddressBus(cpu.GetHL())
-			f(cpu)
+			f()
 		case edge{1, true}:
 			cpu.writeDataBus(cpu.Regs.A)
 		case edge{2, false}:
@@ -1041,8 +1042,8 @@ func ldhla(f func(cpu *CPU)) func(cpu *CPU, e edge) bool {
 	}
 }
 
-func ldxxnn(f func(cpu *CPU, wz uint16)) func(cpu *CPU, e edge) bool {
-	return func(cpu *CPU, e edge) bool {
+func (cpu *CPU) ldxxnn(f func(wz uint16)) func(e edge) bool {
+	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -1055,7 +1056,7 @@ func ldxxnn(f func(cpu *CPU, wz uint16)) func(cpu *CPU, e edge) bool {
 		case edge{2, true}:
 			cpu.Regs.TempW = cpu.readDataBus()
 		case edge{3, false}:
-			f(cpu, join16(cpu.Regs.TempW, cpu.Regs.TempZ))
+			f(join16(cpu.Regs.TempW, cpu.Regs.TempZ))
 			return true
 		case edge{3, true}:
 			return true
