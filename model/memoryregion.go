@@ -20,7 +20,7 @@ func (mr *MemoryRegion) GetCounters(addr uint16) (uint64, uint64) {
 
 func (mr *MemoryRegion) Read(addr uint16) uint8 {
 	idx := addr - mr.Offset
-	if !mr.CountdownDisable {
+	if !mr.CountdownDisable { // todo move out of fast path
 		mr.ReadCountdowns[idx] = ReadCountdown
 	}
 	return mr.Data[idx]
@@ -28,7 +28,7 @@ func (mr *MemoryRegion) Read(addr uint16) uint8 {
 
 func (mr *MemoryRegion) Write(addr uint16, v uint8) {
 	idx := addr - mr.Offset
-	if !mr.CountdownDisable {
+	if !mr.CountdownDisable { // todo move out of fast path
 		mr.WriteCountdowns[idx] = WriteCountdown
 	}
 	mr.Data[idx] = v

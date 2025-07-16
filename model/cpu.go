@@ -294,22 +294,7 @@ func (cpu *CPU) writeAddressBus(addr uint16) {
 		}
 	}
 	cpu.wroteToAddressBusThisCycle = true
-	//cpu.Debug("WriteAddressBus", "0x%04x", addr)
 	cpu.Bus.WriteAddress(addr)
-}
-
-func (cpu *CPU) writeDataBus(v uint8) {
-	if !cpu.clockCycle.Falling {
-		panic("writeDataBus must be called on falling edge")
-	}
-	cpu.Bus.WriteData(v)
-}
-
-func (cpu *CPU) readDataBus() uint8 {
-	if !cpu.clockCycle.Falling {
-		panic("readDataBus must be called on falling edge")
-	}
-	return cpu.Bus.Data
 }
 
 func (cpu *CPU) applyPendingIME() {

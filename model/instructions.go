@@ -377,7 +377,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			// TODO: this impl is not exactly correct
 			case edge{2, false}:
 			case edge{2, true}:
@@ -397,12 +397,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{2, true}:
-				cpu.Regs.TempW = cpu.readDataBus()
+				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
 			case edge{3, true}:
 			case edge{4, false}:
@@ -437,12 +437,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{2, true}:
-				cpu.Regs.TempW = cpu.readDataBus()
+				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
 				cpu.SetSP(cpu.Regs.SP - 1)
 			case edge{3, true}:
@@ -450,11 +450,11 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP - 1)
 			case edge{4, true}:
-				cpu.writeDataBus(msb(cpu.Regs.PC))
+				cpu.Bus.WriteData(msb(cpu.Regs.PC))
 			case edge{5, false}:
 				cpu.writeAddressBus(cpu.Regs.SP)
 			case edge{5, true}:
-				cpu.writeDataBus(lsb(cpu.Regs.PC))
+				cpu.Bus.WriteData(lsb(cpu.Regs.PC))
 			case edge{6, false}:
 				cpu.SetPC(cpu.Regs.GetWZ())
 				return true
@@ -471,12 +471,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
 			case edge{2, true}:
-				cpu.Regs.TempW = cpu.readDataBus()
+				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
 				cpu.SetPC(cpu.Regs.GetWZ())
 			case edge{3, true}:
@@ -493,12 +493,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.SetSP(cpu.Regs.SP - 1)
 				cpu.writeAddressBus(cpu.Regs.SP)
 			case edge{1, true}:
-				cpu.writeDataBus(cpu.Regs.B)
+				cpu.Bus.WriteData(cpu.Regs.B)
 			case edge{2, false}:
 				cpu.SetSP(cpu.Regs.SP - 1)
 				cpu.writeAddressBus(cpu.Regs.SP)
 			case edge{2, true}:
-				cpu.writeDataBus(cpu.Regs.C)
+				cpu.Bus.WriteData(cpu.Regs.C)
 			case edge{3, false}:
 			case edge{3, true}:
 			case edge{4, false}:
@@ -516,12 +516,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
 			case edge{2, true}:
-				cpu.Regs.TempW = cpu.readDataBus()
+				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
 				cpu.SetBC(cpu.Regs.GetWZ())
 				return true
@@ -544,7 +544,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, false}:
 				cpu.writeAddressBus(join16(0xff, cpu.Regs.C))
 			case edge{1, true}:
-				cpu.writeDataBus(cpu.Regs.A)
+				cpu.Bus.WriteData(cpu.Regs.A)
 			case edge{2, false}, edge{2, true}:
 				return true
 			default:
@@ -557,7 +557,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, false}:
 				cpu.writeAddressBus(cpu.GetHL())
 			case edge{1, true}:
-				data := cpu.readDataBus()
+				data := cpu.Bus.Data
 				carry := uint16(cpu.Regs.A)+uint16(data) > 256
 				result := cpu.Regs.A + data
 				cpu.Regs.A = result
@@ -577,7 +577,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, false}:
 				cpu.writeAddressBus(cpu.GetHL())
 			case edge{1, true}:
-				data := cpu.readDataBus()
+				data := cpu.Bus.Data
 				carry := data > cpu.Regs.A
 				result := cpu.Regs.A - data
 				cpu.Regs.SetFlagZ(result == 0)
@@ -597,16 +597,16 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{2, true}:
-				cpu.Regs.TempW = cpu.readDataBus()
+				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
 				cpu.writeAddressBus(cpu.Regs.GetWZ())
 			case edge{3, true}:
-				cpu.writeDataBus(cpu.Regs.A)
+				cpu.Bus.WriteData(cpu.Regs.A)
 			case edge{4, false}, edge{4, true}:
 				return true
 			default:
@@ -620,16 +620,16 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{2, true}:
-				cpu.Regs.TempW = cpu.readDataBus()
+				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
 				cpu.writeAddressBus(cpu.Regs.GetWZ())
 			case edge{3, true}:
-				cpu.Regs.A = cpu.readDataBus()
+				cpu.Regs.A = cpu.Bus.Data
 			case edge{4, false}, edge{4, true}:
 				return true
 			default:
@@ -643,7 +643,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				return true
 			case edge{2, true}:
@@ -664,12 +664,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, false}:
 				cpu.writeAddressBus(cpu.Regs.PC)
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
 				cpu.IncPC()
 			case edge{2, true}:
-				cpu.writeDataBus(cpu.Regs.A)
+				cpu.Bus.WriteData(cpu.Regs.A)
 			case edge{3, false}, edge{3, true}:
 				return true
 			default:
@@ -683,11 +683,11 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
 			case edge{2, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{3, false}:
 				return true
 			case edge{3, true}:
@@ -703,7 +703,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, false}:
 				cpu.writeAddressBus(join16(cpu.Regs.D, cpu.Regs.E))
 			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.readDataBus()
+				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
 				return true
 			case edge{2, true}:
@@ -727,7 +727,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.PC)
 				cpu.IncPC()
 			case edge{1, true}:
-				opcode := cpu.readDataBus()
+				opcode := cpu.Bus.Data
 				cpu.CBOp = CBOp{Op: cb((opcode & 0xf8) >> 3), Target: CBTarget(opcode & 0x7)}
 			case edge{2, false}:
 				return true
@@ -834,7 +834,7 @@ func (cpu *CPU) jrcce(f func() bool) func(e edge) bool {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.Bus.Data
 		case edge{2, false}:
 			if f() {
 			} else {
@@ -874,12 +874,12 @@ func (cpu *CPU) jpccnn(f func() bool) func(e edge) bool {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.Bus.Data
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{2, true}:
-			cpu.Regs.TempW = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.Bus.Data
 		case edge{3, false}:
 			if f() {
 				cpu.SetPC(cpu.Regs.GetWZ())
@@ -1007,7 +1007,7 @@ func (cpu *CPU) ldrn(reg *uint8) func(e edge) bool {
 		case edge{1, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.Bus.Data
 		case edge{2, false}:
 			cpu.IncPC()
 			return true
@@ -1028,7 +1028,7 @@ func (cpu *CPU) ldhla(f func()) func(e edge) bool {
 			cpu.writeAddressBus(cpu.GetHL())
 			f()
 		case edge{1, true}:
-			cpu.writeDataBus(cpu.Regs.A)
+			cpu.Bus.WriteData(cpu.Regs.A)
 		case edge{2, false}:
 			return true
 		case edge{2, true}:
@@ -1047,12 +1047,12 @@ func (cpu *CPU) ldxxnn(f func(wz uint16)) func(e edge) bool {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{1, true}:
-			cpu.Regs.TempZ = cpu.readDataBus()
+			cpu.Regs.TempZ = cpu.Bus.Data
 		case edge{2, false}:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		case edge{2, true}:
-			cpu.Regs.TempW = cpu.readDataBus()
+			cpu.Regs.TempW = cpu.Bus.Data
 		case edge{3, false}:
 			f(join16(cpu.Regs.TempW, cpu.Regs.TempZ))
 			return true

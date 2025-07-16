@@ -102,13 +102,17 @@ type FrameBuffer [256][256]Color
 type ViewPort [144][160]Color
 
 type PixelFIFO struct {
-	Slots [8]Pixel
-	Level int
+	Slots    [8]Pixel
+	Level    int
+	ShiftPos int
+	PushPos  int
 }
 
 func (fifo *PixelFIFO) Clear() {
 	clear(fifo.Slots[:])
 	fifo.Level = 0
+	fifo.ShiftPos = 0
+	fifo.PushPos = 0
 }
 
 func (fifo *PixelFIFO) ShiftOut() (Pixel, bool) {
@@ -116,16 +120,24 @@ func (fifo *PixelFIFO) ShiftOut() (Pixel, bool) {
 	if fifo.Level == 0 {
 		return p, false
 	}
-	p = fifo.Slots[0]
-	for i := range 7 {
-		fifo.Slots[i] = fifo.Slots[i+1]
+	fifo.Level--
+	p = fifo.Slots[fifo.ShiftPos]
+	fifo.ShiftPos++
+	if fifo.ShiftPos == 8 {
+		fifo.ShiftPos = 0
 	}
-	fifo.Slots[7] = Pixel{}
 	return p, true
 }
 
 func (fifo *PixelFIFO) Write8(pixels [8]Pixel) {
-	fifo.Slots = pixels
+	pos := fifo.ShiftPos
+	for i := range 8 {
+		fifo.Slots[pos] = pixels[i]
+		pos++
+		if pos == 8 {
+			pos = 0
+		}
+	}
 	fifo.Level = 8
 }
 
@@ -605,8 +617,19 @@ func (sf *SpriteFetcher) pushFIFO() bool {
 	line := sf.PPU.decodeTileLine(sf.TileLSB, sf.TileMSB)
 	obj := sf.PPU.OAMBuffer[sf.SpriteIDX]
 	offset := obj.X - sf.X + uint8(sf.PPU.SpriteFIFO.Level)
+	pos := sf.PPU.SpriteFIFO.ShiftPos
+	for range offset {
+		pos++
+		if pos == 8 {
+			pos = 0
+		}
+	}
 	for i := offset; i < 8; i++ {
-		sf.PPU.SpriteFIFO.Slots[i] = line[i]
+		sf.PPU.SpriteFIFO.Slots[pos] = line[i]
+		pos++
+		if pos == 8 {
+			pos = 0
+		}
 	}
 	sf.PPU.SpriteFIFO.Level = 8
 	return true

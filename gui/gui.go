@@ -210,12 +210,9 @@ func (gui *GUI) Render(gtx C) {
 		Rigid(func(gtx C) D {
 			return Row(
 				gtx,
+				Spacer(25, 700),
 				Rigid(func(gtx C) D {
-					minSize := gtx.Dp(unit.Dp(200))
-					border := widget.Border{
-						Color: color.NRGBA{A: 255},
-						Width: unit.Dp(1),
-					}
+					minSize := gtx.Dp(unit.Dp(100))
 
 					inset := layout.UniformInset(unit.Dp(2))
 
@@ -230,8 +227,6 @@ func (gui *GUI) Render(gtx C) {
 					dataLabel.Font.Typeface = "monospace"
 					dataLabel.MaxLines = 1
 					dataLabel.Alignment = text.End
-
-					var headingText = []string{"Data", "value"}
 
 					orig := gtx.Constraints
 					gtx.Constraints.Min = image.Point{}
@@ -263,11 +258,8 @@ func (gui *GUI) Render(gtx C) {
 							}
 						},
 						func(gtx C, col int) D {
-							return border.Layout(gtx, func(gtx C) D {
-								return inset.Layout(gtx, func(gtx C) D {
-									headingLabel.Text = headingText[col]
-									return headingLabel.Layout(gtx)
-								})
+							return inset.Layout(gtx, func(gtx C) D {
+								return headingLabel.Layout(gtx)
 							})
 						},
 						func(gtx C, row, col int) D {
