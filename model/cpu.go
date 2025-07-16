@@ -3,37 +3,7 @@ package model
 import (
 	"fmt"
 	"os"
-	"slices"
 )
-
-var coreDebugEvents = []string{
-	// "NotImplemented",
-	"Panic",
-	// "PreFetch",
-	// "ExecDone",
-	// "ExecBegin",
-	//"SetBC",
-	// "Handler",
-	// "SetPC",
-	//"ExecBeginCPn",
-	//"GetHL",
-	// "IncPC",
-	//"SetFlagZ",
-	// "WriteAddressBus",
-	// "PeriphRead",
-	//"GetFlagZ",
-	//"PeriphWrite",
-	//"ExecCBOp",
-	// "SetHL",
-	//"CPn",
-	//"SetA",
-	//"SetC",
-	//"Watchfffc",
-}
-
-var coreDumpEvents = []string{
-	// "Watchfffc",
-}
 
 type Interrupts struct {
 	IF              uint8
@@ -73,7 +43,6 @@ func (cpu *CPU) SetHL(v uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetHL must be called on rising edge")
 	}
-	cpu.Debug("SetHL", "0x%04x", v)
 	cpu.Regs.H = uint8(v >> 8)
 	cpu.Regs.L = uint8(v)
 }
@@ -82,7 +51,6 @@ func (cpu *CPU) SetBC(v uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetBC must be called on rising edge")
 	}
-	cpu.Debug("SetBC", "0x%04x", v)
 	cpu.Regs.B = uint8(v >> 8)
 	cpu.Regs.C = uint8(v)
 }
@@ -91,7 +59,6 @@ func (cpu *CPU) SetDE(v uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetDE must be called on rising edge")
 	}
-	cpu.Debug("SetDE", "0x%04x", v)
 	cpu.Regs.D = uint8(v >> 8)
 	cpu.Regs.E = uint8(v)
 }
@@ -100,67 +67,56 @@ func (cpu *CPU) SetSP(v uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetSP must be called on rising edge")
 	}
-	cpu.Debug("SetSP", "0x%04x", v)
 	cpu.Regs.SP = v
 }
 
 func (cpu *CPU) GetA() uint8 {
 	v := cpu.Regs.A
-	cpu.Debug("GetA", "0x%02x", v)
 	return v
 }
 
 func (cpu *CPU) GetB() uint8 {
 	v := cpu.Regs.B
-	cpu.Debug("GetB", "0x%02x", v)
 	return v
 }
 
 func (cpu *CPU) GetC() uint8 {
 	v := cpu.Regs.C
-	cpu.Debug("GetC", "0x%02x", v)
 	return v
 }
 
 func (cpu *CPU) GetD() uint8 {
 	v := cpu.Regs.D
-	cpu.Debug("GetD", "0x%02x", v)
 	return v
 }
 
 func (cpu *CPU) GetE() uint8 {
 	v := cpu.Regs.E
-	cpu.Debug("GetE", "0x%02x", v)
 	return v
 }
 
 func (cpu *CPU) GetH() uint8 {
 	v := cpu.Regs.H
-	cpu.Debug("GetE", "0x%02x", v)
 	return v
 }
 
 func (cpu *CPU) GetL() uint8 {
 	v := cpu.Regs.L
-	cpu.Debug("GetE", "0x%02x", v)
 	return v
 }
 
 func (cpu *CPU) GetBC() uint16 {
 	v := join16(cpu.Regs.B, cpu.Regs.C)
-	cpu.Debug("GetBC", "0x%04x", v)
 	return v
 }
 
 func (cpu *CPU) GetDE() uint16 {
 	v := join16(cpu.Regs.D, cpu.Regs.E)
-	cpu.Debug("GetDE", "0x%04x", v)
 	return v
 }
 
 func (cpu *CPU) GetHL() uint16 {
 	v := join16(cpu.Regs.H, cpu.Regs.L)
-	cpu.Debug("GetHL", "0x%04x", v)
 	return v
 }
 
@@ -179,7 +135,6 @@ func (cpu *CPU) SetPC(pc uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetPC must be called on rising edge")
 	}
-	cpu.Debug("SetPC", "0x%04x", pc)
 	cpu.Regs.PC = pc
 }
 
@@ -188,25 +143,6 @@ func (cpu *CPU) IncPC() {
 		panic("IncPC must be called on rising edge")
 	}
 	cpu.Regs.PC++
-	cpu.Debug("IncPC", "0x%04x", cpu.Regs.PC)
-}
-
-func (cpu *CPU) Debug(event string, f string, v ...any) {
-	if cpu.inCoreDump {
-		return
-	}
-	if slices.Contains(coreDebugEvents, event) || slices.Contains(coreDumpEvents, event) {
-		dir := "^"
-		if cpu.clockCycle.Falling {
-			dir = "v"
-		}
-		fmt.Printf("%d %s PC=0x%04x %v mcycle=%v | %s | ", cpu.clockCycle.C, dir, cpu.Regs.PC, cpu.Regs.IR, cpu.machineCycle, event)
-		fmt.Printf(f, v...)
-		fmt.Printf("\n")
-	}
-	if slices.Contains(coreDumpEvents, event) {
-		cpu.Dump()
-	}
 }
 
 func NewCPU(
@@ -300,13 +236,6 @@ func (cpu *CPU) getmem(start, end uint16) []MemInfo {
 }
 
 func (cpu *CPU) fsm(c Cycle) {
-	defer func() {
-		if e := recover(); e != nil {
-			cpu.Debug("Panic", "%v", e)
-			cpu.Dump()
-			panic(e)
-		}
-	}()
 	cpu.wroteToAddressBusThisCycle = false
 
 	cpu.clockCycle = c
@@ -318,7 +247,7 @@ func (cpu *CPU) fsm(c Cycle) {
 		opcode := cpu.Regs.IR
 		if handler := cpu.handlers[opcode]; handler != nil {
 			e := edge{cpu.machineCycle, c.Falling}
-			cpu.Debug("Handler", "e=%v", e)
+			//cpu.Debug("Handler", "e=%v", e)
 			fetch = handler(e)
 		} else {
 			panicf("not implemented opcode %v", opcode)
@@ -330,16 +259,16 @@ func (cpu *CPU) fsm(c Cycle) {
 
 	if fetch {
 		if !c.Falling {
-			cpu.Debug("PreFetch", "PC=%04x", cpu.Regs.PC)
+			//cpu.Debug("PreFetch", "PC=%04x", cpu.Regs.PC)
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		} else {
-			cpu.Debug("ExecDone", "")
+			//cpu.Debug("ExecDone", "")
 			cpu.Regs.SetWZ(0)
 			cpu.machineCycle = 1
 			cpu.Regs.IR = Opcode(cpu.Bus.Data)
-			cpu.Debug("ExecBegin", "%s", cpu.Regs.IR)
-			cpu.Debug(fmt.Sprintf("ExecBegin%s", cpu.Regs.IR), "")
+			//cpu.Debug("ExecBegin", "%s", cpu.Regs.IR)
+			//cpu.Debug(fmt.Sprintf("ExecBegin%s", cpu.Regs.IR), "")
 
 			cpu.rewindBuffer[cpu.rewindBufferIdx] = ExecLogEntry{
 				PC:     cpu.Regs.PC - 1,
@@ -365,7 +294,7 @@ func (cpu *CPU) writeAddressBus(addr uint16) {
 		}
 	}
 	cpu.wroteToAddressBusThisCycle = true
-	cpu.Debug("WriteAddressBus", "0x%04x", addr)
+	//cpu.Debug("WriteAddressBus", "0x%04x", addr)
 	cpu.Bus.WriteAddress(addr)
 }
 

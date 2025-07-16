@@ -52,6 +52,13 @@ func main() {
 		}()
 	}
 	gb := model.NewGameboy(ctx, logger, hwConfig, &sysInterface{})
+	defer func() {
+		if e := recover(); e != nil {
+			gb.CPU.Dump()
+			panic(e)
+		}
+	}()
+
 	f, err := os.ReadFile("assets/cartridges/hello-world.gb")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load cartridge: %v", err))

@@ -273,14 +273,6 @@ func (ppu *PPU) Dump() {
 }
 
 func (ppu *PPU) fsm(c Cycle) {
-	defer func() {
-		if e := recover(); e != nil {
-			ppu.Debug("Panic", "%v", e)
-			ppu.Dump()
-			panic(e)
-		}
-	}()
-
 	if !ppu.Enabled() {
 		return
 	}

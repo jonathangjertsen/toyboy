@@ -68,7 +68,7 @@ func (gui *GUI) Run() {
 	window := new(app.Window)
 	window.Option(app.Title("toyboy"))
 	window.Option(app.Size(unit.Dp(1440), unit.Dp(1080)))
-	gui.SpeedInput.SetText("999")
+	gui.SpeedInput.SetText("9999")
 	gui.VRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.ProgramScroll.List = layout.List{Axis: layout.Vertical}
@@ -315,7 +315,7 @@ func (gui *GUI) Render(gtx C) {
 					gui.SpeedInput.Alignment = text.Middle
 					text := gui.SpeedInput.Text()
 					targetPercent, err := strconv.ParseFloat(text, 64)
-					if err == nil && targetPercent > 0 && targetPercent < 1000 {
+					if err == nil && targetPercent > 0 && targetPercent < 10000 {
 						if gui.TargetPercent != targetPercent {
 							gui.TargetPercent = targetPercent
 							gui.GB.CLK.SetFrequency(targetPercent * 4194304.0 / 100)

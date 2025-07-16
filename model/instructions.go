@@ -647,7 +647,6 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{2, false}:
 				return true
 			case edge{2, true}:
-				cpu.Debug("CPn", "A=%02x n=%02x", cpu.Regs.A, cpu.Regs.TempZ)
 				carry := cpu.Regs.A < cpu.Regs.TempZ
 				result := cpu.Regs.A - cpu.Regs.TempZ
 				cpu.Regs.SetFlagZ(result == 0)
@@ -754,7 +753,6 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				default:
 					panic("unknown CBOp target")
 				}
-				cpu.Debug("ExecCBOp", "op=%v target=%v", cpu.CBOp.Op, cpu.CBOp.Target)
 				switch cpu.CBOp.Op {
 				case CbRL:
 					bit7 := val & 0x80
