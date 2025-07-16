@@ -30,15 +30,18 @@ type GUI struct {
 	ClockMeasurement *plugin.ClockMeasurement
 	Theme            material.Theme
 
-	SpeedInput    widget.Editor
-	StartButton   widget.Clickable
-	PauseButton   widget.Clickable
-	TimingGrid    component.GridState
-	Registers     widget.Label
-	VRAMScroll    widget.List
-	HRAMScroll    widget.List
-	OAMScroll     widget.List
-	ProgramScroll widget.List
+	SpeedInput      widget.Editor
+	StartButton     widget.Clickable
+	PauseButton     widget.Clickable
+	TimingGrid      component.GridState
+	Registers       widget.Label
+	VRAMScroll      widget.List
+	HRAMScroll      widget.List
+	OAMScroll       widget.List
+	ProgramScroll   widget.List
+	RegistersScroll widget.List
+	PPUScroll       widget.List
+	APUScroll       widget.List
 
 	TargetPercent float64
 	LastFrameCPS  float64
@@ -73,6 +76,9 @@ func (gui *GUI) Run() {
 	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.ProgramScroll.List = layout.List{Axis: layout.Vertical}
 	gui.OAMScroll.List = layout.List{Axis: layout.Vertical}
+	gui.RegistersScroll.List = layout.List{Axis: layout.Vertical}
+	gui.PPUScroll.List = layout.List{Axis: layout.Vertical}
+	gui.APUScroll.List = layout.List{Axis: layout.Vertical}
 	err := run(window, gui)
 	if err != nil {
 		log.Fatal(err)
@@ -187,21 +193,17 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(func(gtx C) D {
-							lbl := material.Label(&gui.Theme, unit.Sp(14), "Registers")
-							lbl.Font.Typeface = "monospace"
-							lbl.Font.Weight = font.Black
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
-						Rigid(func(gtx C) D {
-							buf := bytes.Buffer{}
-							cd.PrintRegs(&buf)
-							lbl := material.Label(&gui.Theme, unit.Sp(14), buf.String())
-							lbl.Font.Typeface = "monospace"
-							lbl.Alignment = text.Start
-							return lbl.Layout(gtx)
-						}),
+						Rigid(gui.memHead("Registers")),
+						Rigid(gui.mem(cd.PrintRegs, &gui.RegistersScroll, unit.Dp(300))),
+						Rigid(gui.memHead("PPU")),
+						Rigid(gui.mem(cd.PrintPPU, &gui.PPUScroll, unit.Dp(300))),
+					)
+				}),
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
+						Rigid(gui.memHead("APU")),
+						Rigid(gui.mem(cd.PrintAPU, &gui.APUScroll, unit.Dp(400))),
 					)
 				}),
 			)

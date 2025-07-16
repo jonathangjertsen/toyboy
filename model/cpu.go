@@ -210,9 +210,11 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
 	cd.Program = cpu.getmem(cd.ProgramStart, cd.ProgramEnd)
-	cd.HRAM = cpu.getmem(0xff80, 0xfffe)
-	cd.OAM = cpu.getmem(0xfe00, 0xfe99)
-	cd.VRAM = cpu.getmem(0x8000, 0x9fff)
+	cd.HRAM = cpu.getmem(AddrHRAMBegin, AddrHRAMEnd)
+	cd.OAM = cpu.getmem(AddrOAMBegin, AddrOAMEnd)
+	cd.VRAM = cpu.getmem(AddrVRAMBegin, AddrVRAMEnd)
+	cd.PPU = cpu.getmem(AddrPPUBegin, AddrPPUEnd)
+	cd.APU = cpu.getmem(AddrAPUBegin, AddrAPUEnd)
 	return cd
 }
 

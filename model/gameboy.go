@@ -44,11 +44,11 @@ func NewGameboy(
 
 	bootROMLock := NewBootROMLock(clk)
 	bootROM := NewBootROM(clk, config.Model)
-	vram := NewMemoryRegion(clk, 0x8000, 0x2000)
-	hram := NewMemoryRegion(clk, 0xff80, 0x007f)
+	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
+	hram := NewMemoryRegion(clk, AddrHRAMBegin, SizeHRAM)
 	apu := NewAPU(clk)
-	oam := NewMemoryRegion(clk, 0xfe00, 0xa0)
-	cartridgeSlot := NewMemoryRegion(clk, 0x0000, 0x4000)
+	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
+	cartridgeSlot := NewMemoryRegion(clk, AddrCartridgeBank0Begin, AddrCartridgeBank0Size)
 
 	bus := &Bus{}
 	ppu := NewPPU(clk, ppuClock, bus, sysif)

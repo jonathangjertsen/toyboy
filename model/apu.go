@@ -204,7 +204,7 @@ func (nc *NoiseChannel) SetCtl(v uint8) {
 
 func NewAPU(clock *ClockRT) *APU {
 	return &APU{
-		MemoryRegion:                   NewMemoryRegion(clock, 0xff10, 0xff28),
+		MemoryRegion:                   NewMemoryRegion(clock, AddrAPUBegin, AddrAPUEnd),
 		canWriteLengthTimersWithAPUOff: true, // on monochrome models
 	}
 }
@@ -224,52 +224,52 @@ func (apu *APU) Enabled() bool {
 func (apu *APU) Read(addr uint16) uint8 {
 	_ = apu.MemoryRegion.Read(addr)
 
-	switch addr {
-	case 0xff10:
+	switch Addr(addr) {
+	case AddrNR10:
 		return apu.Pulse1.RegSweep
-	case 0xff11:
+	case AddrNR11:
 		return apu.Pulse1.RegLengthDuty
-	case 0xff12:
+	case AddrNR12:
 		return apu.Pulse1.RegVolumeEnvelope
-	case 0xff13:
+	case AddrNR13:
 		return apu.Pulse1.RegPeriodLow // WO
-	case 0xff14:
+	case AddrNR14:
 		return apu.Pulse1.RegPeriodHighCtl
 	case 0xff15:
 		return 0
-	case 0xff16:
+	case AddrNR21:
 		return apu.Pulse2.RegLengthDuty
-	case 0xff17:
+	case AddrNR22:
 		return apu.Pulse2.RegVolumeEnvelope
-	case 0xff18:
+	case AddrNR23:
 		return apu.Pulse2.RegPeriodLow
-	case 0xff19:
+	case AddrNR24:
 		return apu.Pulse2.RegPeriodHighCtl
-	case 0xff1a:
+	case AddrNR30:
 		return apu.Wave.RegDACEn
-	case 0xff1b:
+	case AddrNR31:
 		return apu.Wave.RegLengthTimer
-	case 0xff1c:
+	case AddrNR32:
 		return apu.Wave.RegOutputLevel
-	case 0xff1d:
+	case AddrNR33:
 		return apu.Wave.RegPeriodLow
-	case 0xff1e:
+	case AddrNR34:
 		return apu.Wave.RegPeriodHighCtl
 	case 0xff1f:
 		return 0
-	case 0xff20:
+	case AddrNR41:
 		return apu.Noise.RegLengthTimer
-	case 0xff21:
+	case AddrNR42:
 		return apu.Noise.RegVolumeEnvelope
-	case 0xff22:
+	case AddrNR43:
 		return apu.Noise.RegRNG
-	case 0xff23:
+	case AddrNR44:
 		return apu.Noise.RegCtl
-	case 0xff24:
+	case AddrNR50:
 		return apu.Mixer.RegMasterVolumeVINPan
-	case 0xff25:
+	case AddrNR51:
 		return apu.Mixer.RegChannelPan
-	case 0xff26:
+	case AddrNR52:
 		return apu.MasterCtl
 	}
 	panicf("Read from unknown apu register %#v", addr)
@@ -279,50 +279,50 @@ func (apu *APU) Read(addr uint16) uint8 {
 func (apu *APU) Write(addr uint16, v uint8) {
 	apu.MemoryRegion.Write(addr, v)
 
-	switch addr {
-	case 0xff10:
+	switch Addr(addr) {
+	case AddrNR10:
 		apu.SetPulse1Sweep(v)
-	case 0xff11:
+	case AddrNR11:
 		apu.SetPulse1LengthDuty(v)
-	case 0xff12:
+	case AddrNR12:
 		apu.SetPulse1VolumeEnvelope(v)
-	case 0xff13:
+	case AddrNR13:
 		apu.SetPulse1PeriodLow(v) // WO
-	case 0xff14:
+	case AddrNR14:
 		apu.SetPulse1PeriodHighCtl(v)
 	case 0xff15:
-	case 0xff16:
+	case AddrNR21:
 		apu.SetPulse2LengthDuty(v)
-	case 0xff17:
+	case AddrNR22:
 		apu.SetPulse2VolumeEnvelope(v)
-	case 0xff18:
+	case AddrNR23:
 		apu.SetPulse2PeriodLow(v)
-	case 0xff19:
+	case AddrNR24:
 		apu.SetPulse2PeriodHighCtl(v)
-	case 0xff1a:
+	case AddrNR30:
 		apu.SetWaveDACEn(v)
-	case 0xff1b:
+	case AddrNR31:
 		apu.SetWaveLengthTimer(v)
-	case 0xff1c:
+	case AddrNR32:
 		apu.SetWaveOutputLevel(v)
-	case 0xff1d:
+	case AddrNR33:
 		apu.SetWavePeriodLow(v)
-	case 0xff1e:
+	case AddrNR34:
 		apu.SetWavePeriodHighCtl(v)
 	case 0xff1f:
-	case 0xff20:
+	case AddrNR41:
 		apu.SetNoiseLengthTimer(v)
-	case 0xff21:
+	case AddrNR42:
 		apu.SetNoiseVolumeEnvelope(v)
-	case 0xff22:
+	case AddrNR43:
 		apu.SetNoiseRNG(v)
-	case 0xff23:
+	case AddrNR44:
 		apu.SetNoiseCtl(v)
-	case 0xff24:
+	case AddrNR50:
 		apu.SetMasterVolumePan(v)
-	case 0xff25:
+	case AddrNR51:
 		apu.SetChannelPan(v)
-	case 0xff26:
+	case AddrNR52:
 		apu.SetMasterCtl(v)
 	default:
 		panicf("Write to unknown apu register %#v", addr)

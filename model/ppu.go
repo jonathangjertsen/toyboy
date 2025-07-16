@@ -264,7 +264,7 @@ func (ppu *PPU) SetOBP1(v uint8) {
 
 func NewPPU(rtClock *ClockRT, clock *Clock, bus *Bus, hooks PPUHooks) *PPU {
 	ppu := &PPU{
-		MemoryRegion: NewMemoryRegion(rtClock, 0xff40, 0xff4c),
+		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, AddrPPUEnd),
 		Bus:          bus,
 		Hooks:        hooks,
 	}
@@ -758,57 +758,56 @@ func (ppu *PPU) fsmHBlank() {
 }
 
 func (ppu *PPU) Read(addr uint16) uint8 {
-	switch addr {
-	case 0xff40:
+	switch Addr(addr) {
+	case AddrLCDC:
 		return ppu.RegLCDC
-	case 0xff41:
+	case AddrSTAT:
 		return ppu.RegSTAT
-	case 0xff42:
+	case AddrSCY:
 		return ppu.RegSCY
-	case 0xff43:
+	case AddrSCX:
 		return ppu.RegSCX
-	case 0xff44:
+	case AddrLY:
 		return ppu.RegLY
-	case 0xff45:
+	case AddrLYC:
 		return ppu.RegLYC
-	case 0xff47:
+	case AddrBGP:
 		return ppu.RegBGP
-	case 0xff48:
+	case AddrOBP0:
 		return ppu.RegOBP0
-	case 0xff49:
+	case AddrOBP1:
 		return ppu.RegOBP1
-	case 0xff4a:
+	case AddrWY:
 		return ppu.RegWY
-	case 0xff4b:
+	case AddrWX:
 		return ppu.RegWX
 	}
-	panicf("Read from unknown LCD register %#v", addr)
 	return 0
 }
 
 func (ppu *PPU) Write(addr uint16, v uint8) {
-	switch addr {
-	case 0xff40:
+	switch Addr(addr) {
+	case AddrLCDC:
 		ppu.SetLCDC(v)
-	case 0xff41:
+	case AddrSTAT:
 		ppu.SetSTAT(v)
-	case 0xff42:
+	case AddrSCY:
 		ppu.SetSCY(v)
-	case 0xff43:
+	case AddrSCX:
 		ppu.SetSCX(v)
-	case 0xff44:
+	case AddrLY:
 		ppu.SetLY(v)
-	case 0xff45:
+	case AddrLYC:
 		ppu.SetLYC(v)
-	case 0xff47:
+	case AddrBGP:
 		ppu.SetBGP(v)
-	case 0xff48:
+	case AddrOBP0:
 		ppu.SetOBP0(v)
-	case 0xff49:
+	case AddrOBP1:
 		ppu.SetOBP1(v)
-	case 0xff4a:
+	case AddrWY:
 		ppu.SetWY(v)
-	case 0xff4b:
+	case AddrWX:
 		ppu.SetWX(v)
 	default:
 		panicf("Write to unknown LCD register %#v", addr)

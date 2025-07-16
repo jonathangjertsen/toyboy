@@ -13,6 +13,8 @@ type CoreDump struct {
 	HRAM         []MemInfo
 	OAM          []MemInfo
 	VRAM         []MemInfo
+	PPU          []MemInfo
+	APU          []MemInfo
 }
 
 func (cd *CoreDump) PrintRegs(f io.Writer) {
@@ -62,6 +64,24 @@ func (cd *CoreDump) PrintVRAM(f io.Writer) {
 	memdump(f, cd.VRAM, 0x8000, 0x9fff, 0)
 }
 
+func (cd *CoreDump) PrintPPU(f io.Writer) {
+	regdump(f, cd.PPU, AddrPPUBegin, AddrPPUEnd)
+}
+
+func (cd *CoreDump) PrintAPU(f io.Writer) {
+	regdump(f, cd.APU, AddrAPUBegin, AddrAPUEnd)
+}
+
+func regdump(f io.Writer, mem []MemInfo, start, end uint16) {
+	for addr := start; addr <= end; addr++ {
+		a := Addr(addr)
+		if !a.IsValid() {
+			continue
+		}
+		fmt.Fprintf(f, "%5s = %02x\n", Addr(addr), mem[addr-start].Value)
+	}
+}
+
 func memdump(f io.Writer, mem []MemInfo, start, end, highlight uint16) {
 	alignedStart := (start / 0x10) * 0x10
 	for addr := alignedStart; addr < start; addr++ {
@@ -73,7 +93,7 @@ func memdump(f io.Writer, mem []MemInfo, start, end, highlight uint16) {
 
 	for addr := start; addr <= end; addr++ {
 		if addr%0x10 == 0 {
-			fmt.Fprintf(f, "\n %04x |", addr)
+			fmt.Fprintf(f, "\n%04x |", addr)
 		}
 		if highlight == addr {
 			fmt.Fprintf(f, "[%02x]", mem[addr-start].Value)

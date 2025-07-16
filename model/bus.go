@@ -17,25 +17,25 @@ type Bus struct {
 func (b *Bus) WriteAddress(addr uint16) {
 	b.Address = addr
 
-	if addr < 0x100 {
+	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
 			b.Data = b.CartridgeSlot.Read(addr)
 		} else {
 			b.Data = b.BootROM.Read(addr)
 		}
-	} else if addr <= 0x4000 {
+	} else if addr <= AddrCartridgeBank0End {
 		b.Data = b.CartridgeSlot.Read(addr)
-	} else if addr >= 0x8000 && addr < 0xa000 {
+	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		b.Data = b.VRAM.Read(addr)
-	} else if addr >= 0xff80 && addr < 0xffff {
+	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
 		b.Data = b.HRAM.Read(addr)
-	} else if addr >= 0xff10 && addr < 0xff28 {
+	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.Data = b.APU.Read(addr)
-	} else if addr >= 0xfe00 && addr < 0xfea0 {
+	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
 		b.Data = b.OAM.Read(addr)
-	} else if addr >= 0xff40 && addr < 0xff4c {
+	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.Data = b.PPU.Read(addr)
-	} else if addr == 0xff50 {
+	} else if addr == AddrBootROMLock {
 		b.Data = b.BootROMLock.Read(addr)
 		return
 	} else {
@@ -46,26 +46,26 @@ func (b *Bus) WriteAddress(addr uint16) {
 func (b *Bus) WriteData(v uint8) {
 	b.Data = v
 	addr := b.Address
-	if addr < 0x100 {
+	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
 			panicf("Attempted write to cartridge (addr=0x%04x v=%02x)", addr, v)
 		} else {
 			panicf("Attempted write to bootrom (addr=0x%04x v=%02x)", addr, v)
 		}
-	} else if addr <= 0x4000 {
+	} else if addr <= AddrCartridgeBank0End {
 		b.Data = b.CartridgeSlot.Read(addr)
 		panicf("Attempted write to cartridge (addr=0x%04x v=%02x)", addr, v)
-	} else if addr == 0xff50 {
+	} else if addr == AddrBootROMLock {
 		b.BootROMLock.Write(addr, v)
-	} else if addr >= 0x8000 && addr < 0xa000 {
+	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		b.VRAM.Write(addr, v)
-	} else if addr >= 0xff80 && addr < 0xffff {
+	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
 		b.HRAM.Write(addr, v)
-	} else if addr >= 0xff10 && addr < 0xff28 {
+	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.APU.Write(addr, v)
-	} else if addr >= 0xfe00 && addr < 0xfea0 {
+	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
 		b.OAM.Write(addr, v)
-	} else if addr >= 0xff40 && addr < 0xff4c {
+	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.PPU.Write(addr, v)
 	} else {
 		panicf("write to unknown peripheral at 0x%x", addr)
@@ -95,25 +95,25 @@ func (b *Bus) CountdownEnable() {
 }
 
 func (b *Bus) GetCounters(addr uint16) (uint64, uint64) {
-	if addr < 0x100 {
+	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
 			return b.CartridgeSlot.GetCounters(addr)
 		} else {
 			return b.BootROM.GetCounters(addr)
 		}
-	} else if addr <= 0x4000 {
+	} else if addr <= AddrCartridgeBank0End {
 		return b.CartridgeSlot.GetCounters(addr)
-	} else if addr == 0xff50 {
+	} else if addr == AddrBootROMLock {
 		return b.BootROMLock.GetCounters(addr)
-	} else if addr >= 0x8000 && addr < 0xa000 {
+	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		return b.VRAM.GetCounters(addr)
-	} else if addr >= 0xff80 && addr < 0xffff {
+	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
 		return b.HRAM.GetCounters(addr)
-	} else if addr >= 0xff10 && addr < 0xff28 {
+	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		return b.APU.GetCounters(addr)
-	} else if addr >= 0xfe00 && addr < 0xfea0 {
+	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
 		return b.OAM.GetCounters(addr)
-	} else if addr >= 0xff40 && addr < 0xff4c {
+	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		return b.PPU.GetCounters(addr)
 	}
 	panicf("GetCounters from unknown peripheral at 0x%x", addr)
