@@ -1,19 +1,24 @@
 package model
 
 type PixelFetcher struct {
-	Cycle       uint64
-	PPU         *PPU
-	State       PixelFetcherState
-	X           uint8
-	TileIndex   uint8
-	TileLSBAddr uint16
-	TileLSB     uint8
-	TileMSB     uint8
-	Suspended   bool
+	Cycle         uint64
+	State         PixelFetcherState
+	X             uint8
+	TileIndex     uint8
+	TileIndexAddr uint16
+	TileLSBAddr   uint16
+	TileLSB       uint8
+	TileMSB       uint8
+	Suspended     bool
+
+	PPU *PPU
 }
 
 type BackgroundFetcher struct {
 	PixelFetcher
+
+	TileOffsetX uint16
+	TileOffsetY uint16
 
 	WindowYReached    bool
 	WindowFetching    bool
@@ -53,6 +58,7 @@ func (bgf *BackgroundFetcher) fsm() {
 	case PixelFetcherStatePushFIFO:
 		if bgf.pushFIFO() {
 			bgf.State = PixelFetcherStateFetchTileNo
+			bgf.X++
 		}
 	}
 }
@@ -70,20 +76,22 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 
 	// GBEDG: Additionally, the address which the tile number is read from is offset by the fetcher-internal X-Position-Counter, which is incremented each time the last step is completed.
 	// GBEDG: The value of SCX / 8 is also added if the Fetcher is not fetching Window pixels. In order to make the wrap-around with SCX work, this offset is ANDed with 0x1f
-	// GBEDG: Note: The sum of [...] the X-POS+SCX [...] is ANDed with 0x3ff in order to ensure that the address stays within the Tilemap memory regions.
-	offsetX := (uint16(bgf.X) + (uint16(bgf.PPU.RegSCX/8) & 0x1f)) & 0x3ff
-	addr += offsetX
+	offsetX := (uint16(bgf.X) + (uint16(bgf.PPU.RegSCX/8))&0x1f)
 
 	// GBEDG: An offset of 32 * (((LY + SCY) & 0xFF) / 8) is also added if background pixels are being fetched, otherwise, if window pixels are being fetched, this offset is determined by 32 * (WINDOW_LINE_COUNTER / 8)
 	var offsetY uint16
 	if bgf.WindowFetching {
-		offsetY = 32 * (bgf.WindowLineCounter / 8)
+		offsetY = (bgf.WindowLineCounter / 8)
 	} else {
-		offsetY = 32 * (uint16((bgf.PPU.RegLY+bgf.PPU.RegSCY)&0xff) / 8)
+		offsetY = (uint16((bgf.PPU.RegLY+bgf.PPU.RegSCY)&0xff) / 8)
 	}
-	offsetY &= 0x3ff
-	addr += offsetY
 
+	// GBEDG: Note: The sum of [...] the X-POS+SCX [...] is ANDed with 0x3ff in order to ensure that the address stays within the Tilemap memory regions.
+	bgf.TileOffsetX = offsetX
+	bgf.TileOffsetY = offsetY
+	addr += (offsetX + 32*offsetY) & 0x3ff
+
+	bgf.TileIndexAddr = addr
 	bgf.TileIndex = bgf.PPU.Bus.VRAM.Read(addr)
 }
 
@@ -131,7 +139,7 @@ func (bgf *BackgroundFetcher) pushFIFO() bool {
 	if bgf.PPU.BackgroundFIFO.Level > 0 {
 		return false
 	}
-	bgf.PPU.BackgroundFIFO.Write8(decodeTileLine(bgf.TileLSB, bgf.TileMSB))
+	bgf.PPU.BackgroundFIFO.Write8(DecodeTileLine(bgf.TileLSB, bgf.TileMSB))
 	return true
 }
 
@@ -139,7 +147,6 @@ type SpriteFetcher struct {
 	PixelFetcher
 	Fetching  bool
 	SpriteIDX int
-	TileNo    int
 }
 
 func (sf *SpriteFetcher) fsm() {
@@ -220,7 +227,7 @@ func (sf *SpriteFetcher) fetchTileMSB() {
 }
 
 func (sf *SpriteFetcher) pushFIFO() bool {
-	line := decodeTileLine(sf.TileLSB, sf.TileMSB)
+	line := DecodeTileLine(sf.TileLSB, sf.TileMSB)
 	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
 	offset := obj.X - sf.X + uint8(sf.PPU.SpriteFIFO.Level)
 	pos := sf.PPU.SpriteFIFO.ShiftPos

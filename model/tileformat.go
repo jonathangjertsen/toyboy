@@ -1,8 +1,10 @@
 package model
 
-func decodeTileLine(lsb, msb uint8) [8]Pixel {
-	var pixels [8]Pixel
-	for i := 0; i < 8; i++ {
+type TileLine [8]Pixel
+
+func DecodeTileLine(lsb, msb uint8) TileLine {
+	var pixels TileLine
+	for i := range 8 {
 		lsbMask := lsb & (1 << (8 - i))
 		lsbMask >>= (8 - i)
 		msbMask := msb & (1 << (8 - i))
@@ -11,4 +13,15 @@ func decodeTileLine(lsb, msb uint8) [8]Pixel {
 		pixels[i].Color = Color(lsbMask | msbMask)
 	}
 	return pixels
+}
+
+type Tile [8]TileLine
+
+func DecodeTile(b []byte) Tile {
+	var tile Tile
+	for i := range 8 {
+		msb, lsb := b[2*i], b[2*i+1]
+		tile[i] = DecodeTileLine(msb, lsb)
+	}
+	return tile
 }

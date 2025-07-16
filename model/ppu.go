@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"image/color"
 	"slices"
 )
 
@@ -29,6 +30,34 @@ type PPUMode uint8
 
 // ENUM(WhiteOrTransparent, LightGray, DarkGray, Black)
 type Color uint8
+
+func (c Color) Grayscale() uint8 {
+	switch c {
+	case ColorWhiteOrTransparent:
+		return 0xf0
+	case ColorLightGray:
+		return 0xa0
+	case ColorDarkGray:
+		return 0x70
+	case ColorBlack:
+		return 0x30
+	}
+	return 0x00
+}
+
+func (c Color) RGBA() color.RGBA {
+	switch c {
+	case ColorWhiteOrTransparent:
+		return color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
+	case ColorLightGray:
+		return color.RGBA{R: 0xa0, G: 0xa0, B: 0xa0, A: 0xff}
+	case ColorDarkGray:
+		return color.RGBA{R: 0x70, G: 0x70, B: 0x70, A: 0xff}
+	case ColorBlack:
+		return color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}
+	}
+	return color.RGBA{}
+}
 
 // ENUM(FetchTileNo, FetchTileLSB, FetchTileMSB, PushFIFO)
 type PixelFetcherState uint8
@@ -71,11 +100,10 @@ type PPU struct {
 	OAMScanCycle uint64
 
 	// Pixel draw state
-	PixelDrawCycle           uint64
-	BackgroundFetcher        BackgroundFetcher
-	RemainingPixelsToDiscard uint8
-	SpriteFetcher            SpriteFetcher
-	PixelShifter             PixelShifter
+	PixelDrawCycle    uint64
+	BackgroundFetcher BackgroundFetcher
+	SpriteFetcher     SpriteFetcher
+	PixelShifter      PixelShifter
 
 	HBlankRemainingCycles     uint64
 	VBlankLineRemainingCycles uint64
@@ -120,9 +148,9 @@ func (ppu *PPU) WindowEnable() bool {
 
 func (ppu *PPU) BGTilemapArea() uint16 {
 	if ppu.RegLCDC&0x08 != 0 {
-		return 0x9800
+		return 0x9c00
 	}
-	return 0x9c00
+	return 0x9800
 }
 
 func (ppu *PPU) ObjHeight() uint8 {
@@ -151,7 +179,7 @@ func (ppu *PPU) SetLCDC(v uint8) {
 
 func (ppu *PPU) SetSTAT(v uint8) {
 	ppu.Debug("SetSTAT", "%02x", v)
-	ppu.RegSTAT = v
+	ppu.RegSTAT = maskedWrite(ppu.RegSTAT, v, 0xf8)
 	panic("not implemented: SetSTAT")
 }
 
@@ -251,27 +279,31 @@ func (ppu *PPU) fsm(c Cycle) {
 	}
 }
 
+func (ppu *PPU) setMode(mode PPUMode) {
+	ppu.Mode = mode
+	ppu.RegSTAT = maskedWrite(ppu.RegSTAT, uint8(mode), 0x7)
+}
+
 func (ppu *PPU) beginFrame() {
-	ppu.RegLY = 0
-	ppu.BackgroundFetcher.Cycle = 0
-	ppu.BackgroundFetcher.State = PixelFetcherStateFetchTileNo
-	ppu.BackgroundFetcher.WindowFetching = false
-	ppu.BackgroundFetcher.WindowYReached = false
 	ppu.beginOAMScan()
 }
 
 func (ppu *PPU) beginOAMScan() {
-	ppu.Mode = PPUModeOAMScan
+	ppu.setMode(PPUModeOAMScan)
 	ppu.OAMScanCycle = 0
 	ppu.OAMBuffer.Level = 0
 }
 
 // start of scanline after OAM scan
 func (ppu *PPU) beginPixelDraw() {
-	ppu.Mode = PPUModePixelDraw
+	ppu.setMode(PPUModePixelDraw)
 	ppu.BackgroundFetcher.Cycle = 0
 	ppu.BackgroundFetcher.State = PixelFetcherStateFetchTileNo
 	ppu.BackgroundFetcher.WindowFetching = false
+	ppu.BackgroundFetcher.X = 0
+	ppu.SpriteFetcher.Cycle = 0
+	ppu.SpriteFetcher.State = PixelFetcherStateFetchTileNo
+	ppu.SpriteFetcher.X = 0
 	ppu.BackgroundFIFO.Clear()
 	ppu.SpriteFIFO.Clear()
 	ppu.PixelDrawCycle = 0
@@ -281,13 +313,13 @@ func (ppu *PPU) beginPixelDraw() {
 	// the remaining scrolling is actually done at the start of a scanline while shifting pixels out of the background FIFO.
 	// SCX mod 8 pixels are discarded at the start of each scanline rather than being pushed to the LCD,
 	// which is also the cause of PPU Mode 3 being extended by SCX mod 8 cycles.
-	ppu.RemainingPixelsToDiscard = ppu.RegSCX % 8
+	ppu.PixelShifter.Discard = ppu.RegSCX % 8
 }
 
 func (ppu *PPU) beginHBlank() {
 	ppu.Debug("BeginHBlank", "pixelCycle=%v", ppu.PixelDrawCycle)
 
-	ppu.Mode = PPUModeHBlank
+	ppu.setMode(PPUModeHBlank)
 
 	if ppu.PixelDrawCycle > 376 {
 		panicv(ppu.PixelDrawCycle)
@@ -299,7 +331,7 @@ func (ppu *PPU) beginHBlank() {
 func (ppu *PPU) beginVBlank() {
 	ppu.Debug("BeginVBlank", "")
 
-	ppu.Mode = PPUModeVBlank
+	ppu.setMode(PPUModeVBlank)
 
 	ppu.VBlankLineRemainingCycles = 456
 }
@@ -372,12 +404,9 @@ func (ppu *PPU) fsmVBlank() {
 	}
 
 	ppu.LastFrame = ppu.FBViewport
-
-	if ppu.RegLY == 153 {
-		ppu.RegLY = 0
+	ppu.IncRegLY()
+	if ppu.RegLY == 0 {
 		ppu.beginFrame()
-	} else {
-		ppu.RegLY++
 	}
 }
 
@@ -387,7 +416,7 @@ func (ppu *PPU) fsmHBlank() {
 		return
 	}
 
-	ppu.RegLY++
+	ppu.IncRegLY()
 	if ppu.BackgroundFetcher.WindowFetching {
 		ppu.BackgroundFetcher.WindowLineCounter++
 	}
@@ -398,6 +427,18 @@ func (ppu *PPU) fsmHBlank() {
 		ppu.beginVBlank()
 	} else {
 		panicv(ppu.RegLY)
+	}
+}
+
+func (ppu *PPU) IncRegLY() {
+	ppu.RegLY++
+	if ppu.RegLY >= 153 {
+		ppu.RegLY = 0
+	}
+	if ppu.RegLY == ppu.RegLYC {
+		ppu.RegSTAT |= uint8(1 << 2)
+	} else {
+		ppu.RegSTAT &= ^uint8(1 << 2)
 	}
 }
 

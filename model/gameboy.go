@@ -1,11 +1,8 @@
 package model
 
-import (
-	"context"
-	"log/slog"
-)
-
 type Gameboy struct {
+	Config HWConfig
+
 	CLK           *ClockRT
 	PHI           *Clock
 	CPU           *CPU
@@ -17,7 +14,11 @@ func (gb *Gameboy) PowerOn() {
 	gb.CLK.Start()
 }
 
-func (gb *Gameboy) PowerOff() {
+func (gb *Gameboy) Pause() {
+	gb.CLK.Pause()
+}
+
+func (gb *Gameboy) Stop() {
 	gb.CLK.Stop()
 }
 
@@ -38,16 +39,22 @@ func (gb *Gameboy) GetViewport() ViewPort {
 }
 
 func NewGameboy(
-	ctx context.Context,
-	logger *slog.Logger,
 	config HWConfig,
 ) *Gameboy {
-	clk := NewRealtimeClock(config.SystemClock)
+	gameboy := &Gameboy{
+		Config: config,
+	}
+	gameboy.init()
+	return gameboy
+}
+
+func (gb *Gameboy) init() {
+	clk := NewRealtimeClock(gb.Config.SystemClock)
 	ppuClock := clk.Divide(2)
 	cpuClock := clk.Divide(4)
 
 	bootROMLock := NewBootROMLock(clk)
-	bootROM := NewBootROM(clk, config.Model)
+	bootROM := NewBootROM(clk, gb.Config.Model)
 	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
 	hram := NewMemoryRegion(clk, AddrHRAMBegin, SizeHRAM)
 	apu := NewAPU(clk)
@@ -68,12 +75,9 @@ func NewGameboy(
 
 	cpu := NewCPU(cpuClock, bus)
 
-	soc := &Gameboy{}
-	soc.CLK = clk
-	soc.PHI = cpuClock
-	soc.CPU = cpu
-	soc.CartridgeSlot = &cartridgeSlot
-	soc.PPU = ppu
-
-	return soc
+	gb.CLK = clk
+	gb.PHI = cpuClock
+	gb.CPU = cpu
+	gb.CartridgeSlot = &cartridgeSlot
+	gb.PPU = ppu
 }

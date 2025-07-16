@@ -39,3 +39,22 @@ func (fifo *PixelFIFO) Write8(pixels [8]Pixel) {
 	}
 	fifo.Level = 8
 }
+
+type PixelFIFODump struct {
+	Slots [8]Pixel
+	Level int
+}
+
+func (fifo *PixelFIFO) Dump() PixelFIFODump {
+	var dump PixelFIFODump
+	dump.Level = fifo.Level
+	pos := fifo.ShiftPos
+	for i := range fifo.Level {
+		dump.Slots[i] = fifo.Slots[pos]
+		i++
+		if i == 8 {
+			i = 0
+		}
+	}
+	return dump
+}

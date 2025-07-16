@@ -1,9 +1,10 @@
 package model
 
 type PixelShifter struct {
-	RemainingPixelsToDiscard uint8
-	Suspended                bool
-	X                        uint8
+	Discard     uint8
+	Suspended   bool
+	X           uint8
+	LastShifted Color
 
 	PPU *PPU
 }
@@ -13,9 +14,9 @@ func (ps *PixelShifter) fsm() {
 		return
 	}
 
-	if ps.RemainingPixelsToDiscard > 0 {
+	if ps.Discard > 0 {
 		if _, shifted := ps.PPU.BackgroundFIFO.ShiftOut(); shifted {
-			ps.RemainingPixelsToDiscard--
+			ps.Discard--
 		}
 		return
 	}
@@ -27,6 +28,7 @@ func (ps *PixelShifter) fsm() {
 
 	// Write pixel to LCD
 	ps.PPU.FBViewport[ps.PPU.RegLY][ps.X] = pixel.Color
+	ps.LastShifted = pixel.Color
 	ps.X++
 }
 

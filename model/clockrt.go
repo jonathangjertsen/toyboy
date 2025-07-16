@@ -11,6 +11,7 @@ type ClockRT struct {
 	cyclesPerTick uint64
 	resume        chan struct{}
 	pause         chan struct{}
+	stop          chan struct{}
 	jobs          chan func()
 	uiDevices     []func()
 	divided       []clockRTDivided
@@ -36,6 +37,7 @@ func NewRealtimeClock(config ClockConfig) *ClockRT {
 	clockRT := ClockRT{
 		resume: make(chan struct{}),
 		pause:  make(chan struct{}),
+		stop:   make(chan struct{}),
 		jobs:   make(chan func()),
 	}
 	go clockRT.run(config.Frequency)
@@ -95,6 +97,7 @@ func (clockRT *ClockRT) run(initFreq float64) {
 	clockRT.wait()
 	clockRT.ticker = time.NewTicker(clockRT.tickInterval)
 	for {
+		var exit bool
 		select {
 		case <-clockRT.ticker.C:
 			count = clockRT.Cycles(count, clockRT.cyclesPerTick)
@@ -105,6 +108,11 @@ func (clockRT *ClockRT) run(initFreq float64) {
 			clockRT.wait()
 		case job := <-clockRT.jobs:
 			job()
+		case <-clockRT.stop:
+			exit = true
+		}
+		if exit {
+			break
 		}
 	}
 }
@@ -121,10 +129,16 @@ func (clockRT *ClockRT) Start() {
 	clockRT.resume <- struct{}{}
 }
 
+// Pause the clock
+// When this function returns, the clock has stopped
+func (clockRT *ClockRT) Pause() {
+	clockRT.pause <- struct{}{}
+}
+
 // Stop the clock
 // When this function returns, the clock has stopped
 func (clockRT *ClockRT) Stop() {
-	clockRT.pause <- struct{}{}
+	clockRT.stop <- struct{}{}
 }
 
 func (clockRT *ClockRT) Cycle(currCycle uint64) {
