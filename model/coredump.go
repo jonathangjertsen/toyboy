@@ -106,7 +106,6 @@ func memdump(f io.Writer, mem []MemInfo, start, end, highlight uint16) {
 			}
 			fmt.Fprintf(f, "%s%02x ", pre, mem[addr-start].Value)
 		}
-
 	}
 
 	alignedEnd := (end/0x10)*0x10 + 0x10 - 1

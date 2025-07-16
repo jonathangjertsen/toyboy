@@ -16,6 +16,8 @@ import (
 	"gioui.org/font"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -298,6 +300,43 @@ func (gui *GUI) Render(gtx C) {
 							return dataLabel.Layout(gtx)
 						},
 					)
+				}),
+			)
+		}),
+		Rigid(func(gtx C) D {
+			return Column(
+				gtx,
+				Rigid(gui.memHead("Viewport")),
+				Rigid(func(gtx C) D {
+					vp := gui.GB.GetViewport()
+
+					gtx.Constraints.Min.Y = gtx.Dp(unit.Dp(144))
+					gtx.Constraints.Max.Y = gtx.Dp(unit.Dp(144))
+					gtx.Constraints.Min.X = gtx.Dp(unit.Dp(160))
+					gtx.Constraints.Max.X = gtx.Dp(unit.Dp(160))
+					dr := image.Rectangle{Max: gtx.Constraints.Min}
+					img := image.Gray{Pix: make([]uint8, 144*160), Stride: 160, Rect: dr}
+
+					for r := range 144 {
+						for c := range 160 {
+							var col uint8
+							switch vp[r][c] {
+							case model.ColorWhiteOrTransparent:
+								col = 0xf0
+							case model.ColorLightGray:
+								col = 0xa0
+							case model.ColorDarkGray:
+								col = 0x70
+							case model.ColorBlack:
+								col = 0x30
+							}
+							img.Pix[r*160+c] = col
+						}
+					}
+					paint.NewImageOp(&img).Add(gtx.Ops)
+					defer clip.Rect(dr).Push(gtx.Ops).Pop()
+					paint.PaintOp{}.Add(gtx.Ops)
+					return D{Size: gtx.Constraints.Max}
 				}),
 			)
 		}),

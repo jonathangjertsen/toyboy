@@ -23,23 +23,6 @@ var hwConfig = model.HWConfig{
 	},
 }
 
-type sysInterface struct {
-}
-
-func (si *sysInterface) FrameCompleted(vp model.ViewPort) {
-	if vp == (model.ViewPort{}) {
-		return
-	}
-
-	fmt.Printf("FRAME:\n")
-	for _, row := range vp {
-		for _, col := range row {
-			fmt.Printf("%d", int(col))
-		}
-		fmt.Printf("\n")
-	}
-}
-
 func main() {
 	ctx := context.Background()
 	var logWriter io.Writer = os.Stdout
@@ -51,7 +34,7 @@ func main() {
 			logger.Info("Exited", "err", http.ListenAndServe("localhost:6060", nil))
 		}()
 	}
-	gb := model.NewGameboy(ctx, logger, hwConfig, &sysInterface{})
+	gb := model.NewGameboy(ctx, logger, hwConfig)
 	defer func() {
 		if e := recover(); e != nil {
 			gb.CPU.Dump()

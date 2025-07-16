@@ -9,6 +9,7 @@ type Gameboy struct {
 	CLK           *ClockRT
 	PHI           *Clock
 	CPU           *CPU
+	PPU           *PPU
 	CartridgeSlot *MemoryRegion
 }
 
@@ -28,15 +29,18 @@ func (gb *Gameboy) GetCoreDump() CoreDump {
 	return cd
 }
 
-type SysInterface interface {
-	PPUHooks
+func (gb *Gameboy) GetViewport() ViewPort {
+	var vp ViewPort
+	gb.CLK.Sync(func() {
+		vp = gb.PPU.LastFrame
+	})
+	return vp
 }
 
 func NewGameboy(
 	ctx context.Context,
 	logger *slog.Logger,
 	config HWConfig,
-	sysif SysInterface,
 ) *Gameboy {
 	clk := NewRealtimeClock(config.SystemClock)
 	ppuClock := clk.Divide(2)
@@ -51,7 +55,7 @@ func NewGameboy(
 	cartridgeSlot := NewMemoryRegion(clk, AddrCartridgeBank0Begin, AddrCartridgeBank0Size)
 
 	bus := &Bus{}
-	ppu := NewPPU(clk, ppuClock, bus, sysif)
+	ppu := NewPPU(clk, ppuClock, bus)
 
 	bus.BootROMLock = bootROMLock
 	bus.BootROM = &bootROM
@@ -69,6 +73,7 @@ func NewGameboy(
 	soc.PHI = cpuClock
 	soc.CPU = cpu
 	soc.CartridgeSlot = &cartridgeSlot
+	soc.PPU = ppu
 
 	return soc
 }
