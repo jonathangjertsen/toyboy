@@ -1,5 +1,3 @@
-; ANCHOR: dummy      Lines beginning with `ANCHOR` and `ANCHOR_END` are used by mdBook <https://rust-lang.github.io/mdBook/format/mdbook.html#including-portions-of-a-file>
-; ANCHOR_END: dummy  Note that lines matching /^; ANCHOR/ are stripped from the online version
 INCLUDE "hardware.inc"
 
 SECTION "Header", ROM0[$100]
@@ -19,69 +17,47 @@ WaitVBlank:
 	ld a, 0
 	ld [rLCDC], a
 
+; ANCHOR: copy_tiles
 	; Copy the tile data
 	ld de, Tiles
 	ld hl, $9000
 	ld bc, TilesEnd - Tiles
-CopyTiles:
-	ld a, [de]
-	ld [hli], a
-	inc de
-	dec bc
-	ld a, b
-	or a, c
-	jp nz, CopyTiles
+	call Memcopy
+; ANCHOR_END: copy_tiles
 
+; ANCHOR: copy_map
 	; Copy the tilemap
 	ld de, Tilemap
 	ld hl, $9800
 	ld bc, TilemapEnd - Tilemap
-CopyTilemap:
-	ld a, [de]
-	ld [hli], a
-	inc de
-	dec bc
-	ld a, b
-	or a, c
-	jp nz, CopyTilemap
+	call Memcopy
+; ANCHOR_END: copy_map
 
-; ANCHOR: copy-paddle
+; ANCHOR: copy_paddle
 	; Copy the paddle tile
 	ld de, Paddle
 	ld hl, $8000
 	ld bc, PaddleEnd - Paddle
-CopyPaddle:
-	ld a, [de]
-	ld [hli], a
-	inc de
-	dec bc
-	ld a, b
-	or a, c
-	jp nz, CopyPaddle
-; ANCHOR_END: copy-paddle
+	call Memcopy
+; ANCHOR_END: copy_paddle
 
-; ANCHOR: clear-oam
-	ld a, 0
+	xor a, a
 	ld b, 160
 	ld hl, _OAMRAM
 ClearOam:
 	ld [hli], a
 	dec b
 	jp nz, ClearOam
-; ANCHOR_END: clear-oam
 
-; ANCHOR: init-object
 	ld hl, _OAMRAM
 	ld a, 128 + 16
 	ld [hli], a
-	ld a, 0
+	ld a, 16 + 8
 	ld [hli], a
 	ld a, 0
 	ld [hli], a
-	ld [hli], a
-; ANCHOR_END: init-object
+	ld [hl], a
 
-; ANCHOR: enable-oam
 	; Turn the LCD on
 	ld a, LCDCF_ON | LCDCF_BGON | LCDCF_OBJON
 	ld [rLCDC], a
@@ -91,13 +67,16 @@ ClearOam:
 	ld [rBGP], a
 	ld a, %11100100
 	ld [rOBP0], a
-; ANCHOR_END: enable-oam
 
-; ANCHOR: main-loop
+	; ANCHOR: initialize-vars
 	; Initialize global variables
 	ld a, 0
 	ld [wFrameCounter], a
+	ld [wCurKeys], a
+	ld [wNewKeys], a
+	; ANCHOR_END: initialize-vars
 
+; ANCHOR: main
 Main:
 	ld a, [rLY]
 	cp 144
@@ -107,20 +86,93 @@ WaitVBlank2:
 	cp 144
 	jp c, WaitVBlank2
 
-	ld a, [wFrameCounter]
-	inc a
-	ld [wFrameCounter], a
+	; Check the current keys every frame and move left or right.
+	call UpdateKeys
 
-	; Reset the frame counter back to 0
-	ld a, 0
-	ld [wFrameCounter], a
+	; First, check if the left button is pressed.
+CheckLeft:
+	ld a, [wCurKeys]
+	and a, PADF_LEFT
+	jp z, CheckRight
+Left:
+	; Move the paddle one pixel to the left.
+	ld a, [_OAMRAM + 1]
+	dec a
+	; If we've already hit the edge of the playfield, don't move.
+	cp a, 15
+	jp z, Main
+	ld [_OAMRAM + 1], a
+	jp Main
 
+; Then check the right button.
+CheckRight:
+	ld a, [wCurKeys]
+	and a, PADF_RIGHT
+	jp z, Main
+Right:
 	; Move the paddle one pixel to the right.
 	ld a, [_OAMRAM + 1]
 	inc a
+	; If we've already hit the edge of the playfield, don't move.
+	cp a, 105
+	jp z, Main
 	ld [_OAMRAM + 1], a
 	jp Main
-; ANCHOR_END: main-loop
+; ANCHOR_END: main
+
+; ANCHOR: input-routine
+UpdateKeys:
+  ; Poll half the controller
+  ld a, P1F_GET_BTN
+  call .onenibble
+  ld b, a ; B7-4 = 1; B3-0 = unpressed buttons
+
+  ; Poll the other half
+  ld a, P1F_GET_DPAD
+  call .onenibble
+  swap a ; A7-4 = unpressed directions; A3-0 = 1
+  xor a, b ; A = pressed buttons + directions
+  ld b, a ; B = pressed buttons + directions
+
+  ; And release the controller
+  ld a, P1F_GET_NONE
+  ldh [rP1], a
+
+  ; Combine with previous wCurKeys to make wNewKeys
+  ld a, [wCurKeys]
+  xor a, b ; A = keys that changed state
+  and a, b ; A = keys that changed to pressed
+  ld [wNewKeys], a
+  ld a, b
+  ld [wCurKeys], a
+  ret
+
+.onenibble
+  ldh [rP1], a ; switch the key matrix
+  call .knownret ; burn 10 cycles calling a known ret
+  ldh a, [rP1] ; ignore value while waiting for the key matrix to settle
+  ldh a, [rP1]
+  ldh a, [rP1] ; this read counts
+  or a, $F0 ; A7-4 = 1; A3-0 = unpressed keys
+.knownret
+  ret
+; ANCHOR_END: input-routine
+
+; ANCHOR: memcpy
+; Copy bytes from one area to another.
+; @param de: Source
+; @param hl: Destination
+; @param bc: Length
+Memcopy:
+	ld a, [de]
+	ld [hli], a
+	inc de
+	dec bc
+	ld a, b
+	or a, c
+	jp nz, Memcopy
+	ret
+; ANCHOR_END: memcpy
 
 Tiles:
 	dw `33333333
@@ -355,20 +407,22 @@ Tilemap:
 	db $04, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09, $07, $03, $03, $03, $03, $03, $03, 0,0,0,0,0,0,0,0,0,0,0,0
 TilemapEnd:
 
-; ANCHOR: paddle-gfx
 Paddle:
-	dw `13333331
+	dw `03333330
 	dw `30000003
-	dw `13333331
+	dw `03333330
 	dw `00000000
 	dw `00000000
 	dw `00000000
 	dw `00000000
 	dw `00000000
 PaddleEnd:
-; ANCHOR_END: paddle-gfx
 
-; ANCHOR: variables
 SECTION "Counter", WRAM0
 wFrameCounter: db
-; ANCHOR_END: variables
+
+; ANCHOR: vars
+SECTION "Input Variables", WRAM0
+wCurKeys: db
+wNewKeys: db
+; ANCHOR_END: vars

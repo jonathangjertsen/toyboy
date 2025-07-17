@@ -13,6 +13,7 @@ type Bus struct {
 	OAM           *MemoryRegion
 	PPU           *PPU
 	CartridgeSlot *MemoryRegion
+	Joypad        *Joypad
 }
 
 func (b *Bus) WriteAddress(addr uint16) {
@@ -38,9 +39,10 @@ func (b *Bus) WriteAddress(addr uint16) {
 		b.Data = b.OAM.Read(addr)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.Data = b.PPU.Read(addr)
+	} else if addr == AddrJoypad {
+		b.Data = b.Joypad.Read(addr)
 	} else if addr == AddrBootROMLock {
 		b.Data = b.BootROMLock.Read(addr)
-		return
 	} else {
 		panicf("read from unknown peripheral at 0x%x", addr)
 	}
@@ -60,6 +62,8 @@ func (b *Bus) WriteData(v uint8) {
 		panicf("Attempted write to cartridge (addr=0x%04x v=%02x)", addr, v)
 	} else if addr == AddrBootROMLock {
 		b.BootROMLock.Write(addr, v)
+	} else if addr == AddrJoypad {
+		b.Joypad.Write(addr, v)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		b.VRAM.Write(addr, v)
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {

@@ -81,6 +81,7 @@ func (gb *Gameboy) init() {
 	apu := NewAPU(clk)
 	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
 	cartridgeSlot := NewMemoryRegion(clk, AddrCartridgeBank0Begin, AddrCartridgeBank0Size)
+	joypad := NewJoypad(clk)
 
 	bus := &Bus{}
 	ppu := NewPPU(clk, ppuClock, bus, debugger)
@@ -94,6 +95,7 @@ func (gb *Gameboy) init() {
 	bus.OAM = &oam
 	bus.PPU = ppu
 	bus.CartridgeSlot = &cartridgeSlot
+	bus.Joypad = joypad
 
 	cpu := NewCPU(cpuClock, bus)
 

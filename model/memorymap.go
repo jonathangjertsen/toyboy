@@ -29,6 +29,8 @@ const (
 	SizeEchoRAM      = 0x1f00
 	AddrEchoRAMEnd   = AddrEchoRAMBegin + SizeEchoRAM - 1
 
+	AddrJoypad = 0xff00
+
 	AddrAPUBegin = 0xff10
 	SizeAPU      = 0x0017
 	AddrAPUEnd   = AddrAPUBegin + SizeAPU - 1

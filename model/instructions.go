@@ -178,18 +178,25 @@ package model
 // JPNZnn   = 0xC2,
 // JPnn     = 0xC3,
 // PUSHBC   = 0xC5,
+// ADDn     = 0xC6,
 // RET      = 0xC9,
 // JPZnn    = 0xCA,
 // CB       = 0xCB,
 // CALLnn   = 0xCD,
+// ADCn     = 0xCE,
 // JPCnn    = 0xDA,
 // JPNCnn   = 0xD2,
+// SUBn     = 0xD6
+// SBCn     = 0xDE,
 // LDHnA    = 0xE0,
 // LDHCA    = 0xE2,
+// ANDn     = 0xE6,
 // LDnnA    = 0xEA,
+// XORn     = 0xEE,
 // LDHAn    = 0xF0,
 // LDAnn    = 0xFA,
 // DI       = 0xF3,
+// ORn      = 0xF6,
 // EI       = 0xFB,
 // CPn      = 0xFE,
 // )
@@ -634,28 +641,36 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			}
 			return false
 		},
-		OpcodeCPn: func(e edge) bool {
-			switch e {
-			case edge{1, false}:
-				cpu.writeAddressBus(cpu.Regs.PC)
-				cpu.IncPC()
-			case edge{1, true}:
-				cpu.Regs.TempZ = cpu.Bus.Data
-			case edge{2, false}:
-				return true
-			case edge{2, true}:
-				carry := cpu.Regs.A < cpu.Regs.TempZ
-				result := cpu.Regs.A - cpu.Regs.TempZ
-				cpu.Regs.SetFlagZ(result == 0)
-				cpu.Regs.SetFlagN(true)
-				cpu.Regs.TODOFlagH()
-				cpu.Regs.SetFlagC(carry)
-				return true
-			default:
-				panicv(e)
-			}
-			return false
-		},
+		OpcodeCPn: cpu.alun(func(imm uint8) {
+			carry := cpu.Regs.A < imm
+			result := cpu.Regs.A - imm
+			cpu.Regs.SetFlagZ(result == 0)
+			cpu.Regs.SetFlagN(true)
+			cpu.Regs.TODOFlagH()
+			cpu.Regs.SetFlagC(carry)
+		}),
+		OpcodeORn: cpu.alun(func(imm uint8) {
+			cpu.Regs.A |= imm
+			cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
+			cpu.Regs.SetFlagN(false)
+			cpu.Regs.SetFlagH(false)
+			cpu.Regs.SetFlagC(false)
+		}),
+		OpcodeANDn: cpu.alun(func(imm uint8) {
+			cpu.Regs.A &= imm
+			cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
+			cpu.Regs.SetFlagN(false)
+			cpu.Regs.SetFlagH(false)
+			cpu.Regs.SetFlagC(false)
+		}),
+		OpcodeADDn: cpu.alun(func(imm uint8) {
+			carry := uint16(cpu.Regs.A)+uint16(imm) > 0xff
+			cpu.Regs.A += imm
+			cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
+			cpu.Regs.SetFlagN(false)
+			cpu.Regs.TODOFlagH()
+			cpu.Regs.SetFlagC(carry)
+		}),
 		OpcodeLDHnA: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
@@ -761,6 +776,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 					cpu.Regs.SetFlagN(false)
 					cpu.Regs.SetFlagH(false)
 					cpu.Regs.SetFlagC(bit7 != 0)
+				case CbSWAP:
+					val = ((val & 0x0f) << 4) | ((val & 0xf0) >> 4)
+					cpu.Regs.SetFlagZ(val == 0)
+					cpu.Regs.SetFlagN(false)
+					cpu.Regs.SetFlagH(false)
+					cpu.Regs.SetFlagC(false)
 				case CbBit0:
 					cbbit(cpu, val, 0x01)
 				case CbBit1:
@@ -990,6 +1011,26 @@ func (cpu *CPU) iduOp(f func()) func(e edge) bool {
 			f()
 		case edge{1, true}:
 		case edge{2, false}, edge{2, true}:
+			return true
+		default:
+			panicv(e)
+		}
+		return false
+	}
+}
+
+func (cpu *CPU) alun(f func(imm uint8)) func(e edge) bool {
+	return func(e edge) bool {
+		switch e {
+		case edge{1, false}:
+			cpu.writeAddressBus(cpu.Regs.PC)
+			cpu.IncPC()
+		case edge{1, true}:
+			cpu.Regs.TempZ = cpu.Bus.Data
+		case edge{2, false}:
+			return true
+		case edge{2, true}:
+			f(cpu.Regs.TempZ)
 			return true
 		default:
 			panicv(e)
