@@ -14,10 +14,13 @@ It tries to be cycle-accurate, everything is triggered from the clock.
 ## Status
 
 - Runs the bootrom
-- Runs the Hello world ROM from GB ASM tutorial
+- Runs the Hello world ROM from GB ASM tutorial, working on the Unbricked ROM
 - Handles most instructions
-- Blind implementation of PPU which, controversially, doesn't work
-- Next step: add UI to help with visual debugging of memory
+- PPU mostly works
+
+Currently looks like this
+
+![](screenshot.png)
 
 ## Resources used
 
