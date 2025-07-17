@@ -73,7 +73,7 @@ func (gui *GUI) initGameboy() {
 			panic(e)
 		}
 	}()
-	f, err := os.ReadFile("assets/cartridges/hello-world.gb")
+	f, err := os.ReadFile("assets/cartridges/empty.gb")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load cartridge: %v", err))
 	} else if len(f) != 0x8000 {

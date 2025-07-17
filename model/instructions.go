@@ -249,9 +249,6 @@ type InstructionHandling func(e edge) bool
 func handlers(cpu *CPU) [256]InstructionHandling {
 	return [256]InstructionHandling{
 		OpcodeNop: cpu.singleCycle(func() {
-			if cpu.clockCycle.C > 0 {
-				panic("unexpected nop") // TODO remove
-			}
 		}),
 		OpcodeLDAA: cpu.ld(&cpu.Regs.A, &cpu.Regs.A),
 		OpcodeLDAB: cpu.ld(&cpu.Regs.A, &cpu.Regs.B),
