@@ -7,6 +7,7 @@ import (
 )
 
 type CoreDump struct {
+	Cycle        Cycle
 	Regs         RegisterFile
 	ProgramStart uint16
 	ProgramEnd   uint16
@@ -30,6 +31,7 @@ type PPUDump struct {
 	PixelShifter              PixelShifter
 	BackgroundFetcher         BackgroundFetcher
 	SpriteFetcher             SpriteFetcher
+	OAMBuffer                 OAMBuffer
 }
 
 type MemDump []MemInfo
@@ -85,6 +87,14 @@ func (cd *CoreDump) PrintOAM(f io.Writer) {
 	memdump(f, cd.OAM, 0xfe00, 0xfe99, 0)
 }
 
+func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
+	oam := cd.OAM.Bytes()
+	for idx := range 40 {
+		obj := DecodeSprite(oam[idx*4 : (idx+1)*4])
+		fmt.Fprintf(f, "%02d T=%03d X=%03d Y=%03d Attr=%02x\n", idx, obj.TileIndex, obj.X, obj.Y, obj.Attributes)
+	}
+}
+
 func (cd *CoreDump) PrintVRAM(f io.Writer) {
 	memdump(f, cd.VRAM, 0x8000, 0x9fff, 0)
 }
@@ -116,19 +126,6 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 	fmt.Fprintf(f, "BFetch.WYRch:  %d\n", bool2int(ppu.BackgroundFetcher.WindowYReached))
 	fmt.Fprintf(f, "BFetch.WFetch: %d\n", bool2int(ppu.BackgroundFetcher.WindowFetching))
 	fmt.Fprintf(f, "BFetch.WLC:    %d\n", ppu.BackgroundFetcher.WindowLineCounter)
-	fmt.Fprintf(f, "SFetch.C:      %d\n", ppu.SpriteFetcher.Cycle)
-	fmt.Fprintf(f, "SFetch.State:  %d\n", int(ppu.SpriteFetcher.State))
-	fmt.Fprintf(f, "SFetch.Fetch:  %d\n", bool2int(ppu.SpriteFetcher.Fetching))
-	fmt.Fprintf(f, "SFetch.X:      %d\n", ppu.SpriteFetcher.X)
-	fmt.Fprintf(f, "SFetch.SIdx:   %d\n", ppu.SpriteFetcher.SpriteIDX)
-	fmt.Fprintf(f, "SFetch.&TIdx:  0x%04x\n", ppu.SpriteFetcher.TileIndexAddr)
-	fmt.Fprintf(f, "SFetch.TIdx:   %d\n", ppu.SpriteFetcher.TileIndex)
-	fmt.Fprintf(f, "SFetch.TAddr:  0x%04x\n", ppu.SpriteFetcher.TileLSBAddr)
-	fmt.Fprintf(f, "SFetch.Tile:   0x%04x\n", join16(ppu.SpriteFetcher.TileMSB, ppu.SpriteFetcher.TileLSB))
-	fmt.Fprintf(f, "SFetch.Susp:   %d\n", bool2int(ppu.SpriteFetcher.Suspended))
-	fmt.Fprintf(f, "Shift.Discard: %d\n", ppu.PixelShifter.Discard)
-	fmt.Fprintf(f, "Shift.X:       %d\n", ppu.PixelShifter.X)
-	fmt.Fprintf(f, "Shift.Susp:    %d\n", bool2int(ppu.PixelShifter.Suspended))
 	fmt.Fprintf(f, "\n")
 	fmt.Fprintf(f, "BGFIFO: /[")
 	for i := range ppu.BGFIFO.Level {
@@ -147,6 +144,18 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 		fmt.Fprintf(f, " ")
 	}
 	fmt.Fprintf(f, "]\n")
+	fmt.Fprintf(f, "SFetch.C:      %d\n", ppu.SpriteFetcher.Cycle)
+	fmt.Fprintf(f, "SFetch.State:  %d\n", int(ppu.SpriteFetcher.State))
+	fmt.Fprintf(f, "SFetch.X:      %d\n", ppu.SpriteFetcher.X)
+	fmt.Fprintf(f, "SFetch.SIdx:   %d\n", ppu.SpriteFetcher.SpriteIDX)
+	fmt.Fprintf(f, "SFetch.TIdx:   %d\n", ppu.SpriteFetcher.TileIndex)
+	fmt.Fprintf(f, "SFetch.TAddr:  0x%04x\n", ppu.SpriteFetcher.TileLSBAddr)
+	fmt.Fprintf(f, "SFetch.Tile:   0x%04x\n", join16(ppu.SpriteFetcher.TileMSB, ppu.SpriteFetcher.TileLSB))
+	fmt.Fprintf(f, "SFetch.Susp:   %d\n", bool2int(ppu.SpriteFetcher.Suspended))
+	fmt.Fprintf(f, "Shift.Discard: %d\n", ppu.PixelShifter.Discard)
+	fmt.Fprintf(f, "Shift.X:       %d\n", ppu.PixelShifter.X)
+	fmt.Fprintf(f, "Shift.Susp:    %d\n", bool2int(ppu.PixelShifter.Suspended))
+	fmt.Fprintf(f, "OAMBuffer.LV:  %d\n", ppu.OAMBuffer.Level)
 }
 
 func (cd *CoreDump) PrintAPU(f io.Writer) {
@@ -233,6 +242,7 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	cd.PPU.PixelShifter = cpu.Bus.PPU.PixelShifter
 	cd.PPU.BackgroundFetcher = cpu.Bus.PPU.BackgroundFetcher
 	cd.PPU.SpriteFetcher = cpu.Bus.PPU.SpriteFetcher
+	cd.PPU.OAMBuffer = cpu.Bus.PPU.OAMBuffer
 	return cd
 }
 

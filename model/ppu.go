@@ -76,8 +76,19 @@ type Sprite struct {
 	Attributes uint8
 }
 
+func DecodeSprite(data []uint8) Sprite {
+	return Sprite{
+		Y:          data[0],
+		X:          data[1],
+		TileIndex:  data[2],
+		Attributes: data[3],
+	}
+}
+
 type PPU struct {
 	MemoryRegion
+
+	Debugger *Debugger
 
 	RegLCDC uint8
 	RegSTAT uint8
@@ -250,13 +261,16 @@ func (ppu *PPU) SetOBP1(v uint8) {
 	ppu.OBJPalette1[3] = Color((v >> 6) & 0x3)
 }
 
-func NewPPU(rtClock *ClockRT, clock *Clock, bus *Bus) *PPU {
+func NewPPU(rtClock *ClockRT, clock *Clock, bus *Bus, debugger *Debugger) *PPU {
 	ppu := &PPU{
 		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, AddrPPUEnd),
 		Bus:          bus,
+		Debugger:     debugger,
 	}
 	ppu.BackgroundFetcher.PPU = ppu
 	ppu.SpriteFetcher.PPU = ppu
+	ppu.SpriteFetcher.Suspended = true
+	ppu.SpriteFetcher.DoneX = 0xff
 	ppu.PixelShifter.PPU = ppu
 	ppu.beginFrame()
 	clock.AttachDevice(ppu.fsm)
@@ -312,7 +326,7 @@ func (ppu *PPU) beginPixelDraw() {
 	ppu.BackgroundFetcher.WindowFetching = false
 	ppu.BackgroundFetcher.X = 0
 	ppu.SpriteFetcher.Cycle = 0
-	ppu.SpriteFetcher.State = PixelFetcherStateFetchTileNo
+	ppu.SpriteFetcher.DoneX = 0xff
 	ppu.SpriteFetcher.X = 0
 	ppu.BackgroundFIFO.Clear()
 	ppu.SpriteFIFO.Clear()
@@ -360,23 +374,23 @@ func (ppu *PPU) fsmOAMScan() {
 	index := uint16((cycle - 1) / 2)
 
 	// Read sprite out of OAM
-	var sprite Sprite
-	sprite.Y = ppu.Bus.OAM.Read(0xfe00 + index*4 + 0)
-	sprite.X = ppu.Bus.OAM.Read(0xfe00 + index*4 + 1)
-	sprite.TileIndex = ppu.Bus.OAM.Read(0xfe00 + index*4 + 2)
-	sprite.Attributes = ppu.Bus.OAM.Read(0xfe00 + index*4 + 3)
+	spriteData := make([]uint8, 4)
+	for offs := uint16(0); offs < 4; offs++ {
+		spriteData[offs] = ppu.Bus.OAM.Read(AddrOAMBegin + index*4 + offs)
+	}
+	sprite := DecodeSprite(spriteData)
 
 	// Check if sprite should be added to buffer
+	if !(sprite.X > 0) {
+		return
+	}
+	if !(ppu.RegLY+16 >= sprite.Y) {
+		return
+	}
+	if !(ppu.RegLY+16 < sprite.Y+ppu.ObjHeight()) {
+		return
+	}
 	if ppu.OAMBuffer.Full() {
-		return
-	}
-	if sprite.X == 0 {
-		return
-	}
-	if ppu.RegLY+16 < sprite.Y {
-		return
-	}
-	if ppu.RegLY+16 <= sprite.Y+ppu.ObjHeight() {
 		return
 	}
 
@@ -384,12 +398,28 @@ func (ppu *PPU) fsmOAMScan() {
 }
 
 func (ppu *PPU) fsmPixelDraw() {
+	if ppu.SpriteFetcher.Suspended && ppu.SpriteFetcher.DoneX != ppu.PixelShifter.X {
+		for idx := range ppu.OAMBuffer.Level {
+			obj := ppu.OAMBuffer.Buffer[idx]
+			if obj.X <= ppu.PixelShifter.X+8 && obj.X > ppu.PixelShifter.X {
+				// Initiate sprite fetch
+				ppu.SpriteFetcher.State = 1
+				ppu.SpriteFetcher.SpriteIDX = idx
+				ppu.PixelShifter.Suspended = true
+				ppu.SpriteFetcher.Suspended = false
+				ppu.SpriteFetcher.DoneX = 0xff
+				break
+			}
+		}
+	} else {
+		if ppu.SpriteFetcher.DoneX != 0xff {
+			ppu.BackgroundFetcher.Suspended = false
+			ppu.PixelShifter.Suspended = false
+		}
+	}
+
 	ppu.SpriteFetcher.fsm()
-	ppu.BackgroundFetcher.Suspended = !ppu.SpriteFetcher.Suspended
-	ppu.PixelShifter.Suspended = !ppu.SpriteFetcher.Suspended
-
 	ppu.BackgroundFetcher.fsm()
-
 	ppu.PixelShifter.fsm()
 
 	// GBEDG: After each pixel shifted out, the PPU checks if it has reached the window
@@ -450,6 +480,7 @@ func (ppu *PPU) IncRegLY() {
 	} else {
 		ppu.RegSTAT &= ^uint8(1 << 2)
 	}
+	ppu.Debugger.SetY(ppu.RegLY)
 }
 
 func (ppu *PPU) Read(addr uint16) uint8 {

@@ -1,21 +1,21 @@
 package model
 
 type PixelFetcher struct {
-	Cycle         uint64
-	State         PixelFetcherState
-	X             uint8
-	TileIndex     uint8
-	TileIndexAddr uint16
-	TileLSBAddr   uint16
-	TileLSB       uint8
-	TileMSB       uint8
-	Suspended     bool
+	Cycle       uint64
+	State       PixelFetcherState
+	X           uint8
+	TileIndex   uint8
+	TileLSBAddr uint16
+	TileLSB     uint8
+	TileMSB     uint8
+	Suspended   bool
 
 	PPU *PPU
 }
 
 type BackgroundFetcher struct {
 	PixelFetcher
+	TileIndexAddr uint16
 
 	TileOffsetX uint16
 	TileOffsetY uint16
@@ -147,44 +147,19 @@ func (bgf *BackgroundFetcher) pushFIFO() bool {
 	if bgf.PPU.BackgroundFIFO.Level > 0 {
 		return false
 	}
-	bgf.PPU.BackgroundFIFO.Write8(DecodeTileLine(bgf.TileLSB, bgf.TileMSB))
+	bgf.PPU.BackgroundFIFO.Write8(DecodeTileLine(bgf.TileMSB, bgf.TileLSB))
 	return true
 }
 
 type SpriteFetcher struct {
 	PixelFetcher
-	Fetching  bool
 	SpriteIDX int
+	DoneX     uint8
 }
 
 func (sf *SpriteFetcher) fsm() {
 	sfCycle := sf.Cycle
 	sf.Cycle++
-
-	// If the X-Position of any sprite in the sprite buffer is less than or equal to the current Pixel-X-Position + 8,
-	// a sprite fetch is initiated
-	sf.Suspended = true
-	for idx := range sf.PPU.OAMBuffer.Level {
-		obj := sf.PPU.OAMBuffer.Buffer[idx]
-		doSpriteFetch := obj.X <= sf.X+8
-
-		// presumably also...?
-		if obj.X < sf.X {
-			doSpriteFetch = false
-		}
-		if obj.Y < sf.PPU.RegLY {
-			doSpriteFetch = false
-		}
-		if obj.Y > sf.PPU.RegLY+8 { // TODO: tall sprites
-			doSpriteFetch = false
-		}
-
-		if doSpriteFetch {
-			sf.Suspended = false
-			sf.SpriteIDX = idx
-			break
-		}
-	}
 
 	if sf.Suspended {
 		return
@@ -214,6 +189,8 @@ func (sf *SpriteFetcher) fsm() {
 	case PixelFetcherStatePushFIFO:
 		if sf.pushFIFO() {
 			sf.State = PixelFetcherStateFetchTileNo
+			sf.Suspended = true
+			sf.DoneX = sf.PPU.PixelShifter.X
 		}
 	}
 }
@@ -235,23 +212,25 @@ func (sf *SpriteFetcher) fetchTileMSB() {
 }
 
 func (sf *SpriteFetcher) pushFIFO() bool {
-	line := DecodeTileLine(sf.TileLSB, sf.TileMSB)
+	line := DecodeTileLine(sf.TileMSB, sf.TileLSB)
 	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
-	offset := obj.X - sf.X + uint8(sf.PPU.SpriteFIFO.Level)
+	offsetInSprite := sf.PPU.PixelShifter.X + 8 - obj.X
+	pixelsToPush := 8 - offsetInSprite
 	pos := sf.PPU.SpriteFIFO.ShiftPos
-	for range offset {
+	for i := range int(pixelsToPush) {
+		incLevel := i >= sf.PPU.SpriteFIFO.Level
+		pushPixel := incLevel || sf.PPU.SpriteFIFO.Slots[pos].Color == ColorWhiteOrTransparent
+		if pushPixel {
+			pixel := line[int(offsetInSprite)+i]
+			sf.PPU.SpriteFIFO.Slots[pos] = pixel
+		}
+		if incLevel {
+			sf.PPU.SpriteFIFO.Level++
+		}
 		pos++
 		if pos == 8 {
 			pos = 0
 		}
 	}
-	for i := offset; i < 8; i++ {
-		sf.PPU.SpriteFIFO.Slots[pos] = line[i]
-		pos++
-		if pos == 8 {
-			pos = 0
-		}
-	}
-	sf.PPU.SpriteFIFO.Level = 8
 	return true
 }

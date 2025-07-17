@@ -2,20 +2,23 @@ package model
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
 type ClockRT struct {
-	ticker        *time.Ticker
-	tickInterval  time.Duration
-	cyclesPerTick uint64
-	resume        chan struct{}
-	pause         chan struct{}
-	stop          chan struct{}
-	jobs          chan func()
-	uiDevices     []func()
-	divided       []clockRTDivided
-	Onpanic       func()
+	ticker          *time.Ticker
+	tickInterval    time.Duration
+	cycle           Cycle
+	cyclesPerTick   uint64
+	resume          chan struct{}
+	pause           chan struct{}
+	stop            chan struct{}
+	jobs            chan func()
+	uiDevices       []func()
+	divided         []clockRTDivided
+	Onpanic         func()
+	pauseAfterCycle atomic.Int32
 }
 
 // Executes the function in the clocks' goroutine
@@ -101,14 +104,13 @@ func (clockRT *ClockRT) run(initFreq float64) {
 	}()
 	clockRT.setFreq(initFreq)
 
-	var count uint64
 	clockRT.wait()
 	clockRT.ticker = time.NewTicker(clockRT.tickInterval)
 	for {
 		var exit bool
 		select {
 		case <-clockRT.ticker.C:
-			count = clockRT.Cycles(count, clockRT.cyclesPerTick)
+			clockRT.Cycles(clockRT.cyclesPerTick)
 			clockRT.uiCycle()
 		case <-clockRT.resume:
 			fmt.Printf("Ignored resume\n")
@@ -167,10 +169,13 @@ func (clockRT *ClockRT) Cycle(currCycle uint64) {
 	}
 }
 
-func (clockRT *ClockRT) Cycles(currCycle uint64, n uint64) uint64 {
+func (clockRT *ClockRT) Cycles(n uint64) {
 	for range n {
-		clockRT.Cycle(currCycle)
-		currCycle++
+		clockRT.Cycle(clockRT.cycle.C)
+		if clockRT.pauseAfterCycle.Load() > 0 {
+			clockRT.wait()
+			clockRT.pauseAfterCycle.Add(-1)
+		}
+		clockRT.cycle.C++
 	}
-	return currCycle
 }

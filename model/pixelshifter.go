@@ -18,7 +18,6 @@ func (ps *PixelShifter) fsm() {
 		if _, shifted := ps.PPU.BackgroundFIFO.ShiftOut(); shifted {
 			ps.Discard--
 		}
-		return
 	}
 
 	pixel, havePixel := ps.getPixel()
@@ -30,6 +29,8 @@ func (ps *PixelShifter) fsm() {
 	ps.PPU.FBViewport[ps.PPU.RegLY][ps.X] = pixel.Color
 	ps.LastShifted = pixel.Color
 	ps.X++
+
+	ps.PPU.Debugger.SetX(ps.X)
 }
 
 func (ps *PixelShifter) getPixel() (Pixel, bool) {

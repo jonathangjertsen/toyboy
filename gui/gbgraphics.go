@@ -22,14 +22,18 @@ type GridConfig struct {
 	FillColor     color.RGBA // RGBA fill/background
 	DashLen       int
 	GridThickness int
-	ShowAddress   bool
 
+	ShowAddress    bool
 	AddressFont    font.Face
 	StartAddress   uint16
 	BlockIncrement uint16
+	LineIncrement  uint16
+	DecimalAddress bool
+
+	ShowOffsets bool
 }
 
-func (gc GridConfig) WithMem(startAddr, blockIncrement uint16) GridConfig {
+func (gc GridConfig) WithMem(startAddr uint16, blockIncrement uint16) GridConfig {
 	gc.StartAddress = startAddr
 	gc.BlockIncrement = blockIncrement
 	gc.ShowAddress = true
@@ -96,19 +100,23 @@ func (gui *GUI) GBGraphics(
 	// Compute width for text labels
 	labelWidth := 0
 	if cfg.ShowAddress {
-		labelWidth = (font.MeasureString(cfg.AddressFont, "ffff ") + fixed.I(1)/2).Round()
+		labelWidth = (font.MeasureString(cfg.AddressFont, "ffffh ") + fixed.I(1)/2).Round()
+	}
+	labelHeight := 0
+	if cfg.ShowOffsets {
+		labelHeight = cfg.AddressFont.Metrics().Height.Ceil() + 2
 	}
 
 	// Adjust final image size to fit address labels
 	sw := w*scale + gridSpacingX + labelWidth
-	sh := h*scale + gridSpacingY
+	sh := h*scale + gridSpacingY + labelHeight
 	dr := image.Rect(0, 0, sw, sh)
 	img := image.NewRGBA(dr)
 
 	// Fill background
 	for y := 0; y < sh; y++ {
 		for x := 0; x < sw; x++ {
-			img.SetRGBA(x+labelWidth, y, cfg.FillColor)
+			img.SetRGBA(x+labelWidth, y+labelHeight, cfg.FillColor)
 		}
 	}
 
@@ -137,7 +145,7 @@ func (gui *GUI) GBGraphics(
 
 			for dy := 0; dy < scale; dy++ {
 				for dx := 0; dx < scale; dx++ {
-					img.SetRGBA(dstX+dx+labelWidth, dstY+dy, col)
+					img.SetRGBA(dstX+dx+labelWidth, dstY+dy+labelHeight, col)
 				}
 			}
 		}
@@ -158,7 +166,7 @@ func (gui *GUI) GBGraphics(
 				for y := 0; y < sh; y++ {
 					useDash := ((y / scale) % cfg.DashLen) < (cfg.DashLen / 2)
 					if useDash {
-						img.SetRGBA(x+labelWidth, y, cfg.GridColor)
+						img.SetRGBA(x+labelWidth, y+labelHeight, cfg.GridColor)
 					}
 				}
 			}
@@ -178,7 +186,7 @@ func (gui *GUI) GBGraphics(
 				for x := 0; x < sw; x++ {
 					useDash := ((x / scale) % cfg.DashLen) < (cfg.DashLen / 2)
 					if useDash {
-						img.SetRGBA(x+labelWidth, y, cfg.GridColor)
+						img.SetRGBA(x+labelWidth, y+labelHeight, cfg.GridColor)
 					}
 				}
 			}
@@ -200,7 +208,12 @@ func (gui *GUI) GBGraphics(
 
 			// Avoid overlap with previous label
 			if yPix-lastY >= fontHeight+margin {
-				text := fmt.Sprintf("%04X", address)
+				var text string
+				if cfg.DecimalAddress {
+					text = fmt.Sprintf("%04d", address)
+				} else {
+					text = fmt.Sprintf("%04Xh", address)
+				}
 				drawer.Dot = fixed.Point26_6{
 					X: fixed.I(2),
 					Y: fixed.I(yPix),
@@ -208,11 +221,114 @@ func (gui *GUI) GBGraphics(
 				drawer.DrawString(text)
 				lastY = yPix
 			}
-			address += cfg.BlockIncrement * uint16(w/blockSize)
+			if cfg.LineIncrement > 0 {
+				address += cfg.LineIncrement * uint16(blockSize)
+			} else {
+				address += cfg.BlockIncrement * uint16(w/blockSize)
+			}
+		}
+	}
+	if cfg.ShowOffsets {
+		drawer := &font.Drawer{
+			Dst:  img,
+			Src:  image.NewUniform(color.Black),
+			Face: cfg.AddressFont,
+		}
+		fontWidth := font.MeasureString(cfg.AddressFont, "00h").Ceil()
+		for col := 0; col < w/blockSize; col++ {
+			xPix := col*blockSize*scale + col*gridT + labelWidth
+			var text string
+			offset := uint16(col) * cfg.BlockIncrement
+			if cfg.DecimalAddress {
+				text = fmt.Sprintf("%02d ", offset)
+			} else {
+				text = fmt.Sprintf("%02Xh", offset)
+			}
+			textX := xPix + (blockSize*scale-fontWidth)/2
+			if textX < labelWidth {
+				textX = labelWidth
+			}
+			drawer.Dot = fixed.P(textX, cfg.AddressFont.Metrics().Ascent.Ceil())
+			drawer.DrawString(text)
 		}
 	}
 	return widget.Image{
 		Src:   paint.NewImageOp(img),
 		Scale: gtx.Metric.PxPerDp,
 	}.Layout(gtx)
+}
+
+func tiledata(vram []uint8) []model.Color {
+	tileData := vram[:0x1800]
+	tiles := make([]model.Tile, len(tileData)/16)
+	for i := range tiles {
+		tiles[i] = model.DecodeTile(tileData[i*16 : (i+1)*16])
+	}
+	return placetiles(tiles, 24, 16)
+}
+
+func tilemap(vram []uint8, addr uint16, signedAddressing bool) []model.Color {
+	tileMap := vram[addr-model.AddrVRAMBegin : addr-model.AddrVRAMBegin+0x400]
+	tiles := make([]model.Tile, len(tileMap))
+	for i := range tiles {
+		tileID := tileMap[i]
+		var offset uint16
+		if signedAddressing {
+			offset = uint16(int32(0x1000) + 16*int32(int8(tileID)))
+		} else {
+			offset = 16 * uint16(tileID)
+		}
+		tile := vram[offset : offset+16]
+		tiles[i] = model.DecodeTile(tile)
+	}
+	return placetiles(tiles, 32, 32)
+}
+
+func placetiles(tiles []model.Tile, w, h int) []model.Color {
+	fb := make([]model.Color, h*w*8*8)
+	for tileRow := range h {
+		for tileCol := range w {
+			tile := tiles[tileRow*w+tileCol]
+			for rowInTile := range 8 {
+				for colInTile := range 8 {
+					col := tile[rowInTile][colInTile].Color
+					fb[(tileRow*8+rowInTile)*(8*w)+tileCol*8+colInTile] = col
+				}
+			}
+		}
+	}
+	return fb
+}
+
+func oambuffer(vram []uint8, buf model.OAMBuffer) []model.Color {
+	tiles := make([]model.Tile, 10)
+	for slot := range buf.Level {
+		obj := buf.Buffer[slot]
+		tileIndex := int(obj.TileIndex)
+		tile := model.DecodeTile(vram[16*tileIndex : 16*(tileIndex+1)])
+		tiles[slot] = tile
+	}
+	return placetiles(tiles, 10, 1)
+}
+
+func oam(vram []uint8, oam []uint8) []model.Color {
+	fb := make([]model.Color, 8*8*10*4)
+	objects := make([]model.Sprite, 40)
+	for i := 0; i < 40; i += 4 {
+		objects = append(objects, model.DecodeSprite(oam[i*4:(i+1)*4]))
+	}
+	for tileRow := range 4 {
+		for tileCol := range 10 {
+			obj := objects[tileRow*10+tileCol]
+			tileIndex := int(obj.TileIndex)
+			tile := model.DecodeTile(vram[16*tileIndex : 16*(tileIndex+1)])
+			for rowInTile := range 8 {
+				for colInTile := range 8 {
+					col := tile[rowInTile][colInTile].Color
+					fb[(tileRow*8+rowInTile)*(8*10)+tileCol*8+colInTile] = col
+				}
+			}
+		}
+	}
+	return fb
 }

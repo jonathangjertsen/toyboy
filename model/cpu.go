@@ -29,9 +29,24 @@ type CPU struct {
 	rewindBufferIdx int
 }
 
+func (cpu *CPU) Reset() {
+	cpu.Regs = RegisterFile{}
+	cpu.Interrupts = Interrupts{}
+	cpu.CBOp = CBOp{}
+	cpu.machineCycle = 0
+	cpu.clockCycle = Cycle{}
+	cpu.inCoreDump = false
+	cpu.wroteToAddressBusThisCycle = false
+	cpu.rewindBuffer = [16]ExecLogEntry{}
+	cpu.rewindBufferIdx = 0
+}
+
 type ExecLogEntry struct {
 	PC     uint16
 	Opcode Opcode
+}
+
+func (cpu *CPU) Sync(f func()) {
 }
 
 func (cpu *CPU) SetHL(v uint16) {
@@ -148,6 +163,7 @@ func NewCPU(
 		PHI: phi,
 		Bus: bus,
 	}
+	cpu.Reset()
 	cpu.handlers = handlers(cpu)
 	phi.AttachDevice(cpu.fsm)
 	return cpu

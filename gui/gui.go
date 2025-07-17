@@ -33,14 +33,19 @@ type GUI struct {
 	Theme            material.Theme
 
 	SpeedInput      widget.Editor
+	BreakXInput     widget.Editor
+	BreakYInput     widget.Editor
+	StepCyclesInput widget.Editor
+	StepButton      widget.Clickable
 	StartButton     widget.Clickable
 	PauseButton     widget.Clickable
-	ResetButton     widget.Clickable
+	SoftResetButton widget.Clickable
 	TimingGrid      component.GridState
 	Registers       widget.Label
 	VRAMScroll      widget.List
 	HRAMScroll      widget.List
 	OAMScroll       widget.List
+	OAMAttrScroll   widget.List
 	ProgramScroll   widget.List
 	RegistersScroll widget.List
 	PPUScroll       widget.List
@@ -48,6 +53,7 @@ type GUI struct {
 
 	TargetPercent float64
 	LastFrameCPS  float64
+	StepCycles    uint64
 }
 
 func New(config model.HWConfig) *GUI {
@@ -92,10 +98,13 @@ func (gui *GUI) Run() {
 	window.Option(app.Size(unit.Dp(3000), unit.Dp(1920)))
 	window.Option(app.Fullscreen.Option())
 	gui.SpeedInput.SetText("100")
+	gui.BreakXInput.SetText("")
+	gui.BreakYInput.SetText("")
 	gui.VRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.ProgramScroll.List = layout.List{Axis: layout.Vertical}
 	gui.OAMScroll.List = layout.List{Axis: layout.Vertical}
+	gui.OAMAttrScroll.List = layout.List{Axis: layout.Vertical}
 	gui.RegistersScroll.List = layout.List{Axis: layout.Vertical}
 	gui.PPUScroll.List = layout.List{Axis: layout.Vertical}
 	gui.APUScroll.List = layout.List{Axis: layout.Vertical}
@@ -145,18 +154,22 @@ func (gui *GUI) Interactions(gtx C) {
 	}
 
 	if gui.StartButton.Clicked(gtx) {
-		gui.GB.PowerOn()
+		gui.GB.Start()
 	}
 	if gui.PauseButton.Clicked(gtx) {
 		gui.GB.Pause()
 	}
-	if gui.ResetButton.Clicked(gtx) {
-		gui.GB.Stop()
-		gui.initGameboy()
+	if gui.StepButton.Clicked(gtx) {
+		for range gui.StepCycles {
+			gui.GB.Step()
+		}
+	}
+	if gui.SoftResetButton.Clicked(gtx) {
+		gui.GB.SoftReset()
 	}
 }
 
-func (gui *GUI) memHead(name string) func(gtx C) D {
+func (gui *GUI) label(name string) func(gtx C) D {
 	return func(gtx C) D {
 		lbl := material.Label(&gui.Theme, unit.Sp(14), name)
 		lbl.Font.Typeface = "monospace"
@@ -201,34 +214,34 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(gui.memHead("VRAM")),
+						Rigid(gui.label("VRAM")),
 						Rigid(gui.mem(cd.PrintVRAM, &gui.VRAMScroll, unit.Dp(660))),
 					)
 				}),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(gui.memHead("Program")),
+						Rigid(gui.label("Program")),
 						Rigid(gui.mem(cd.PrintProgram, &gui.ProgramScroll, unit.Dp(200))),
-						Rigid(gui.memHead("HRAM")),
+						Rigid(gui.label("HRAM")),
 						Rigid(gui.mem(cd.PrintHRAM, &gui.HRAMScroll, unit.Dp(200))),
-						Rigid(gui.memHead("OAM")),
+						Rigid(gui.label("OAM")),
 						Rigid(gui.mem(cd.PrintOAM, &gui.OAMScroll, unit.Dp(220))),
 					)
 				}),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(gui.memHead("Registers")),
+						Rigid(gui.label("Registers")),
 						Rigid(gui.mem(cd.PrintRegs, &gui.RegistersScroll, unit.Dp(300))),
-						Rigid(gui.memHead("APU")),
+						Rigid(gui.label("APU")),
 						Rigid(gui.mem(cd.PrintAPU, &gui.APUScroll, unit.Dp(300))),
 					)
 				}),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(gui.memHead("PPU")),
+						Rigid(gui.label("PPU")),
 						Rigid(gui.mem(cd.PrintPPU, &gui.PPUScroll, unit.Dp(800))),
 					)
 				}),
@@ -333,9 +346,15 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					gc := DefaultGridConfig
 					gc.Show = false
+					gc.ShowAddress = true
+					gc.StartAddress = 0
+					gc.BlockIncrement = 8
+					gc.LineIncrement = 1
+					gc.ShowOffsets = true
+					gc.DecimalAddress = true
 					return Column(
 						gtx,
-						Rigid(gui.memHead(fmt.Sprintf("Viewport (X=%d,Y=%d)", cd.PPU.BackgroundFetcher.X, (cd.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value)/8))),
+						Rigid(gui.label(fmt.Sprintf("Viewport (X=%d,Y=%d)", cd.PPU.BackgroundFetcher.X, (cd.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value)/8))),
 						Rigid(func(gtx C) D {
 							vp := gui.GB.GetViewport()
 							pixels := vp.Flatten()
@@ -344,9 +363,18 @@ func (gui *GUI) Render(gtx C) {
 								160,
 								144,
 								pixels[:],
-								2,
+								4,
 								gc,
 								nil,
+								/*
+									[]Highlight{
+										{
+											BlockX: int(cd.PPU.PixelShifter.X) / 8,
+											BlockY: int(cd.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value) / 8,
+											Color:  color.RGBA{R: 255, A: 128},
+										},
+									},
+								*/
 							)
 						}),
 					)
@@ -354,7 +382,7 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(gui.memHead("Tile data")),
+						Rigid(gui.label("Tile data")),
 						Rigid(func(gtx C) D {
 							return gui.GBGraphics(
 								gtx,
@@ -371,7 +399,7 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(gui.memHead("Tile map 1")),
+						Rigid(gui.label("Tile map 1")),
 						Rigid(func(gtx C) D {
 							return gui.GBGraphics(
 								gtx,
@@ -388,7 +416,7 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
-						Rigid(gui.memHead("Tile map 2")),
+						Rigid(gui.label("Tile map 2")),
 						Rigid(func(gtx C) D {
 							return gui.GBGraphics(
 								gtx,
@@ -402,22 +430,120 @@ func (gui *GUI) Render(gtx C) {
 						}),
 					)
 				}),
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
+						Rigid(gui.label("OAM buffer")),
+						Rigid(func(gtx C) D {
+							highlights := make([]Highlight, 10-cd.PPU.OAMBuffer.Level)
+							for i := range highlights {
+								highlights[i].BlockX = cd.PPU.OAMBuffer.Level + i
+								highlights[i].Color = color.RGBA{R: 255, A: 10}
+							}
+							return gui.GBGraphics(
+								gtx,
+								80,
+								8,
+								oambuffer(vramBytes, cd.PPU.OAMBuffer),
+								4,
+								DefaultGridConfig,
+								highlights,
+							)
+						}),
+						Rigid(gui.label("OAM")),
+						Rigid(func(gtx C) D {
+							return gui.GBGraphics(
+								gtx,
+								80,
+								32,
+								oam(vramBytes, cd.OAM.Bytes()),
+								4,
+								DefaultGridConfig.WithMem(model.AddrOAMBegin, 4),
+								nil,
+							)
+						}),
+						Rigid(gui.mem(cd.PrintOAMAttrs, &gui.OAMAttrScroll, unit.Dp(100))),
+					)
+				}),
 			)
 		}),
 		Rigid(func(gtx C) D {
 			return Row(
 				gtx,
+				Rigid(gui.label(fmt.Sprintf("Running=%v", gui.GB.Running))),
 				Rigid(func(gtx C) D {
-					return gui.NumberInput(gtx, &gui.SpeedInput, "speed", func(text string) {
-						targetPercent, err := strconv.ParseFloat(text, 64)
-						if err == nil && targetPercent > 0 && targetPercent < 10000 {
-							if gui.TargetPercent != targetPercent {
-								gui.TargetPercent = targetPercent
-								gui.Config.SystemClock.Frequency = targetPercent * 4194304.0 / 100
-								gui.GB.CLK.SetFrequency(gui.Config.SystemClock.Frequency)
-							}
-						}
-					})
+					return Column(
+						gtx,
+						Rigid(func(gtx C) D {
+							return Row(
+								gtx,
+								Rigid(gui.label("Speed%")),
+								Rigid(func(gtx layout.Context) layout.Dimensions {
+									return gui.NumberInput(gtx, &gui.SpeedInput, "speed", func(text string) {
+										targetPercent, err := strconv.ParseFloat(text, 64)
+										if err == nil && targetPercent > 0 && targetPercent < 10000 {
+											if gui.TargetPercent != targetPercent {
+												gui.TargetPercent = targetPercent
+												gui.Config.SystemClock.Frequency = targetPercent * 4194304.0 / 100
+												gui.GB.CLK.SetFrequency(gui.Config.SystemClock.Frequency)
+											}
+										}
+									})
+								}),
+							)
+						}),
+						Rigid(func(gtx C) D {
+							return Row(
+								gtx,
+								Rigid(gui.label("PPU breakpoint")),
+								Rigid(func(gtx C) D {
+									return gui.NumberInput(gtx, &gui.BreakXInput, "breakX", func(text string) {
+										breakX, err := strconv.ParseInt(text, 10, 64)
+										if err != nil {
+											breakX = -1
+										}
+										if gui.GB.Debugger.BreakX.Load() != breakX {
+											gui.GB.Debugger.BreakX.Store(breakX)
+										}
+									})
+								}),
+								Rigid(func(gtx C) D {
+									return gui.NumberInput(gtx, &gui.BreakYInput, "breakY", func(text string) {
+										breakY, err := strconv.ParseInt(text, 10, 64)
+										if err != nil {
+											breakY = -1
+										}
+										if gui.GB.Debugger.BreakY.Load() != breakY {
+											gui.GB.Debugger.BreakY.Store(breakY)
+										}
+									})
+								}),
+							)
+						}),
+					)
+				}),
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
+						Rigid(gui.label(fmt.Sprintf("Clock: %d, Falling=%v", cd.Cycle.C, cd.Cycle.Falling))),
+						Rigid(func(gtx C) D {
+							return gui.Button(gtx, &gui.StepButton, "Step")
+						}),
+						Rigid(func(gtx C) D {
+							return Row(
+								gtx,
+								Rigid(gui.label("Step cycles")),
+								Rigid(func(gtx C) D {
+									return gui.NumberInput(gtx, &gui.StepCyclesInput, "cycles", func(text string) {
+										cycles, err := strconv.ParseUint(text, 10, 64)
+										if err == nil && cycles > 0 {
+											gui.StepCycles = cycles
+										}
+									})
+								}),
+							)
+						}),
+					)
 				}),
 				Rigid(func(gtx C) D {
 					return gui.Button(gtx, &gui.StartButton, "Run")
@@ -426,7 +552,7 @@ func (gui *GUI) Render(gtx C) {
 					return gui.Button(gtx, &gui.PauseButton, "Pause")
 				}),
 				Rigid(func(gtx C) D {
-					return gui.Button(gtx, &gui.ResetButton, "Reset")
+					return gui.Button(gtx, &gui.SoftResetButton, "SoftReset")
 				}),
 			)
 		}),
@@ -434,55 +560,24 @@ func (gui *GUI) Render(gtx C) {
 	)
 }
 
-func tiledata(vram []uint8) []model.Color {
-	tileData := vram[:0x1800]
-	tiles := make([]model.Tile, len(tileData)/16)
-	for i := range tiles {
-		tiles[i] = model.DecodeTile(tileData[i*16 : (i+1)*16])
-	}
-	return placetiles(tiles, 24, 16)
-}
-
-func tilemap(vram []uint8, addr uint16, signedAddressing bool) []model.Color {
-	tileMap := vram[addr-model.AddrVRAMBegin : addr-model.AddrVRAMBegin+0x400]
-	tiles := make([]model.Tile, len(tileMap))
-	for i := range tiles {
-		tileID := tileMap[i]
-		var offset uint16
-		if signedAddressing {
-			offset = uint16(int32(0x1000) + 16*int32(int8(tileID)))
-		} else {
-			offset = 16 * uint16(tileID)
-		}
-		tile := vram[offset : offset+16]
-		tiles[i] = model.DecodeTile(tile)
-	}
-	return placetiles(tiles, 32, 32)
-}
-
-func placetiles(tiles []model.Tile, w, h int) []model.Color {
-	fb := make([]model.Color, h*w*8*8)
-	for tileRow := range h {
-		for tileCol := range w {
-			tile := tiles[tileRow*w+tileCol]
-			for rowInTile := range 8 {
-				for colInTile := range 8 {
-					col := tile[rowInTile][colInTile].Color
-					fb[(tileRow*8+rowInTile)*(8*w)+tileCol*8+colInTile] = col
-				}
-			}
-		}
-	}
-	return fb
-}
-
 func (gui *GUI) Button(gtx C, clickable *widget.Clickable, text string) D {
 	return material.Button(&gui.Theme, clickable, text).Layout(gtx)
 }
 
 func (gui *GUI) NumberInput(gtx C, editor *widget.Editor, placeholder string, f func(text string)) D {
-	gui.SpeedInput.SingleLine = true
-	gui.SpeedInput.Alignment = text.Middle
+	editor.SingleLine = true
+	editor.Alignment = text.Middle
 	f(editor.Text())
-	return material.Editor(&gui.Theme, editor, placeholder).Layout(gtx)
+	return layout.Inset{
+		Top:    unit.Dp(0),
+		Right:  unit.Dp(170),
+		Bottom: unit.Dp(40),
+		Left:   unit.Dp(170),
+	}.Layout(gtx, func(gtx C) D {
+		return widget.Border{
+			Color:        color.NRGBA{R: 204, G: 204, B: 204, A: 255},
+			CornerRadius: unit.Dp(3),
+			Width:        unit.Dp(2),
+		}.Layout(gtx, material.Editor(&gui.Theme, editor, placeholder).Layout)
+	})
 }

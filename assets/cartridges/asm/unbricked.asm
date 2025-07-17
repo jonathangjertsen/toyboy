@@ -74,7 +74,7 @@ ClearOam:
 	ld hl, _OAMRAM
 	ld a, 128 + 16
 	ld [hli], a
-	ld a, 16 + 8
+	ld a, 0
 	ld [hli], a
 	ld a, 0
 	ld [hli], a
@@ -110,8 +110,6 @@ WaitVBlank2:
 	ld a, [wFrameCounter]
 	inc a
 	ld [wFrameCounter], a
-	cp a, 15 ; Every 15 frames (a quarter of a second), run the following code
-	jp nz, Main
 
 	; Reset the frame counter back to 0
 	ld a, 0

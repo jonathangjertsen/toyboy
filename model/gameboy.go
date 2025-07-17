@@ -1,31 +1,49 @@
 package model
 
 type Gameboy struct {
-	Config HWConfig
+	Config  HWConfig
+	Running bool
 
 	CLK           *ClockRT
+	Debugger      *Debugger
 	PHI           *Clock
 	CPU           *CPU
 	PPU           *PPU
 	CartridgeSlot *MemoryRegion
 }
 
-func (gb *Gameboy) PowerOn() {
+func (gb *Gameboy) Start() {
 	gb.CLK.Start()
+	gb.Running = true
 }
 
 func (gb *Gameboy) Pause() {
 	gb.CLK.Pause()
+	gb.Running = false
 }
 
-func (gb *Gameboy) Stop() {
-	gb.CLK.Stop()
+func (gb *Gameboy) Step() {
+	gb.CLK.pauseAfterCycle.Add(1)
+	gb.CLK.Start()
+}
+
+func (gb *Gameboy) SoftReset() {
+	gb.CLK.Sync(func() {
+		gb.CLK.cycle.C = 0
+		gb.CLK.cycle.Falling = false
+		for i := range gb.CLK.divided {
+			gb.CLK.divided[i].counter = 0
+			gb.CLK.divided[i].cycle = 0
+		}
+		gb.CPU.Reset()
+	})
 }
 
 func (gb *Gameboy) GetCoreDump() CoreDump {
 	var cd CoreDump
 	gb.CLK.Sync(func() {
 		cd = gb.CPU.GetCoreDump()
+		cd.Cycle = gb.CLK.cycle
 	})
 	return cd
 }
@@ -50,6 +68,8 @@ func NewGameboy(
 
 func (gb *Gameboy) init() {
 	clk := NewRealtimeClock(gb.Config.SystemClock)
+	debugger := NewDebugger(clk)
+
 	ppuClock := clk.Divide(2)
 	cpuClock := clk.Divide(4)
 
@@ -63,7 +83,7 @@ func (gb *Gameboy) init() {
 	cartridgeSlot := NewMemoryRegion(clk, AddrCartridgeBank0Begin, AddrCartridgeBank0Size)
 
 	bus := &Bus{}
-	ppu := NewPPU(clk, ppuClock, bus)
+	ppu := NewPPU(clk, ppuClock, bus, debugger)
 
 	bus.BootROMLock = bootROMLock
 	bus.BootROM = &bootROM
@@ -82,6 +102,7 @@ func (gb *Gameboy) init() {
 	gb.CPU = cpu
 	gb.CartridgeSlot = &cartridgeSlot
 	gb.PPU = ppu
+	gb.Debugger = debugger
 
 	clk.Onpanic = gb.CPU.Dump
 }
