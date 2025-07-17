@@ -6,7 +6,7 @@ func (vp *ViewPort) Flatten() [144 * 160]Color {
 	var out [144 * 160]Color
 	for i := range 144 {
 		for j := range 160 {
-			out[i*144+j] = vp[i][j]
+			out[i*160+j] = vp[i][j]
 		}
 	}
 	return out

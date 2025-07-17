@@ -74,38 +74,46 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 		addr = bgf.PPU.BGTilemapArea()
 	}
 
-	// GBEDG: Additionally, the address which the tile number is read from is offset by the fetcher-internal X-Position-Counter, which is incremented each time the last step is completed.
-	// GBEDG: The value of SCX / 8 is also added if the Fetcher is not fetching Window pixels. In order to make the wrap-around with SCX work, this offset is ANDed with 0x1f
-	offsetX := (uint16(bgf.X) + (uint16(bgf.PPU.RegSCX/8))&0x1f)
+	// GBEDG: Additionally, the address which the tile number is read from is offset by the fetcher-internal X-Position-Counter,
+	//        which is incremented each time the last step is completed.
+	offsetX := uint16(bgf.X)
+	if !bgf.WindowFetching {
+		// GBEDG: The value of SCX / 8 is also added if the Fetcher is not fetching Window pixels.
+		//        In order to make the wrap-around with SCX work, this offset is ANDed with 0x1f
+		offsetX += uint16((bgf.PPU.RegSCX / 8))
+		offsetX &= 0x1f
+	}
 
-	// GBEDG: An offset of 32 * (((LY + SCY) & 0xFF) / 8) is also added if background pixels are being fetched, otherwise, if window pixels are being fetched, this offset is determined by 32 * (WINDOW_LINE_COUNTER / 8)
 	var offsetY uint16
-	if bgf.WindowFetching {
-		offsetY = (bgf.WindowLineCounter / 8)
+	if !bgf.WindowFetching {
+		// GBEDG: An offset of 32 * (((LY + SCY) & 0xFF) / 8) is also added if background pixels are being fetched,
+		offs := bgf.PPU.RegLY + bgf.PPU.RegSCY // implicitly &ed with 0xff since they are uint8
+		offs /= 8
+		offsetY = 32 * uint16(offs)
 	} else {
-		offsetY = (uint16((bgf.PPU.RegLY+bgf.PPU.RegSCY)&0xff) / 8)
+		// GBEDG: otherwise, if window pixels are being fetched, this offset is determined by 32 * (WINDOW_LINE_COUNTER / 8)
+		offsetY = 32 * (bgf.WindowLineCounter / 8)
 	}
 
 	// GBEDG: Note: The sum of [...] the X-POS+SCX [...] is ANDed with 0x3ff in order to ensure that the address stays within the Tilemap memory regions.
 	bgf.TileOffsetX = offsetX
-	bgf.TileOffsetY = offsetY
-	addr += (offsetX + 32*offsetY) & 0x3ff
+	bgf.TileOffsetY = offsetY / 32
+	addr += (offsetX + offsetY) & 0x3ff
 
 	bgf.TileIndexAddr = addr
 	bgf.TileIndex = bgf.PPU.Bus.VRAM.Read(addr)
 }
 
 func (bgf *BackgroundFetcher) fetchTileLSB() {
-	var addr uint16
-	if bgf.PPU.RegLCDC&0x10 == 0 {
-		addr = 0x8000 + 16*uint16(bgf.TileIndex)
+	var idx uint8 = bgf.TileIndex
+	signedAddressing := bgf.PPU.RegLCDC&0x10 == 0
+	var offset uint16
+	if signedAddressing {
+		offset = uint16(int32(0x1000) + 16*int32(int8(idx)))
 	} else {
-		if bgf.TileIndex >= 128 {
-			addr = 0x8800 + 16*uint16(bgf.TileIndex-128)
-		} else {
-			addr = 0x9000 + 16*uint16(bgf.TileIndex)
-		}
+		offset = 16 * uint16(bgf.TileIndex)
 	}
+	addr := 0x8000 + offset
 	if bgf.WindowFetching {
 		addr += 2 * uint16(bgf.WindowLineCounter%8)
 	} else {

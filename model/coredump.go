@@ -135,7 +135,7 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 		fmt.Fprintf(f, "%d", ppu.BGFIFO.Slots[i].Color)
 	}
 	for range 8 - ppu.BGFIFO.Level {
-		fmt.Fprintf(f, "x")
+		fmt.Fprintf(f, " ")
 	}
 	fmt.Fprintf(f, "]\n")
 	fmt.Fprintf(f, "       [%d]\n", ppu.LastShifted)
@@ -144,7 +144,7 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 		fmt.Fprintf(f, "%d", ppu.SpriteFIFO.Slots[i].Color)
 	}
 	for range 8 - ppu.SpriteFIFO.Level {
-		fmt.Fprintf(f, "x")
+		fmt.Fprintf(f, " ")
 	}
 	fmt.Fprintf(f, "]\n")
 }

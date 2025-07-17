@@ -32,9 +32,7 @@ type GridConfig struct {
 func (gc GridConfig) WithMem(startAddr, blockIncrement uint16) GridConfig {
 	gc.StartAddress = startAddr
 	gc.BlockIncrement = blockIncrement
-	if blockIncrement == 0 || startAddr == 0 {
-		gc.ShowAddress = false
-	}
+	gc.ShowAddress = true
 	return gc
 }
 
@@ -52,7 +50,7 @@ var DefaultGridConfig = GridConfig{
 	FillColor:      color.RGBA{R: 240, G: 240, B: 240, A: 255},
 	DashLen:        4,
 	GridThickness:  1,
-	ShowAddress:    true,
+	ShowAddress:    false,
 	AddressFont:    basicfont.Face7x13,
 	StartAddress:   0x8000,
 	BlockIncrement: 16,

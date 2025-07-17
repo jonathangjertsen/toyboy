@@ -13,6 +13,10 @@ const (
 	SizeVRAM      = 0x2000
 	AddrVRAMEnd   = AddrVRAMBegin + SizeVRAM - 1
 
+	AddrTileData    = 0x8000
+	SizeTileData    = 0x0400
+	AddrTileDataEnd = AddrTileData + SizeTileData - 1
+
 	AddrAPUBegin = 0xff10
 	SizeAPU      = 0x0017
 	AddrAPUEnd   = AddrAPUBegin + SizeAPU - 1

@@ -5,10 +5,10 @@ type TileLine [8]Pixel
 func DecodeTileLine(lsb, msb uint8) TileLine {
 	var pixels TileLine
 	for i := range 8 {
-		lsbMask := lsb & (1 << (8 - i))
-		lsbMask >>= (8 - i)
-		msbMask := msb & (1 << (8 - i))
-		msbMask >>= (8 - i)
+		lsbMask := lsb & (1 << (7 - i))
+		lsbMask >>= (7 - i)
+		msbMask := msb & (1 << (7 - i))
+		msbMask >>= (7 - i)
 		msbMask <<= 1
 		pixels[i].Color = Color(lsbMask | msbMask)
 	}

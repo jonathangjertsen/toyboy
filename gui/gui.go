@@ -73,7 +73,7 @@ func (gui *GUI) initGameboy() {
 			panic(e)
 		}
 	}()
-	f, err := os.ReadFile("assets/cartridges/empty.gb")
+	f, err := os.ReadFile("assets/cartridges/hello-world.gb")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load cartridge: %v", err))
 	} else if len(f) != 0x8000 {
@@ -96,7 +96,7 @@ func (gui *GUI) Run() {
 	window := new(app.Window)
 	window.Option(app.Title("toyboy"))
 	window.Option(app.Size(unit.Dp(3000), unit.Dp(1920)))
-	gui.SpeedInput.SetText("9999")
+	gui.SpeedInput.SetText("100")
 	gui.VRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.ProgramScroll.List = layout.List{Axis: layout.Vertical}
@@ -336,9 +336,11 @@ func (gui *GUI) Render(gtx C) {
 			return Row(
 				gtx,
 				Rigid(func(gtx C) D {
+					gc := DefaultGridConfig
+					gc.Show = false
 					return Column(
 						gtx,
-						Rigid(gui.memHead("Viewport")),
+						Rigid(gui.memHead(fmt.Sprintf("Viewport (X=%d,Y=%d)", cd.PPU.BackgroundFetcher.X, (cd.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value)/8))),
 						Rigid(func(gtx C) D {
 							vp := gui.GB.GetViewport()
 							pixels := vp.Flatten()
@@ -347,15 +349,9 @@ func (gui *GUI) Render(gtx C) {
 								160,
 								144,
 								pixels[:],
-								3,
-								DefaultGridConfig.WithMem(0, 0),
-								[]Highlight{
-									{
-										BlockX: int(cd.PPU.PixelShifter.X) / 8,
-										BlockY: int(cd.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value) / 8,
-										Color:  color.RGBA{R: 255, G: 0, B: 0, A: 128},
-									},
-								},
+								2,
+								gc,
+								nil,
 							)
 						}),
 					)
@@ -370,15 +366,9 @@ func (gui *GUI) Render(gtx C) {
 								192,
 								128,
 								tiledata(vramBytes),
-								3,
+								2,
 								DefaultGridConfig.WithMem(0x8000, 16),
-								[]Highlight{
-									{
-										BlockX: int(cd.PPU.BackgroundFetcher.TileIndex) % 24,
-										BlockY: int(cd.PPU.BackgroundFetcher.TileIndex) / 24,
-										Color:  color.RGBA{R: 255, G: 0, B: 0, A: 128},
-									},
-								},
+								nil,
 							)
 						}),
 					)
@@ -392,18 +382,10 @@ func (gui *GUI) Render(gtx C) {
 								gtx,
 								256,
 								256,
-								tilemap(vramBytes, 0x9800),
-								3,
+								tilemap(vramBytes, 0x9800, cd.PPU.Registers[0].Value&uint8(1<<4) == 0),
+								2,
 								DefaultGridConfig.WithMem(0x9800, 1),
-								// TODO doesn't include SCX etc, just get the offset out of the pixel fetcher
-								// TODO: doesn't neccessarily select the right tilemap
-								[]Highlight{
-									{
-										BlockX: int(cd.PPU.BackgroundFetcher.TileOffsetX),
-										BlockY: int(cd.PPU.BackgroundFetcher.TileOffsetY),
-										Color:  color.RGBA{R: 255, G: 0, B: 0, A: 128},
-									},
-								},
+								nil,
 							)
 						}),
 					)
@@ -417,8 +399,8 @@ func (gui *GUI) Render(gtx C) {
 								gtx,
 								256,
 								256,
-								tilemap(vramBytes, 0x9c00),
-								3,
+								tilemap(vramBytes, 0x9c00, cd.PPU.Registers[0].Value&uint8(1<<4) == 0),
+								2,
 								DefaultGridConfig.WithMem(0x9c00, 1),
 								nil,
 							)
@@ -466,12 +448,18 @@ func tiledata(vram []uint8) []model.Color {
 	return placetiles(tiles, 24, 16)
 }
 
-func tilemap(vram []uint8, addr uint16) []model.Color {
-	tileMap := vram[addr-0x8000 : addr-0x8000+0x400]
+func tilemap(vram []uint8, addr uint16, signedAddressing bool) []model.Color {
+	tileMap := vram[addr-model.AddrVRAMBegin : addr-model.AddrVRAMBegin+0x400]
 	tiles := make([]model.Tile, len(tileMap))
 	for i := range tiles {
-		offs := 16 * int(tileMap[i])
-		tile := vram[offs : offs+16]
+		tileID := tileMap[i]
+		var offset uint16
+		if signedAddressing {
+			offset = uint16(int32(0x1000) + 16*int32(int8(tileID)))
+		} else {
+			offset = 16 * uint16(tileID)
+		}
+		tile := vram[offset : offset+16]
 		tiles[i] = model.DecodeTile(tile)
 	}
 	return placetiles(tiles, 32, 32)
