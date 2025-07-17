@@ -1,4 +1,4 @@
-all: emulator rom-hello-world rom-empty
+all: emulator rom-hello-world rom-empty rom-unbricked
 
 .PHONY: run
 
@@ -18,9 +18,15 @@ rom-hello-world:
 	rgblink -o ../hello-world.gb hello-world.o;\
 	rgbfix -v -p 0xFF ../hello-world.gb
 
+rom-unbricked:
+	cd assets/cartridges/asm;\
+	rgbasm -o unbricked.o unbricked.asm;\
+	rgblink -o ../unbricked.gb unbricked.o;\
+	rgbfix -v -p 0xFF ../unbricked.gb
+
 install-gio:
 	go install gioui.org/cmd/gogio@latest
 	sudo apt install gcc pkg-config libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-x11-dev libgles2-mesa-dev libegl1-mesa-dev libffi-dev libxcursor-dev libvulkan-dev
 
-run: emulator rom-empty rom-hello-world
+run: emulator rom-empty rom-hello-world rom-unbricked
 	APP_ENV=development bin/emulator

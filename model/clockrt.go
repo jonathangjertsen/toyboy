@@ -15,6 +15,7 @@ type ClockRT struct {
 	jobs          chan func()
 	uiDevices     []func()
 	divided       []clockRTDivided
+	Onpanic       func()
 }
 
 // Executes the function in the clocks' goroutine
@@ -35,10 +36,11 @@ func (r *ClockRT) SetFrequency(f float64) {
 
 func NewRealtimeClock(config ClockConfig) *ClockRT {
 	clockRT := ClockRT{
-		resume: make(chan struct{}),
-		pause:  make(chan struct{}),
-		stop:   make(chan struct{}),
-		jobs:   make(chan func()),
+		resume:  make(chan struct{}),
+		pause:   make(chan struct{}),
+		stop:    make(chan struct{}),
+		jobs:    make(chan func()),
+		Onpanic: func() {},
 	}
 	go clockRT.run(config.Frequency)
 	return &clockRT
@@ -91,6 +93,12 @@ func (clockRT *ClockRT) setFreq(f float64) {
 }
 
 func (clockRT *ClockRT) run(initFreq float64) {
+	defer func() {
+		if e := recover(); e != nil {
+			clockRT.Onpanic()
+			panic(e)
+		}
+	}()
 	clockRT.setFreq(initFreq)
 
 	var count uint64

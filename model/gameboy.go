@@ -57,6 +57,7 @@ func (gb *Gameboy) init() {
 	bootROM := NewBootROM(clk, gb.Config.Model)
 	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
 	hram := NewMemoryRegion(clk, AddrHRAMBegin, SizeHRAM)
+	wram := NewMemoryRegion(clk, AddrWRAMBegin, AddrWRAMEnd)
 	apu := NewAPU(clk)
 	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
 	cartridgeSlot := NewMemoryRegion(clk, AddrCartridgeBank0Begin, AddrCartridgeBank0Size)
@@ -67,6 +68,7 @@ func (gb *Gameboy) init() {
 	bus.BootROMLock = bootROMLock
 	bus.BootROM = &bootROM
 	bus.VRAM = &vram
+	bus.WRAM = &wram
 	bus.HRAM = &hram
 	bus.APU = apu
 	bus.OAM = &oam
@@ -80,4 +82,6 @@ func (gb *Gameboy) init() {
 	gb.CPU = cpu
 	gb.CartridgeSlot = &cartridgeSlot
 	gb.PPU = ppu
+
+	clk.Onpanic = gb.CPU.Dump
 }

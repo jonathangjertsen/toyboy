@@ -17,6 +17,18 @@ const (
 	SizeTileData    = 0x0400
 	AddrTileDataEnd = AddrTileData + SizeTileData - 1
 
+	AddrCartridgeRAMBegin = 0xa000
+	SizeCartridgeRAM      = 0x2000
+	AddrCartridgeRAMEnd   = AddrCartridgeRAMBegin + SizeCartridgeRAM - 1
+
+	AddrWRAMBegin = 0xc000
+	SizeWRAM      = 0x2000
+	AddrWRAMEnd   = AddrWRAMBegin + SizeWRAM - 1
+
+	AddrEchoRAMBegin = 0xe000
+	SizeEchoRAM      = 0x1f00
+	AddrEchoRAMEnd   = AddrEchoRAMBegin + SizeEchoRAM - 1
+
 	AddrAPUBegin = 0xff10
 	SizeAPU      = 0x0017
 	AddrAPUEnd   = AddrAPUBegin + SizeAPU - 1

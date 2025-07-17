@@ -111,7 +111,9 @@ type PPU struct {
 	BackgroundFIFO PixelFIFO
 	SpriteFIFO     PixelFIFO
 
-	Palette [4]Color
+	BGPalette   [4]Color
+	OBJPalette0 [4]Color
+	OBJPalette1 [4]Color
 
 	FBBackground FrameBuffer
 	FBWindow     FrameBuffer
@@ -222,22 +224,30 @@ func (ppu *PPU) SetBGP(v uint8) {
 	ppu.Debug("SetBGP", "%02x", v)
 	ppu.RegBGP = v
 
-	ppu.Palette[0] = Color((v >> 0) & 0x3)
-	ppu.Palette[1] = Color((v >> 2) & 0x3)
-	ppu.Palette[2] = Color((v >> 4) & 0x3)
-	ppu.Palette[3] = Color((v >> 6) & 0x3)
+	ppu.BGPalette[0] = Color((v >> 0) & 0x3)
+	ppu.BGPalette[1] = Color((v >> 2) & 0x3)
+	ppu.BGPalette[2] = Color((v >> 4) & 0x3)
+	ppu.BGPalette[3] = Color((v >> 6) & 0x3)
 }
 
 func (ppu *PPU) SetOBP0(v uint8) {
 	ppu.Debug("SetOBP0", "v=%02x", v)
 	ppu.RegOBP0 = v
-	panic("not implemented: SetOBP0")
+
+	ppu.OBJPalette0[0] = Color((v >> 0) & 0x3)
+	ppu.OBJPalette0[1] = Color((v >> 2) & 0x3)
+	ppu.OBJPalette0[2] = Color((v >> 4) & 0x3)
+	ppu.OBJPalette0[3] = Color((v >> 6) & 0x3)
 }
 
 func (ppu *PPU) SetOBP1(v uint8) {
 	ppu.Debug("SetOBP1", "v=%02x", v)
 	ppu.RegOBP1 = v
-	panic("not implemented: SetOBP1")
+
+	ppu.OBJPalette1[0] = Color((v >> 0) & 0x3)
+	ppu.OBJPalette1[1] = Color((v >> 2) & 0x3)
+	ppu.OBJPalette1[2] = Color((v >> 4) & 0x3)
+	ppu.OBJPalette1[3] = Color((v >> 6) & 0x3)
 }
 
 func NewPPU(rtClock *ClockRT, clock *Clock, bus *Bus) *PPU {

@@ -8,6 +8,7 @@ type Bus struct {
 	BootROM       *MemoryRegion
 	VRAM          *MemoryRegion
 	HRAM          *MemoryRegion
+	WRAM          *MemoryRegion
 	APU           *APU
 	OAM           *MemoryRegion
 	PPU           *PPU
@@ -29,6 +30,8 @@ func (b *Bus) WriteAddress(addr uint16) {
 		b.Data = b.VRAM.Read(addr)
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
 		b.Data = b.HRAM.Read(addr)
+	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
+		b.Data = b.WRAM.Read(addr)
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.Data = b.APU.Read(addr)
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
@@ -61,6 +64,8 @@ func (b *Bus) WriteData(v uint8) {
 		b.VRAM.Write(addr, v)
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
 		b.HRAM.Write(addr, v)
+	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
+		b.WRAM.Write(addr, v)
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.APU.Write(addr, v)
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
@@ -77,6 +82,7 @@ func (b *Bus) CountdownDisable() {
 	b.BootROM.CountdownDisable = true
 	b.VRAM.CountdownDisable = true
 	b.HRAM.CountdownDisable = true
+	b.WRAM.CountdownDisable = true
 	b.APU.CountdownDisable = true
 	b.OAM.CountdownDisable = true
 	b.PPU.CountdownDisable = true
@@ -88,6 +94,7 @@ func (b *Bus) CountdownEnable() {
 	b.BootROM.CountdownDisable = false
 	b.VRAM.CountdownDisable = false
 	b.HRAM.CountdownDisable = false
+	b.WRAM.CountdownDisable = false
 	b.APU.CountdownDisable = false
 	b.OAM.CountdownDisable = false
 	b.PPU.CountdownDisable = false
@@ -109,6 +116,8 @@ func (b *Bus) GetCounters(addr uint16) (uint64, uint64) {
 		return b.VRAM.GetCounters(addr)
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
 		return b.HRAM.GetCounters(addr)
+	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
+		return b.WRAM.GetCounters(addr)
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		return b.APU.GetCounters(addr)
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {

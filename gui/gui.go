@@ -67,13 +67,7 @@ func New(config model.HWConfig) *GUI {
 
 func (gui *GUI) initGameboy() {
 	gb := model.NewGameboy(gui.Config)
-	defer func() {
-		if e := recover(); e != nil {
-			gb.CPU.Dump()
-			panic(e)
-		}
-	}()
-	f, err := os.ReadFile("assets/cartridges/hello-world.gb")
+	f, err := os.ReadFile("assets/cartridges/unbricked.gb")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load cartridge: %v", err))
 	} else if len(f) != 0x8000 {
@@ -96,6 +90,7 @@ func (gui *GUI) Run() {
 	window := new(app.Window)
 	window.Option(app.Title("toyboy"))
 	window.Option(app.Size(unit.Dp(3000), unit.Dp(1920)))
+	window.Option(app.Fullscreen.Option())
 	gui.SpeedInput.SetText("100")
 	gui.VRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
