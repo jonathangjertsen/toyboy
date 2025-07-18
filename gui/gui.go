@@ -3,7 +3,6 @@ package gui
 import (
 	"bytes"
 	"fmt"
-	"image"
 	"image/color"
 	"io"
 	"log"
@@ -21,7 +20,6 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
-	"gioui.org/x/component"
 	"github.com/jonathangjertsen/toyboy/model"
 	"github.com/jonathangjertsen/toyboy/plugin"
 )
@@ -33,6 +31,8 @@ type GUI struct {
 	ClockMeasurement *plugin.ClockMeasurement
 	Theme            material.Theme
 
+	KeyboardControl *KeyboardControl
+
 	SpeedInput      widget.Editor
 	BreakXInput     widget.Editor
 	BreakYInput     widget.Editor
@@ -41,8 +41,8 @@ type GUI struct {
 	StartButton     widget.Clickable
 	PauseButton     widget.Clickable
 	SoftResetButton widget.Clickable
-	TimingGrid      component.GridState
 	Registers       widget.Label
+
 	VRAMScroll      widget.List
 	HRAMScroll      widget.List
 	OAMScroll       widget.List
@@ -51,6 +51,7 @@ type GUI struct {
 	RegistersScroll widget.List
 	PPUScroll       widget.List
 	APUScroll       widget.List
+	TimingScroll    widget.List
 
 	TargetPercent float64
 	LastFrameCPS  float64
@@ -60,6 +61,17 @@ type GUI struct {
 func New(config model.HWConfig) *GUI {
 	gui := &GUI{
 		Config: config,
+		KeyboardControl: NewKeyboardControl(ButtonMapping{
+			A:              "L",
+			B:              "K",
+			Up:             "W",
+			Left:           "A",
+			Down:           "S",
+			Right:          "D",
+			Start:          key.NameEnter,
+			Select:         key.NameSpace,
+			SOCDResolution: SOCDResolutionOppositeNeutral,
+		}),
 		Theme: material.NewTheme().WithPalette(material.Palette{
 			Bg:         color.NRGBA{R: 245, G: 245, B: 245, A: 255},
 			ContrastBg: color.NRGBA{R: 220, G: 220, B: 220, A: 255},
@@ -101,6 +113,9 @@ func (gui *GUI) Run() {
 	gui.SpeedInput.SetText("100")
 	gui.BreakXInput.SetText("")
 	gui.BreakYInput.SetText("")
+	gui.SpeedInput.Filter = "0123456789."
+	gui.BreakXInput.Filter = "0123456789"
+	gui.BreakYInput.Filter = "0123456789"
 	gui.VRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.ProgramScroll.List = layout.List{Axis: layout.Vertical}
@@ -109,6 +124,7 @@ func (gui *GUI) Run() {
 	gui.RegistersScroll.List = layout.List{Axis: layout.Vertical}
 	gui.PPUScroll.List = layout.List{Axis: layout.Vertical}
 	gui.APUScroll.List = layout.List{Axis: layout.Vertical}
+	gui.TimingScroll.List = layout.List{Axis: layout.Vertical}
 	err := run(window, gui)
 	if err != nil {
 		log.Fatal(err)
@@ -170,34 +186,8 @@ func (gui *GUI) Interactions(gtx C) {
 		gui.GB.SoftReset()
 	}
 
-	gui.keypresses(gtx)
-}
-
-func (gui *GUI) keypresses(gtx C) {
-	if keypress, ok := gtx.Event(
-		key.Filter{Name: "W"},
-		key.Filter{Name: "A"},
-		key.Filter{Name: "S"},
-		key.Filter{Name: "D"},
-	); ok {
-		if kev, ok := keypress.(key.Event); ok {
-			pressed := kev.State == key.Press
-			switch kev.Name {
-			case "W":
-				gui.GB.ButtonUp(pressed)
-			case "A":
-				gui.GB.ButtonLeft(pressed)
-			case "S":
-				gui.GB.ButtonDown(pressed)
-			case "D":
-				gui.GB.ButtonRight(pressed)
-			case key.NameEnter:
-				gui.GB.ButtonStart(pressed)
-			case key.NameSpace:
-				gui.GB.ButtonSelect(pressed)
-			}
-		}
-	}
+	jps := gui.KeyboardControl.Frame(gtx)
+	gui.GB.Joypad.SetState(jps)
 }
 
 func (gui *GUI) label(name string) func(gtx C) D {
@@ -283,92 +273,14 @@ func (gui *GUI) Render(gtx C) {
 			return Row(
 				gtx,
 				Spacer(25, 700),
-				Rigid(func(gtx C) D {
-					minSize := gtx.Dp(unit.Dp(100))
-
-					inset := layout.UniformInset(unit.Dp(2))
-
-					// Configure a label styled to be a heading.
-					headingLabel := material.Body1(&gui.Theme, "")
-					headingLabel.Font.Weight = font.Bold
-					headingLabel.Alignment = text.Middle
-					headingLabel.MaxLines = 1
-
-					// Configure a label styled to be a data element.
-					dataLabel := material.Body1(&gui.Theme, "")
-					dataLabel.Font.Typeface = "monospace"
-					dataLabel.MaxLines = 1
-					dataLabel.Alignment = text.End
-
-					orig := gtx.Constraints
-					gtx.Constraints.Min = image.Point{}
-					macro := op.Record(gtx.Ops)
-					dims := inset.Layout(gtx, headingLabel.Layout)
-					_ = macro.Stop()
-					gtx.Constraints = orig
-					return component.Table(
-						&gui.Theme,
-						&gui.TimingGrid,
-					).Layout(
-						gtx,
-						4,
-						2,
-						func(axis layout.Axis, index, constraint int) int {
-							widthUnit := max(int(float32(constraint)/3), minSize)
-							switch axis {
-							case layout.Horizontal:
-								switch index {
-								case 0, 1:
-									return int(widthUnit)
-								case 2, 3:
-									return int(widthUnit / 2)
-								default:
-									return 0
-								}
-							default:
-								return dims.Size.Y
-							}
-						},
-						func(gtx C, col int) D {
-							return inset.Layout(gtx, func(gtx C) D {
-								return headingLabel.Layout(gtx)
-							})
-						},
-						func(gtx C, row, col int) D {
-							switch row {
-							case 0:
-								switch col {
-								case 0:
-									dataLabel.Text = "System clock"
-								case 1:
-									dataLabel.Text = fmt.Sprintf("%.0f", 4*gui.LastFrameCPS)
-								}
-							case 1:
-								switch col {
-								case 0:
-									dataLabel.Text = "CPU clock"
-								case 1:
-									dataLabel.Text = fmt.Sprintf("%.0f", gui.LastFrameCPS)
-								}
-							case 2:
-								switch col {
-								case 0:
-									dataLabel.Text = "Target emulation speed"
-								case 1:
-									dataLabel.Text = fmt.Sprintf("%.2f%%", gui.TargetPercent)
-								}
-							case 3:
-								switch col {
-								case 0:
-									dataLabel.Text = "Actual emulation speed"
-								case 1:
-									dataLabel.Text = fmt.Sprintf("%.2f%%", (100*4*gui.LastFrameCPS)/4194304)
-								}
-							}
-							return dataLabel.Layout(gtx)
-						},
-					)
-				}),
+				Rigid(
+					gui.mem(func(w io.Writer) {
+						fmt.Fprintf(w, "System clock:           %.0f\n", 4*gui.LastFrameCPS)
+						fmt.Fprintf(w, "CPU clock:              %.0f\n", gui.LastFrameCPS)
+						fmt.Fprintf(w, "Target emulation speed: %.2f%%\n", gui.TargetPercent)
+						fmt.Fprintf(w, "Actual emulation speed: %.2f%%\n", (100*4*gui.LastFrameCPS)/4194304)
+					}, &gui.TimingScroll, unit.Dp(400)),
+				),
 			)
 		}),
 		Rigid(func(gtx C) D {
