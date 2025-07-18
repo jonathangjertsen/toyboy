@@ -17,29 +17,31 @@ WaitVBlank:
 	ld a, 0
 	ld [rLCDC], a
 
-; ANCHOR: copy_tiles
 	; Copy the tile data
 	ld de, Tiles
 	ld hl, $9000
 	ld bc, TilesEnd - Tiles
 	call Memcopy
-; ANCHOR_END: copy_tiles
 
-; ANCHOR: copy_map
 	; Copy the tilemap
 	ld de, Tilemap
 	ld hl, $9800
 	ld bc, TilemapEnd - Tilemap
 	call Memcopy
-; ANCHOR_END: copy_map
 
-; ANCHOR: copy_paddle
 	; Copy the paddle tile
 	ld de, Paddle
 	ld hl, $8000
 	ld bc, PaddleEnd - Paddle
 	call Memcopy
-; ANCHOR_END: copy_paddle
+
+; ANCHOR: ball-copy
+	; Copy the ball tile
+	ld de, Ball
+	ld hl, $8010
+	ld bc, BallEnd - Ball
+	call Memcopy
+; ANCHOR_END: ball-copy
 
 	xor a, a
 	ld b, 160
@@ -49,6 +51,8 @@ ClearOam:
 	dec b
 	jp nz, ClearOam
 
+; ANCHOR: oam
+	; Initialize the paddle sprite in OAM
 	ld hl, _OAMRAM
 	ld a, 128 + 16
 	ld [hli], a
@@ -56,7 +60,25 @@ ClearOam:
 	ld [hli], a
 	ld a, 0
 	ld [hli], a
-	ld [hl], a
+	ld [hli], a
+; ANCHOR: init
+	; Now initialize the ball sprite
+	ld a, 100 + 16
+	ld [hli], a
+	ld a, 32 + 8
+	ld [hli], a
+	ld a, 1
+	ld [hli], a
+	ld a, 0
+	ld [hli], a
+; ANCHOR_END: oam
+
+	; The ball starts out going up and to the right
+	ld a, 1
+	ld [wBallMomentumX], a
+	ld a, -1
+	ld [wBallMomentumY], a
+; ANCHOR_END: init
 
 	; Turn the LCD on
 	ld a, LCDCF_ON | LCDCF_BGON | LCDCF_OBJON
@@ -68,15 +90,13 @@ ClearOam:
 	ld a, %11100100
 	ld [rOBP0], a
 
-	; ANCHOR: initialize-vars
 	; Initialize global variables
 	ld a, 0
 	ld [wFrameCounter], a
 	ld [wCurKeys], a
 	ld [wNewKeys], a
-	; ANCHOR_END: initialize-vars
 
-; ANCHOR: main
+; ANCHOR: momentum
 Main:
 	ld a, [rLY]
 	cp 144
@@ -85,6 +105,107 @@ WaitVBlank2:
 	ld a, [rLY]
 	cp 144
 	jp c, WaitVBlank2
+
+	; Add the ball's momentum to its position in OAM.
+	ld a, [wBallMomentumX]
+	ld b, a
+	ld a, [_OAMRAM + 5]
+	add a, b
+	ld [_OAMRAM + 5], a
+
+	ld a, [wBallMomentumY]
+	ld b, a
+	ld a, [_OAMRAM + 4]
+	add a, b
+	ld [_OAMRAM + 4], a
+; ANCHOR_END: momentum
+
+; ANCHOR: first-tile-collision
+BounceOnTop:
+	; Remember to offset the OAM position!
+	; (8, 16) in OAM coordinates is (0, 0) on the screen.
+	ld a, [_OAMRAM + 4]
+	sub a, 16 + 1
+	ld c, a
+	ld a, [_OAMRAM + 5]
+	sub a, 8
+	ld b, a
+	call GetTileByPixel ; Returns tile address in hl
+	ld a, [hl]
+	call IsWallTile
+	jp nz, BounceOnRight
+	ld a, 1
+	ld [wBallMomentumY], a
+; ANCHOR_END: first-tile-collision
+
+; ANCHOR: tile-collision
+BounceOnRight:
+	ld a, [_OAMRAM + 4]
+	sub a, 16
+	ld c, a
+	ld a, [_OAMRAM + 5]
+	sub a, 8 - 1
+	ld b, a
+	call GetTileByPixel
+	ld a, [hl]
+	call IsWallTile
+	jp nz, BounceOnLeft
+	ld a, -1
+	ld [wBallMomentumX], a
+
+BounceOnLeft:
+	ld a, [_OAMRAM + 4]
+	sub a, 16
+	ld c, a
+	ld a, [_OAMRAM + 5]
+	sub a, 8 + 1
+	ld b, a
+	call GetTileByPixel
+	ld a, [hl]
+	call IsWallTile
+	jp nz, BounceOnBottom
+	ld a, 1
+	ld [wBallMomentumX], a
+
+BounceOnBottom:
+	ld a, [_OAMRAM + 4]
+	sub a, 16 - 1
+	ld c, a
+	ld a, [_OAMRAM + 5]
+	sub a, 8
+	ld b, a
+	call GetTileByPixel
+	ld a, [hl]
+	call IsWallTile
+	jp nz, BounceDone
+	ld a, -1
+	ld [wBallMomentumY], a
+BounceDone:
+; ANCHOR_END: tile-collision
+
+; ANCHOR: paddle-bounce
+	; First, check if the ball is low enough to bounce off the paddle.
+	ld a, [_OAMRAM]
+	ld b, a
+	ld a, [_OAMRAM + 4]
+	cp a, b
+	jp nz, PaddleBounceDone ; If the ball isn't at the same Y position as the paddle, it can't bounce.
+	; Now let's compare the X positions of the objects to see if they're touching.
+	ld a, [_OAMRAM + 5] ; Ball's X position.
+	ld b, a
+	ld a, [_OAMRAM + 1] ; Paddle's X position.
+	sub a, 8
+	cp a, b
+	jp nc, PaddleBounceDone
+	add a, 8 + 16 ; 8 to undo, 16 as the width.
+	cp a, b
+	jp c, PaddleBounceDone
+
+	ld a, -1
+	ld [wBallMomentumY], a
+
+PaddleBounceDone:
+; ANCHOR_END: paddle-bounce
 
 	; Check the current keys every frame and move left or right.
 	call UpdateKeys
@@ -118,9 +239,61 @@ Right:
 	jp z, Main
 	ld [_OAMRAM + 1], a
 	jp Main
-; ANCHOR_END: main
 
-; ANCHOR: input-routine
+; ANCHOR: get-tile
+; Convert a pixel position to a tilemap address
+; hl = $9800 + X + Y * 32
+; @param b: X
+; @param c: Y
+; @return hl: tile address
+GetTileByPixel:
+	; First, we need to divide by 8 to convert a pixel position to a tile position.
+	; After this we want to multiply the Y position by 32.
+	; These operations effectively cancel out so we only need to mask the Y value.
+	ld a, c
+	and a, %11111000
+	ld l, a
+	ld h, 0
+	; Now we have the position * 8 in hl
+	add hl, hl ; position * 16
+	add hl, hl ; position * 32
+	; Convert the X position to an offset.
+	ld a, b
+	srl a ; a / 2
+	srl a ; a / 4
+	srl a ; a / 8
+	; Add the two offsets together.
+	add a, l
+	ld l, a
+	adc a, h
+	sub a, l
+	ld h, a
+	; Add the offset to the tilemap's base address, and we are done!
+	ld bc, $9800
+	add hl, bc
+	ret
+; ANCHOR_END: get-tile
+
+; ANCHOR: is-wall-tile
+; @param a: tile ID
+; @return z: set if a is a wall.
+IsWallTile:
+	cp a, $00
+	ret z
+	cp a, $01
+	ret z
+	cp a, $02
+	ret z
+	cp a, $04
+	ret z
+	cp a, $05
+	ret z
+	cp a, $06
+	ret z
+	cp a, $07
+	ret
+; ANCHOR_END: is-wall-tile
+
 UpdateKeys:
   ; Poll half the controller
   ld a, P1F_GET_BTN
@@ -130,7 +303,7 @@ UpdateKeys:
   ; Poll the other half
   ld a, P1F_GET_DPAD
   call .onenibble
-  swap a ; A7-4 = unpressed directions; A3-0 = 1
+  swap a ; A3-0 = unpressed directions; A7-4 = 1
   xor a, b ; A = pressed buttons + directions
   ld b, a ; B = pressed buttons + directions
 
@@ -156,9 +329,7 @@ UpdateKeys:
   or a, $F0 ; A7-4 = 1; A3-0 = unpressed keys
 .knownret
   ret
-; ANCHOR_END: input-routine
 
-; ANCHOR: memcpy
 ; Copy bytes from one area to another.
 ; @param de: Source
 ; @param hl: Destination
@@ -172,7 +343,6 @@ Memcopy:
 	or a, c
 	jp nz, Memcopy
 	ret
-; ANCHOR_END: memcpy
 
 Tiles:
 	dw `33333333
@@ -408,9 +578,9 @@ Tilemap:
 TilemapEnd:
 
 Paddle:
-	dw `03333330
-	dw `30000003
-	dw `03333330
+	dw `33333333
+	dw `32222223
+	dw `33333333
 	dw `00000000
 	dw `00000000
 	dw `00000000
@@ -418,11 +588,28 @@ Paddle:
 	dw `00000000
 PaddleEnd:
 
+; ANCHOR: ball-sprite
+Ball:
+	dw `00033000
+	dw `00322300
+	dw `03222230
+	dw `03222230
+	dw `00322300
+	dw `00033000
+	dw `00000000
+	dw `00000000
+BallEnd:
+; ANCHOR_END: ball-sprite
+
+; ANCHOR: ram
 SECTION "Counter", WRAM0
 wFrameCounter: db
 
-; ANCHOR: vars
 SECTION "Input Variables", WRAM0
 wCurKeys: db
 wNewKeys: db
-; ANCHOR_END: vars
+
+SECTION "Ball Data", WRAM0
+wBallMomentumX: db
+wBallMomentumY: db
+; ANCHOR_END: ram

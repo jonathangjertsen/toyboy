@@ -134,6 +134,10 @@ func join16(msb, lsb uint8) uint16 {
 	return (uint16(msb) << 8) | uint16(lsb)
 }
 
+func split16(w uint16) (uint8, uint8) {
+	return msb(w), lsb(w)
+}
+
 func msb(w uint16) uint8 {
 	return uint8((w >> 8) & 0xff)
 }
@@ -141,6 +145,7 @@ func msb(w uint16) uint8 {
 func lsb(w uint16) uint8 {
 	return uint8(w & 0xff)
 }
+
 func (cpu *CPU) SetPC(pc uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetPC must be called on rising edge")
