@@ -41,9 +41,12 @@ func (gc GridConfig) WithMem(startAddr uint16, blockIncrement uint16) GridConfig
 }
 
 type Highlight struct {
-	BlockX int
-	BlockY int
-	Color  color.RGBA
+	BlockX    int
+	BlockY    int
+	Color     color.RGBA
+	Text      string
+	TextColor color.RGBA
+	Font      font.Face
 }
 
 var DefaultGridConfig = GridConfig{
@@ -251,6 +254,31 @@ func (gui *GUI) GBGraphics(
 			drawer.Dot = fixed.P(textX, cfg.AddressFont.Metrics().Ascent.Ceil())
 			drawer.DrawString(text)
 		}
+	}
+	// Render text inside highlighted blocks
+	for _, hl := range highlights {
+		if hl.Text == "" || hl.Font == nil {
+			continue
+		}
+
+		textX := hl.BlockX*blockSize*scale + hl.BlockX*gridT + labelWidth
+		textY := hl.BlockY*blockSize*scale + hl.BlockY*gridT + labelHeight
+		blockW := blockSize * scale
+		blockH := blockSize * scale
+
+		textWidth := font.MeasureString(hl.Font, hl.Text).Ceil()
+		textHeight := hl.Font.Metrics().Height.Ceil()
+
+		drawer := &font.Drawer{
+			Dst:  img,
+			Src:  image.NewUniform(hl.TextColor),
+			Face: hl.Font,
+			Dot: fixed.P(
+				textX+(blockW-textWidth)/2,
+				textY+(blockH-textHeight)/2+hl.Font.Metrics().Ascent.Ceil(),
+			),
+		}
+		drawer.DrawString(hl.Text)
 	}
 	return widget.Image{
 		Src:   paint.NewImageOp(img),

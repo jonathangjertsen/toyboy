@@ -76,7 +76,7 @@ func (bm *ButtonMapping) JoypadState(keystate map[key.Name]bool) model.JoypadSta
 			jps.Right = false
 			jps.Left = false
 		}
-		if jps.Up && jps.Right {
+		if jps.Up && jps.Down {
 			jps.Up = false
 			jps.Down = false
 		}

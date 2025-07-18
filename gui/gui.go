@@ -13,7 +13,6 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/font"
-	"gioui.org/io/key"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/text"
@@ -22,11 +21,13 @@ import (
 	"gioui.org/widget/material"
 	"github.com/jonathangjertsen/toyboy/model"
 	"github.com/jonathangjertsen/toyboy/plugin"
+	"golang.org/x/image/font/basicfont"
 )
 
 type GUI struct {
-	Config model.HWConfig
-	GB     *model.Gameboy
+	Config      model.HWConfig
+	GB          *model.Gameboy
+	JoypadState model.JoypadState
 
 	ClockMeasurement *plugin.ClockMeasurement
 	Theme            material.Theme
@@ -68,8 +69,8 @@ func New(config model.HWConfig) *GUI {
 			Left:           "A",
 			Down:           "S",
 			Right:          "D",
-			Start:          key.NameEnter,
-			Select:         key.NameSpace,
+			Start:          "M",
+			Select:         "N",
 			SOCDResolution: SOCDResolutionOppositeNeutral,
 		}),
 		Theme: material.NewTheme().WithPalette(material.Palette{
@@ -187,6 +188,7 @@ func (gui *GUI) Interactions(gtx C) {
 	}
 
 	jps := gui.KeyboardControl.Frame(gtx)
+	gui.JoypadState = jps
 	gui.GB.Joypad.SetState(jps)
 }
 
@@ -253,6 +255,15 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
+						Rigid(gui.label("Speed")),
+						Rigid(
+							gui.mem(func(w io.Writer) {
+								fmt.Fprintf(w, "System clock:           %.0f\n", 4*gui.LastFrameCPS)
+								fmt.Fprintf(w, "CPU clock:              %.0f\n", gui.LastFrameCPS)
+								fmt.Fprintf(w, "Target emulation speed: %.2f%%\n", gui.TargetPercent)
+								fmt.Fprintf(w, "Actual emulation speed: %.2f%%\n", (100*4*gui.LastFrameCPS)/4194304)
+							}, &gui.TimingScroll, unit.Dp(100)),
+						),
 						Rigid(gui.label("Registers")),
 						Rigid(gui.mem(cd.PrintRegs, &gui.RegistersScroll, unit.Dp(300))),
 						Rigid(gui.label("APU")),
@@ -272,29 +283,20 @@ func (gui *GUI) Render(gtx C) {
 		Rigid(func(gtx C) D {
 			return Row(
 				gtx,
-				Spacer(25, 700),
-				Rigid(
-					gui.mem(func(w io.Writer) {
-						fmt.Fprintf(w, "System clock:           %.0f\n", 4*gui.LastFrameCPS)
-						fmt.Fprintf(w, "CPU clock:              %.0f\n", gui.LastFrameCPS)
-						fmt.Fprintf(w, "Target emulation speed: %.2f%%\n", gui.TargetPercent)
-						fmt.Fprintf(w, "Actual emulation speed: %.2f%%\n", (100*4*gui.LastFrameCPS)/4194304)
-					}, &gui.TimingScroll, unit.Dp(400)),
-				),
-			)
-		}),
-		Rigid(func(gtx C) D {
-			return Row(
-				gtx,
 				Rigid(func(gtx C) D {
-					gc := DefaultGridConfig
-					gc.Show = false
-					gc.ShowAddress = true
-					gc.StartAddress = 0
-					gc.BlockIncrement = 8
-					gc.LineIncrement = 1
-					gc.ShowOffsets = true
-					gc.DecimalAddress = true
+					confViewport := DefaultGridConfig
+					confViewport.Show = false
+					confViewport.ShowAddress = true
+					confViewport.StartAddress = 0
+					confViewport.BlockIncrement = 8
+					confViewport.LineIncrement = 1
+					confViewport.ShowOffsets = true
+					confViewport.DecimalAddress = true
+
+					confJoypad := DefaultGridConfig
+					confJoypad.ShowAddress = false
+					confJoypad.Show = false
+
 					return Column(
 						gtx,
 						Rigid(gui.label(fmt.Sprintf("Viewport (X=%d,Y=%d)", cd.PPU.BackgroundFetcher.X, (cd.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value)/8))),
@@ -307,7 +309,7 @@ func (gui *GUI) Render(gtx C) {
 								144,
 								pixels[:],
 								4,
-								gc,
+								confViewport,
 								nil,
 								/*
 									[]Highlight{
@@ -318,6 +320,42 @@ func (gui *GUI) Render(gtx C) {
 										},
 									},
 								*/
+							)
+						}),
+						Rigid(gui.label(fmt.Sprintf("Joypad"))),
+						Rigid(func(gtx C) D {
+							joypadViz := make([]model.Color, 8*6*8*4)
+							highlights := [8]Highlight{}
+
+							setButton := func(h *Highlight, x, y int, pressed bool, text string) {
+								h.BlockX = x
+								h.BlockY = y
+								h.Text = text
+								h.Font = basicfont.Face7x13
+								h.TextColor = color.RGBA{R: 0, B: 0, G: 0, A: 255}
+								if pressed {
+									h.Color = color.RGBA{R: 255, B: 0, G: 0, A: 80}
+								} else {
+									h.Color = color.RGBA{R: 0, B: 0, G: 0, A: 40}
+								}
+							}
+							setButton(&highlights[0], 1, 0, gui.JoypadState.Up, "Up")
+							setButton(&highlights[1], 0, 1, gui.JoypadState.Left, "Lf")
+							setButton(&highlights[2], 2, 1, gui.JoypadState.Right, "Ri")
+							setButton(&highlights[3], 1, 2, gui.JoypadState.Down, "Dn")
+							setButton(&highlights[4], 4, 1, gui.JoypadState.B, "B")
+							setButton(&highlights[5], 5, 0, gui.JoypadState.A, "A")
+							setButton(&highlights[6], 5, 3, gui.JoypadState.Start, "St")
+							setButton(&highlights[7], 3, 3, gui.JoypadState.Select, "Se")
+
+							return gui.GBGraphics(
+								gtx,
+								8*6,
+								8*4,
+								joypadViz,
+								8,
+								confJoypad,
+								highlights[:],
 							)
 						}),
 					)
