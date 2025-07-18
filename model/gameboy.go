@@ -10,6 +10,7 @@ type Gameboy struct {
 	CPU           *CPU
 	PPU           *PPU
 	CartridgeSlot *MemoryRegion
+	Joypad        *Joypad
 }
 
 func (gb *Gameboy) Start() {
@@ -25,6 +26,86 @@ func (gb *Gameboy) Pause() {
 func (gb *Gameboy) Step() {
 	gb.CLK.pauseAfterCycle.Add(1)
 	gb.CLK.Start()
+}
+
+func (gb *Gameboy) ButtonRight(pressed bool) {
+	gb.CLK.Sync(func() {
+		if pressed {
+			gb.Joypad.Direction &= ^uint8(1 << 0)
+		} else {
+			gb.Joypad.Direction |= 1 << 0
+		}
+	})
+}
+
+func (gb *Gameboy) ButtonLeft(pressed bool) {
+	gb.CLK.Sync(func() {
+		if pressed {
+			gb.Joypad.Direction &= ^uint8(1 << 1)
+		} else {
+			gb.Joypad.Direction |= 1 << 1
+		}
+	})
+}
+
+func (gb *Gameboy) ButtonUp(pressed bool) {
+	gb.CLK.Sync(func() {
+		if pressed {
+			gb.Joypad.Direction &= ^uint8(1 << 2)
+		} else {
+			gb.Joypad.Direction |= 1 << 2
+		}
+	})
+}
+
+func (gb *Gameboy) ButtonDown(pressed bool) {
+	gb.CLK.Sync(func() {
+		if pressed {
+			gb.Joypad.Direction &= ^uint8(1 << 3)
+		} else {
+			gb.Joypad.Direction |= 1 << 3
+		}
+	})
+}
+
+func (gb *Gameboy) ButtonA(pressed bool) {
+	gb.CLK.Sync(func() {
+		if pressed {
+			gb.Joypad.Action &= ^uint8(1 << 0)
+		} else {
+			gb.Joypad.Action |= 1 << 0
+		}
+	})
+}
+
+func (gb *Gameboy) ButtonB(pressed bool) {
+	gb.CLK.Sync(func() {
+		if pressed {
+			gb.Joypad.Action &= ^uint8(1 << 1)
+		} else {
+			gb.Joypad.Action |= 1 << 1
+		}
+	})
+}
+
+func (gb *Gameboy) ButtonSelect(pressed bool) {
+	gb.CLK.Sync(func() {
+		if pressed {
+			gb.Joypad.Action &= ^uint8(1 << 2)
+		} else {
+			gb.Joypad.Action |= 1 << 2
+		}
+	})
+}
+
+func (gb *Gameboy) ButtonStart(pressed bool) {
+	gb.CLK.Sync(func() {
+		if pressed {
+			gb.Joypad.Action &= ^uint8(1 << 3)
+		} else {
+			gb.Joypad.Action |= 1 << 3
+		}
+	})
 }
 
 func (gb *Gameboy) SoftReset() {
@@ -105,6 +186,7 @@ func (gb *Gameboy) init() {
 	gb.CartridgeSlot = &cartridgeSlot
 	gb.PPU = ppu
 	gb.Debugger = debugger
+	gb.Joypad = joypad
 
 	clk.Onpanic = gb.CPU.Dump
 }

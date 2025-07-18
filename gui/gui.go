@@ -14,6 +14,7 @@ import (
 
 	"gioui.org/app"
 	"gioui.org/font"
+	"gioui.org/io/key"
 	"gioui.org/layout"
 	"gioui.org/op"
 	"gioui.org/text"
@@ -137,6 +138,7 @@ func run(window *app.Window, gui *GUI) error {
 			gtx := app.NewContext(&ops, e)
 			gui.Interactions(gtx)
 			gui.Render(gtx)
+
 			e.Frame(gtx.Ops)
 		}
 	}
@@ -166,6 +168,35 @@ func (gui *GUI) Interactions(gtx C) {
 	}
 	if gui.SoftResetButton.Clicked(gtx) {
 		gui.GB.SoftReset()
+	}
+
+	gui.keypresses(gtx)
+}
+
+func (gui *GUI) keypresses(gtx C) {
+	if keypress, ok := gtx.Event(
+		key.Filter{Name: "W"},
+		key.Filter{Name: "A"},
+		key.Filter{Name: "S"},
+		key.Filter{Name: "D"},
+	); ok {
+		if kev, ok := keypress.(key.Event); ok {
+			pressed := kev.State == key.Press
+			switch kev.Name {
+			case "W":
+				gui.GB.ButtonUp(pressed)
+			case "A":
+				gui.GB.ButtonLeft(pressed)
+			case "S":
+				gui.GB.ButtonDown(pressed)
+			case "D":
+				gui.GB.ButtonRight(pressed)
+			case key.NameEnter:
+				gui.GB.ButtonStart(pressed)
+			case key.NameSpace:
+				gui.GB.ButtonSelect(pressed)
+			}
+		}
 	}
 }
 

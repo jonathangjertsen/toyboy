@@ -4,13 +4,16 @@ type Joypad struct {
 	Written   MemoryRegion
 	Action    uint8
 	Direction uint8
-	Select    uint8
 }
 
 func NewJoypad(clock *ClockRT) *Joypad {
-	return &Joypad{
-		Written: NewMemoryRegion(clock, 0xff00, 0x0001),
+	jp := &Joypad{
+		Written:   NewMemoryRegion(clock, 0xff00, 0x0001),
+		Action:    0x0f,
+		Direction: 0x0f,
 	}
+	jp.Written.Data[0] = 0x1f
+	return jp
 }
 
 func (jp *Joypad) Write(addr uint16, v uint8) {
