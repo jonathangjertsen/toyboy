@@ -1,14 +1,18 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
 
 type Disassembler struct {
 	Program []uint8
 	Decoded []DisInstruction
 	Trace   bool
+	PC      uint16
 
-	addr      uint16
-	recursion int
+	recursion         int
+	cachedDisassembly *Disassembly
 }
 
 type DisInstruction struct {
@@ -16,6 +20,88 @@ type DisInstruction struct {
 	Size    uint16
 	Address uint16
 	Opcode  Opcode
+}
+
+func (di *DisInstruction) Asm() string {
+	str := di.Opcode.String()
+	ln := len(str)
+	switch di.Opcode {
+	default:
+	case OpcodeLDAnn:
+		return fmt.Sprintf("%s %s, $%04xh", str[:ln-3], str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
+	case OpcodeLDBCnn, OpcodeLDDEnn, OpcodeLDHLnn, OpcodeLDSPnn:
+		return fmt.Sprintf("%s %s, $%04xh", str[:ln-4], str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
+	case OpcodeLDnnA:
+		return fmt.Sprintf("%s [$%04xh], %s", str[:ln-3], join16(di.Raw[2], di.Raw[1]), str[ln-1:])
+	case OpcodeLDHLAInc:
+		return "LD (HL+), A"
+	case OpcodeLDHLADec:
+		return "LD (HL-), A"
+	case OpcodeRET, OpcodeNop, OpcodeRLA:
+		return str
+	case OpcodeRETZ:
+		return fmt.Sprintf("%s %s", str[:ln-1], str[ln-1:])
+	case OpcodePUSHBC, OpcodePOPBC:
+		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
+	case OpcodeXORn, OpcodeADDn, OpcodeANDn, OpcodeORn, OpcodeADCn, OpcodeSBCn, OpcodeCPn, OpcodeSUBn:
+		return fmt.Sprintf("%s A, $%02xh", str[:ln-1], di.Raw[1])
+	case OpcodeLDAA, OpcodeLDAB, OpcodeLDAC, OpcodeLDAD, OpcodeLDAE, OpcodeLDAH, OpcodeLDAL,
+		OpcodeLDBA, OpcodeLDBB, OpcodeLDBC, OpcodeLDBD, OpcodeLDBE, OpcodeLDBH, OpcodeLDBL,
+		OpcodeLDCA, OpcodeLDCB, OpcodeLDCC, OpcodeLDCD, OpcodeLDCE, OpcodeLDCH, OpcodeLDCL,
+		OpcodeLDDA, OpcodeLDDB, OpcodeLDDC, OpcodeLDDD, OpcodeLDDE, OpcodeLDDH, OpcodeLDDL,
+		OpcodeLDEA, OpcodeLDEB, OpcodeLDEC, OpcodeLDED, OpcodeLDEE, OpcodeLDEH, OpcodeLDEL,
+		OpcodeLDHA, OpcodeLDHB, OpcodeLDHC, OpcodeLDHD, OpcodeLDHE, OpcodeLDHH, OpcodeLDHL,
+		OpcodeLDLA, OpcodeLDLB, OpcodeLDLC, OpcodeLDLD, OpcodeLDLE, OpcodeLDLH, OpcodeLDLL:
+		return fmt.Sprintf("%s %s, %s", str[:ln-2], str[ln-2:ln-1], str[ln-1:])
+	case OpcodeXORA, OpcodeXORB, OpcodeXORC, OpcodeXORD, OpcodeXORE, OpcodeXORH, OpcodeXORL,
+		OpcodeORA, OpcodeORB, OpcodeORC, OpcodeORD, OpcodeORE, OpcodeORH, OpcodeORL,
+		OpcodeANDA, OpcodeANDB, OpcodeANDC, OpcodeANDD, OpcodeANDE, OpcodeANDH, OpcodeANDL,
+		OpcodeADDA, OpcodeADDB, OpcodeADDC, OpcodeADDD, OpcodeADDE, OpcodeADDH, OpcodeADDL,
+		OpcodeADCA, OpcodeADCB, OpcodeADCC, OpcodeADCD, OpcodeADCE, OpcodeADCH, OpcodeADCL,
+		OpcodeSUBA, OpcodeSUBB, OpcodeSUBC, OpcodeSUBD, OpcodeSUBE, OpcodeSUBH, OpcodeSUBL,
+		OpcodeSBCA, OpcodeSBCB, OpcodeSBCC, OpcodeSBCD, OpcodeSBCE, OpcodeSBCH, OpcodeSBCL,
+		OpcodeCPA, OpcodeCPB, OpcodeCPC, OpcodeCPD, OpcodeCPE, OpcodeCPH, OpcodeCPL:
+		return fmt.Sprintf("%s A, %s", str[:ln-1], str[ln-1:])
+	case OpcodeADDHL, OpcodeSUBHL, OpcodeANDHL, OpcodeORHL, OpcodeADCHL, OpcodeSBCHL, OpcodeXORHL, OpcodeCPHL:
+		return fmt.Sprintf("%s A, (HL)", str[:ln-2])
+	case OpcodeLDABC, OpcodeLDADE,
+		OpcodeLDAHL, OpcodeLDBHL, OpcodeLDCHL, OpcodeLDDHL, OpcodeLDEHL, OpcodeLDHHL, OpcodeLDLHL:
+		return fmt.Sprintf("%s %s, (HL)", str[:ln-3], str[ln-3:ln-2])
+	case OpcodeLDHLA, OpcodeLDHLB, OpcodeLDHLC, OpcodeLDHLD, OpcodeLDHLE, OpcodeLDHLH, OpcodeLDHLL:
+		return fmt.Sprintf("%s (HL), %s", str[:ln-3], str[ln-1:])
+	case OpcodeDECA, OpcodeDECB, OpcodeDECC, OpcodeDECD, OpcodeDECE, OpcodeDECH, OpcodeDECL,
+		OpcodeINCA, OpcodeINCB, OpcodeINCC, OpcodeINCD, OpcodeINCE, OpcodeINCH, OpcodeINCL:
+		return fmt.Sprintf("%s %s", str[:ln-1], str[ln-1:])
+	case OpcodeINCBC, OpcodeINCDE, OpcodeINCHL, OpcodeINCSP, OpcodeDECBC, OpcodeDECDE, OpcodeDECHL, OpcodeDECSP:
+		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
+	case OpcodeJPnn, OpcodeCALLnn:
+		return fmt.Sprintf("%s $%04xh", str[:ln-2], join16(di.Raw[2], di.Raw[1]))
+	case OpcodeJPCnn, OpcodeJPZnn:
+		return fmt.Sprintf("%s %s, $%04xh", str[:ln-3], str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
+	case OpcodeJPNZnn, OpcodeJPNCnn:
+		return fmt.Sprintf("%s %s, $%04xh", str[:ln-4], str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
+	case OpcodeJRNZe, OpcodeJRNCe:
+		return fmt.Sprintf("%s %s, PC+$%02xh", str[:ln-3], str[ln-3:ln-1], int8(di.Raw[1]))
+	case OpcodeJRZe, OpcodeJRCe:
+		return fmt.Sprintf("%s %s, PC+$%02xh", str[:ln-2], str[ln-2:ln-1], int8(di.Raw[1]))
+	case OpcodeJRe:
+		return fmt.Sprintf("%s PC+$%02xh", str[:ln-1], int8(di.Raw[1]))
+	case OpcodeLDAn, OpcodeLDBn, OpcodeLDCn, OpcodeLDDn, OpcodeLDEn, OpcodeLDHn, OpcodeLDLn:
+		return fmt.Sprintf("%s %s, $%02xh", str[:ln-2], str[ln-2:ln-1], join16(di.Raw[2], di.Raw[1]))
+	case OpcodeADDHLHL, OpcodeADDHLDE, OpcodeADDHLBC, OpcodeADDHLSP:
+		return fmt.Sprintf("%s %s, %s", str[:ln-4], str[ln-4:ln-2], str[ln-2:])
+	case OpcodeLDHnA:
+		return fmt.Sprintf("LDH ($%02xh),A; eff. LD $%04x, A", di.Raw[1], 0xff00+int(di.Raw[1]))
+	case OpcodeLDHAn:
+		return fmt.Sprintf("LDH A,($%02xh); eff. LD A,$%04x", di.Raw[1], 0xff00+int(di.Raw[1]))
+	case OpcodeLDHCA:
+		return "LDH A,(C); eff. LD A,C+$0xff00"
+	case OpcodeCB:
+		cbop := CBOp{Op: cb((di.Raw[0] & 0xf8) >> 3), Target: CBTarget(di.Raw[0] & 0x7)}
+		return fmt.Sprintf("%s %s", cbop.Op, cbop.Target)
+	}
+	panicf("%v\n", di.Opcode)
+	return ""
 }
 
 type DataSection struct {
@@ -32,15 +118,114 @@ func (cs CodeSection) Address() uint16 {
 }
 
 type Disassembly struct {
+	PC   uint16
 	Code []CodeSection
 	Data []DataSection
 }
 
-func NewDisassembler(program []uint8) *Disassembler {
-	return &Disassembler{
-		Program: program,
-		Decoded: make([]DisInstruction, len(program)),
+func (d *Disassembly) Print(w io.Writer) {
+	for _, section := range d.Code {
+		fmt.Fprintf(w, "\nCode section at 0x%04x\n", section.Address())
+		for _, inst := range section.Instructions {
+			if inst.Address == d.PC {
+				fmt.Fprintf(w, "[%04x]->%s\n", inst.Address, inst.Asm())
+			} else {
+				fmt.Fprintf(w, "%04xh | %s\n", inst.Address, inst.Asm())
+			}
+		}
 	}
+	data := splitSections(d.Data)
+	prevEndAddr := uint16(0xffff)
+	for _, section := range data {
+		if prevEndAddr != section.Address {
+			fmt.Fprintf(w, "\nData section at 0x%04x\n", section.Address)
+		}
+		prevEndAddr = section.Address + uint16(len(section.Raw))
+		allEqual := true
+		testByte := section.Raw[0]
+		for _, b := range section.Raw {
+			if b != testByte {
+				allEqual = false
+				break
+			}
+		}
+		if allEqual {
+			fmt.Fprintf(w, "0x%0x bytes of 0x%02x\n", len(section.Raw), testByte)
+			continue
+		}
+
+		i := 0
+		for line := range (len(section.Raw) + 15) / 16 {
+			fmt.Fprintf(w, "%04xh | ", int(section.Address)+line*16)
+			for range 16 {
+				if i >= len(section.Raw) {
+					break
+				}
+				fmt.Fprintf(w, "%02x ", section.Raw[i])
+				i++
+			}
+			fmt.Fprintf(w, "\n")
+		}
+	}
+}
+func splitSections(sections []DataSection) []DataSection {
+	var result []DataSection
+	for _, section := range sections {
+		raw := section.Raw
+		start := 0
+
+		for start < len(raw) {
+			runStart := start
+			runByte := raw[start]
+			runLen := 1
+
+			// Find run of same byte
+			for i := start + 1; i < len(raw) && raw[i] == runByte; i++ {
+				runLen++
+			}
+
+			if runLen >= 32 {
+				// Add preceding non-uniform part
+				if runStart > 0 {
+					result = append(result, DataSection{
+						Address: section.Address,
+						Raw:     raw[0:runStart],
+					})
+				}
+				// Add the uniform run
+				result = append(result, DataSection{
+					Address: section.Address + uint16(runStart),
+					Raw:     raw[runStart : runStart+runLen],
+				})
+				// Continue after the run
+				raw = raw[runStart+runLen:]
+				section.Address += uint16(runStart + runLen)
+				start = 0
+			} else {
+				start++
+			}
+		}
+
+		// Add any remaining non-uniform tail
+		if len(raw) > 0 {
+			result = append(result, DataSection{
+				Address: section.Address,
+				Raw:     raw,
+			})
+		}
+	}
+	return result
+}
+
+func NewDisassembler() *Disassembler {
+	return &Disassembler{}
+}
+
+func (dis *Disassembler) SetProgram(program []uint8) {
+	dis.Program = program
+	dis.Decoded = make([]DisInstruction, len(program))
+	dis.cachedDisassembly = nil
+	dis.printf("setProgram with len=%d\n", len(program))
 }
 
 func (dis *Disassembler) printf(format string, args ...any) {
@@ -57,6 +242,7 @@ func (dis *Disassembler) SetPC(address uint16) {
 	dis.recursion++
 	defer func() {
 		dis.recursion--
+		dis.PC = address
 	}()
 
 	for {
@@ -67,14 +253,13 @@ func (dis *Disassembler) SetPC(address uint16) {
 
 		if dis.Decoded[address].Size > 0 {
 			dis.printf("already decoded %x\n", address)
-			return // already disassembled
+			return
 		}
 
-		dis.addr = address
 		di, err := dis.readNewInstruction(address)
 		if err != nil {
 			panicf("failed decoding at %x: %v\n", address, err)
-			return // failed to decode at address
+			return
 		}
 		dis.add(di)
 		address += di.Size
@@ -85,7 +270,12 @@ func (dis *Disassembler) SetPC(address uint16) {
 	}
 }
 
-func (dis *Disassembler) Disassembly() Disassembly {
+func (dis *Disassembler) Disassembly() *Disassembly {
+	if dis.cachedDisassembly != nil {
+		dis.cachedDisassembly.PC = dis.PC
+		return dis.cachedDisassembly
+	}
+
 	var out Disassembly
 	currCodeSection := CodeSection{}
 	currDataSection := DataSection{}
@@ -119,7 +309,8 @@ func (dis *Disassembler) Disassembly() Disassembly {
 	if currDataSection.Raw != nil {
 		out.Data = append(out.Data, currDataSection)
 	}
-	return out
+	dis.cachedDisassembly = &out
+	return &out
 }
 
 func (dis *Disassembler) add(di DisInstruction) {
@@ -127,6 +318,7 @@ func (dis *Disassembler) add(di DisInstruction) {
 	for addr := di.Address; addr != di.Address+di.Size; addr++ {
 		dis.Decoded[addr] = di
 	}
+	dis.cachedDisassembly = nil
 }
 
 // returns true if unconditional branch, i.e. can never fall through

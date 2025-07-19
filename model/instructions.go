@@ -10,6 +10,7 @@ package model
 // DECB     = 0x05,
 // LDBn     = 0x06,
 // ADDHLBC  = 0x09,
+// LDABC    = 0x0a,
 // DECBC    = 0x0b,
 // INCC     = 0x0c,
 // DECC     = 0x0d,
@@ -263,6 +264,8 @@ type edge struct {
 type InstructionHandling func(e edge) bool
 
 var instSize = [256]uint16{
+	OpcodeNop: 1,
+
 	OpcodeLDSPnn: 3,
 	OpcodeLDHLnn: 3,
 	OpcodeLDBCnn: 3,

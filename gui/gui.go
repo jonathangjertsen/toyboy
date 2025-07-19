@@ -52,6 +52,7 @@ type GUI struct {
 	OAMAttrScroll      widget.List
 	ProgramScroll      widget.List
 	RewindBufferScroll widget.List
+	DisassemblyScroll  widget.List
 	RegistersScroll    widget.List
 	PPUScroll          widget.List
 	APUScroll          widget.List
@@ -97,6 +98,7 @@ func (gui *GUI) initGameboy() {
 		panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
 	}
 	copy(gb.CartridgeSlot.Data, f)
+	gb.Disassembler.SetPC(0x0100)
 
 	cm := plugin.NewClockMeasurement()
 	gb.PHI.AttachDevice(func(c model.Cycle) {
@@ -125,6 +127,7 @@ func (gui *GUI) Run() {
 	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.ProgramScroll.List = layout.List{Axis: layout.Vertical}
 	gui.RewindBufferScroll.List = layout.List{Axis: layout.Vertical}
+	gui.DisassemblyScroll.List = layout.List{Axis: layout.Vertical}
 	gui.OAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.OAMAttrScroll.List = layout.List{Axis: layout.Vertical}
 	gui.RegistersScroll.List = layout.List{Axis: layout.Vertical}
@@ -207,7 +210,7 @@ func (gui *GUI) label(name string) func(gtx C) D {
 	}
 }
 
-func (gui *GUI) mem(f func(io.Writer), list *widget.List, height unit.Dp) func(gtx C) D {
+func (gui *GUI) mem(f func(io.Writer), list *widget.List, height, width unit.Dp) func(gtx C) D {
 	return func(gtx C) D {
 		buf := bytes.Buffer{}
 		f(&buf)
@@ -216,6 +219,8 @@ func (gui *GUI) mem(f func(io.Writer), list *widget.List, height unit.Dp) func(g
 		return layout.Stack{}.Layout(
 			gtx,
 			layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+				gtx.Constraints.Min.X = int(width)
+				gtx.Constraints.Max.X = int(width)
 				gtx.Constraints.Min.Y = int(height)
 				gtx.Constraints.Max.Y = int(height)
 				return material.List(&gui.Theme, list).Layout(gtx, len(lines), func(gtx layout.Context, index int) layout.Dimensions {
@@ -243,34 +248,39 @@ func (gui *GUI) Render(gtx C) {
 					return Column(
 						gtx,
 						Rigid(gui.label("VRAM")),
-						Rigid(gui.mem(cd.PrintVRAM, &gui.VRAMScroll, unit.Dp(660))),
+						Rigid(gui.mem(cd.PrintVRAM, &gui.VRAMScroll, unit.Dp(660), unit.Dp(600))),
 					)
 				}),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
 						Rigid(gui.label("WRAM")),
-						Rigid(gui.mem(cd.PrintWRAM, &gui.WRAMScroll, unit.Dp(660))),
+						Rigid(gui.mem(cd.PrintWRAM, &gui.WRAMScroll, unit.Dp(660), unit.Dp(600))),
 					)
 				}),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
 						Rigid(gui.label("Program")),
-						Rigid(gui.mem(cd.PrintProgram, &gui.ProgramScroll, unit.Dp(200))),
+						Rigid(gui.mem(cd.PrintProgram, &gui.ProgramScroll, unit.Dp(200), unit.Dp(600))),
 						Rigid(gui.label("HRAM")),
-						Rigid(gui.mem(cd.PrintHRAM, &gui.HRAMScroll, unit.Dp(200))),
+						Rigid(gui.mem(cd.PrintHRAM, &gui.HRAMScroll, unit.Dp(200), unit.Dp(600))),
 						Rigid(gui.label("OAM")),
-						Rigid(gui.mem(cd.PrintOAM, &gui.OAMScroll, unit.Dp(220))),
+						Rigid(gui.mem(cd.PrintOAM, &gui.OAMScroll, unit.Dp(220), unit.Dp(600))),
 					)
 				}),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
 						Rigid(gui.label("Last executed instructions")),
-						Rigid(gui.mem(cd.PrintRewindBuffer, &gui.RewindBufferScroll, unit.Dp(300))),
+						Rigid(gui.mem(cd.PrintRewindBuffer, &gui.RewindBufferScroll, unit.Dp(300), unit.Dp(300))),
+					)
+				}),
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
 						Rigid(gui.label("Disassembly")),
-						Rigid(gui.mem(cd.PrintDisassembly, &gui.RewindBufferScroll, unit.Dp(500))),
+						Rigid(gui.mem(cd.PrintDisassembly, &gui.DisassemblyScroll, unit.Dp(800), unit.Dp(500))),
 					)
 				}),
 				Rigid(func(gtx C) D {
@@ -283,19 +293,19 @@ func (gui *GUI) Render(gtx C) {
 								fmt.Fprintf(w, "CPU clock:              %.0f\n", gui.LastFrameCPS)
 								fmt.Fprintf(w, "Target emulation speed: %.2f%%\n", gui.TargetPercent)
 								fmt.Fprintf(w, "Actual emulation speed: %.2f%%\n", (100*4*gui.LastFrameCPS)/4194304)
-							}, &gui.TimingScroll, unit.Dp(100)),
+							}, &gui.TimingScroll, unit.Dp(100), unit.Dp(400)),
 						),
 						Rigid(gui.label("Registers")),
-						Rigid(gui.mem(cd.PrintRegs, &gui.RegistersScroll, unit.Dp(300))),
+						Rigid(gui.mem(cd.PrintRegs, &gui.RegistersScroll, unit.Dp(300), unit.Dp(200))),
 						Rigid(gui.label("APU")),
-						Rigid(gui.mem(cd.PrintAPU, &gui.APUScroll, unit.Dp(300))),
+						Rigid(gui.mem(cd.PrintAPU, &gui.APUScroll, unit.Dp(300), unit.Dp(200))),
 					)
 				}),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
 						Rigid(gui.label("PPU")),
-						Rigid(gui.mem(cd.PrintPPU, &gui.PPUScroll, unit.Dp(800))),
+						Rigid(gui.mem(cd.PrintPPU, &gui.PPUScroll, unit.Dp(800), unit.Dp(200))),
 					)
 				}),
 			)
@@ -463,7 +473,7 @@ func (gui *GUI) Render(gtx C) {
 								nil,
 							)
 						}),
-						Rigid(gui.mem(cd.PrintOAMAttrs, &gui.OAMAttrScroll, unit.Dp(100))),
+						Rigid(gui.mem(cd.PrintOAMAttrs, &gui.OAMAttrScroll, unit.Dp(100), unit.Dp(200))),
 					)
 				}),
 			)

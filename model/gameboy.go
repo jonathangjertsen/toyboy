@@ -5,6 +5,7 @@ type Gameboy struct {
 
 	CLK           *ClockRT
 	Debugger      *Debugger
+	Disassembler  *Disassembler
 	PHI           *Clock
 	CPU           *CPU
 	PPU           *PPU
@@ -23,86 +24,6 @@ func (gb *Gameboy) Pause() {
 func (gb *Gameboy) Step() {
 	gb.CLK.pauseAfterCycle.Add(1)
 	gb.CLK.Start()
-}
-
-func (gb *Gameboy) ButtonRight(pressed bool) {
-	gb.CLK.Sync(func() {
-		if pressed {
-			gb.Joypad.Direction &= ^uint8(1 << 0)
-		} else {
-			gb.Joypad.Direction |= 1 << 0
-		}
-	})
-}
-
-func (gb *Gameboy) ButtonLeft(pressed bool) {
-	gb.CLK.Sync(func() {
-		if pressed {
-			gb.Joypad.Direction &= ^uint8(1 << 1)
-		} else {
-			gb.Joypad.Direction |= 1 << 1
-		}
-	})
-}
-
-func (gb *Gameboy) ButtonUp(pressed bool) {
-	gb.CLK.Sync(func() {
-		if pressed {
-			gb.Joypad.Direction &= ^uint8(1 << 2)
-		} else {
-			gb.Joypad.Direction |= 1 << 2
-		}
-	})
-}
-
-func (gb *Gameboy) ButtonDown(pressed bool) {
-	gb.CLK.Sync(func() {
-		if pressed {
-			gb.Joypad.Direction &= ^uint8(1 << 3)
-		} else {
-			gb.Joypad.Direction |= 1 << 3
-		}
-	})
-}
-
-func (gb *Gameboy) ButtonA(pressed bool) {
-	gb.CLK.Sync(func() {
-		if pressed {
-			gb.Joypad.Action &= ^uint8(1 << 0)
-		} else {
-			gb.Joypad.Action |= 1 << 0
-		}
-	})
-}
-
-func (gb *Gameboy) ButtonB(pressed bool) {
-	gb.CLK.Sync(func() {
-		if pressed {
-			gb.Joypad.Action &= ^uint8(1 << 1)
-		} else {
-			gb.Joypad.Action |= 1 << 1
-		}
-	})
-}
-
-func (gb *Gameboy) ButtonSelect(pressed bool) {
-	gb.CLK.Sync(func() {
-		if pressed {
-			gb.Joypad.Action &= ^uint8(1 << 2)
-		} else {
-			gb.Joypad.Action |= 1 << 2
-		}
-	})
-}
-
-func (gb *Gameboy) ButtonStart(pressed bool) {
-	gb.CLK.Sync(func() {
-		if pressed {
-			gb.Joypad.Action &= ^uint8(1 << 3)
-		} else {
-			gb.Joypad.Action |= 1 << 3
-		}
-	})
 }
 
 func (gb *Gameboy) SoftReset() {
@@ -147,12 +68,15 @@ func NewGameboy(
 func (gb *Gameboy) init() {
 	clk := NewRealtimeClock(gb.Config.SystemClock)
 	debugger := NewDebugger(clk)
+	disassembler := NewDisassembler()
 
 	ppuClock := clk.Divide(2)
 	cpuClock := clk.Divide(4)
 
 	bootROMLock := NewBootROMLock(clk)
 	bootROM := NewBootROM(clk, gb.Config.Model)
+	disassembler.SetProgram(bootROM.Data)
+	disassembler.SetPC(0)
 	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
 	hram := NewMemoryRegion(clk, AddrHRAMBegin, SizeHRAM)
 	wram := NewMemoryRegion(clk, AddrWRAMBegin, AddrWRAMEnd)
@@ -160,6 +84,11 @@ func (gb *Gameboy) init() {
 	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
 	cartridgeSlot := NewMemoryRegion(clk, AddrCartridgeBank0Begin, AddrCartridgeBank0Size)
 	joypad := NewJoypad(clk)
+
+	bootROMLock.OnUnlock = func() {
+		disassembler.SetProgram(cartridgeSlot.Data)
+		disassembler.SetPC(0x100)
+	}
 
 	bus := &Bus{}
 	ppu := NewPPU(clk, ppuClock, bus, debugger)
@@ -175,9 +104,10 @@ func (gb *Gameboy) init() {
 	bus.CartridgeSlot = &cartridgeSlot
 	bus.Joypad = joypad
 
-	cpu := NewCPU(cpuClock, bus, debugger)
+	cpu := NewCPU(cpuClock, bus, debugger, disassembler)
 
 	gb.CLK = clk
+	gb.Disassembler = disassembler
 	gb.PHI = cpuClock
 	gb.CPU = cpu
 	gb.CartridgeSlot = &cartridgeSlot

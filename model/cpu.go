@@ -8,9 +8,10 @@ type Interrupts struct {
 }
 
 type CPU struct {
-	PHI      *Clock
-	Bus      *Bus
-	Debugger *Debugger
+	PHI          *Clock
+	Bus          *Bus
+	Debugger     *Debugger
+	Disassembler *Disassembler
 
 	Regs       RegisterFile
 	Interrupts Interrupts
@@ -143,10 +144,6 @@ func join16(msb, lsb uint8) uint16 {
 	return (uint16(msb) << 8) | uint16(lsb)
 }
 
-func split16(w uint16) (uint8, uint8) {
-	return msb(w), lsb(w)
-}
-
 func msb(w uint16) uint8 {
 	return uint8((w >> 8) & 0xff)
 }
@@ -167,19 +164,20 @@ func (cpu *CPU) IncPC() {
 	if cpu.clockCycle.Falling {
 		panic("IncPC must be called on rising edge")
 	}
-	cpu.Regs.PC++
-	cpu.Debugger.SetPC(cpu.Regs.PC)
+	cpu.SetPC(cpu.Regs.PC + 1)
 }
 
 func NewCPU(
 	phi *Clock,
 	bus *Bus,
 	debugger *Debugger,
+	disassembler *Disassembler,
 ) *CPU {
 	cpu := &CPU{
 		PHI:          phi,
 		Bus:          bus,
 		Debugger:     debugger,
+		Disassembler: disassembler,
 		nopCountMax:  4,
 		rewindBuffer: make([]ExecLogEntry, 16),
 	}
@@ -255,6 +253,7 @@ func (cpu *CPU) fsm(c Cycle) {
 			if cpu.rewindBufferIdx >= len(cpu.rewindBuffer) {
 				cpu.rewindBufferIdx = 0
 			}
+			cpu.Disassembler.SetPC(cpu.Regs.PC - 1)
 		}
 	} else if c.Falling {
 		cpu.machineCycle++

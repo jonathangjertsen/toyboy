@@ -9,7 +9,8 @@ type BootROMLock struct {
 	MemoryRegion
 	RegBootROMLock uint8
 
-	BootOff bool
+	BootOff  bool
+	OnUnlock func()
 }
 
 func NewBootROMLock(clock *ClockRT) *BootROMLock {
@@ -38,6 +39,9 @@ func (brl *BootROMLock) Write(addr uint16, v uint8) {
 	if v&1 == 1 {
 		brl.RegBootROMLock = 0x01
 		brl.BootOff = true
+		if brl.OnUnlock != nil {
+			brl.OnUnlock()
+		}
 	}
 }
 

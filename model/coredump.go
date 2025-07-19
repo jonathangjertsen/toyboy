@@ -19,6 +19,7 @@ type CoreDump struct {
 	PPU             PPUDump
 	RewindBuffer    []ExecLogEntry
 	RewindBufferIdx int
+	Disassembly     *Disassembly
 }
 
 type PPUDump struct {
@@ -231,6 +232,7 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
 	cd.Program = cpu.Bus.getmem(0x0000, AddrCartridgeBank0End)
+	cd.Disassembly = cpu.Disassembler.Disassembly()
 	cd.HRAM = cpu.Bus.getmem(AddrHRAMBegin, AddrHRAMEnd)
 	cd.OAM = cpu.Bus.getmem(AddrOAMBegin, AddrOAMEnd)
 	cd.VRAM = cpu.Bus.getmem(AddrVRAMBegin, AddrVRAMEnd)
@@ -311,5 +313,5 @@ func (cd *CoreDump) PrintRewindBuffer(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintDisassembly(f io.Writer) {
-
+	cd.Disassembly.Print(f)
 }
