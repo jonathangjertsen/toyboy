@@ -200,9 +200,9 @@ func (sf *SpriteFetcher) fetchTileNo() {
 }
 
 func (sf *SpriteFetcher) fetchTileLSB() {
+	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
 	addr := 0x8000 + 16*uint16(sf.TileIndex)
-	// TODO: what about window?
-	addr += 2 * uint16((sf.PPU.RegLY+sf.PPU.RegSCY)%8)
+	addr += 2 * uint16((sf.PPU.RegLY+sf.PPU.RegSCY-obj.Y)%8)
 	sf.TileLSBAddr = addr
 	sf.TileLSB = sf.PPU.Bus.VRAM.Read(addr)
 }

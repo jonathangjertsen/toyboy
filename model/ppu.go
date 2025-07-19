@@ -326,6 +326,7 @@ func (ppu *PPU) beginPixelDraw() {
 	ppu.BackgroundFetcher.WindowFetching = false
 	ppu.BackgroundFetcher.X = 0
 	ppu.SpriteFetcher.Cycle = 0
+	ppu.SpriteFetcher.State = PixelFetcherStateFetchTileNo
 	ppu.SpriteFetcher.DoneX = 0xff
 	ppu.SpriteFetcher.X = 0
 	ppu.BackgroundFIFO.Clear()
@@ -403,7 +404,7 @@ func (ppu *PPU) fsmPixelDraw() {
 			obj := ppu.OAMBuffer.Buffer[idx]
 			if obj.X <= ppu.PixelShifter.X+8 && obj.X > ppu.PixelShifter.X {
 				// Initiate sprite fetch
-				ppu.SpriteFetcher.State = 1
+				ppu.SpriteFetcher.State = PixelFetcherStateFetchTileNo
 				ppu.SpriteFetcher.SpriteIDX = idx
 				ppu.PixelShifter.Suspended = true
 				ppu.SpriteFetcher.Suspended = false

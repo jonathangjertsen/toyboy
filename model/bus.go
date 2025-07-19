@@ -4,6 +4,8 @@ type Bus struct {
 	Data    uint8
 	Address uint16
 
+	inCoreDump bool
+
 	BootROMLock   *BootROMLock
 	BootROM       *MemoryRegion
 	VRAM          *MemoryRegion
@@ -44,7 +46,9 @@ func (b *Bus) WriteAddress(addr uint16) {
 	} else if addr == AddrBootROMLock {
 		b.Data = b.BootROMLock.Read(addr)
 	} else {
-		panicf("read from unknown peripheral at 0x%x", addr)
+		if !b.inCoreDump {
+			panicf("Read from unmapped address 0x%04x", addr)
+		}
 	}
 }
 
@@ -77,11 +81,14 @@ func (b *Bus) WriteData(v uint8) {
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.PPU.Write(addr, v)
 	} else {
-		panicf("write to unknown peripheral at 0x%x", addr)
+		if !b.inCoreDump {
+			panicf("write to unmapped address 0x%x", addr)
+		}
 	}
 }
 
-func (b *Bus) CountdownDisable() {
+func (b *Bus) CoreDumpBegin() {
+	b.inCoreDump = true
 	b.BootROMLock.CountdownDisable = true
 	b.BootROM.CountdownDisable = true
 	b.VRAM.CountdownDisable = true
@@ -93,7 +100,8 @@ func (b *Bus) CountdownDisable() {
 	b.CartridgeSlot.CountdownDisable = true
 }
 
-func (b *Bus) CountdownEnable() {
+func (b *Bus) CoreDumpEnd() {
+	b.inCoreDump = false
 	b.BootROMLock.CountdownDisable = false
 	b.BootROM.CountdownDisable = false
 	b.VRAM.CountdownDisable = false
@@ -129,6 +137,8 @@ func (b *Bus) GetCounters(addr uint16) (uint64, uint64) {
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		return b.PPU.GetCounters(addr)
 	}
-	panicf("GetCounters from unknown peripheral at 0x%x", addr)
+	if !b.inCoreDump {
+		panicf("GetCounters for unmapped address 0x%04x", addr)
+	}
 	return 0, 0
 }

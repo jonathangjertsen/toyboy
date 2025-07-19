@@ -7,16 +7,18 @@ import (
 )
 
 type CoreDump struct {
-	Cycle        Cycle
-	Regs         RegisterFile
-	ProgramStart uint16
-	ProgramEnd   uint16
-	Program      MemDump
-	HRAM         MemDump
-	OAM          MemDump
-	VRAM         MemDump
-	APU          MemDump
-	PPU          PPUDump
+	Cycle           Cycle
+	Regs            RegisterFile
+	ProgramStart    uint16
+	ProgramEnd      uint16
+	Program         MemDump
+	HRAM            MemDump
+	OAM             MemDump
+	VRAM            MemDump
+	APU             MemDump
+	PPU             PPUDump
+	RewindBuffer    []ExecLogEntry
+	RewindBufferIdx int
 }
 
 type PPUDump struct {
@@ -76,7 +78,7 @@ func (cd *CoreDump) PrintRegs(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintProgram(f io.Writer) {
-	memdump(f, cd.Program, cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
+	memdump(f, cd.Program[cd.ProgramStart:cd.ProgramEnd+1], cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
 }
 
 func (cd *CoreDump) PrintHRAM(f io.Writer) {
@@ -96,7 +98,11 @@ func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintVRAM(f io.Writer) {
-	memdump(f, cd.VRAM, 0x8000, 0x9fff, 0)
+	memdump(f, cd.VRAM, AddrVRAMBegin, AddrVRAMEnd, 0)
+}
+
+func (cd *CoreDump) PrintWRAM(f io.Writer) {
+	memdump(f, cd.VRAM, AddrWRAMBegin, AddrWRAMEnd, 0)
 }
 
 func bool2int(b bool) int {
@@ -206,11 +212,9 @@ func memdump(f io.Writer, mem []MemInfo, start, end, highlight uint16) {
 }
 
 func (cpu *CPU) GetCoreDump() CoreDump {
-	cpu.inCoreDump = true
-	cpu.Bus.CountdownDisable()
+	cpu.Bus.CoreDumpBegin()
 	defer func() {
-		cpu.inCoreDump = false
-		cpu.Bus.CountdownEnable()
+		cpu.Bus.CoreDumpEnd()
 	}()
 
 	var cd CoreDump
@@ -226,7 +230,7 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 		cd.ProgramEnd = cpu.Regs.PC + 0x40
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
-	cd.Program = cpu.Bus.getmem(cd.ProgramStart, cd.ProgramEnd)
+	cd.Program = cpu.Bus.getmem(0x0000, AddrCartridgeBank0End)
 	cd.HRAM = cpu.Bus.getmem(AddrHRAMBegin, AddrHRAMEnd)
 	cd.OAM = cpu.Bus.getmem(AddrOAMBegin, AddrOAMEnd)
 	cd.VRAM = cpu.Bus.getmem(AddrVRAMBegin, AddrVRAMEnd)
@@ -243,6 +247,8 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	cd.PPU.BackgroundFetcher = cpu.Bus.PPU.BackgroundFetcher
 	cd.PPU.SpriteFetcher = cpu.Bus.PPU.SpriteFetcher
 	cd.PPU.OAMBuffer = cpu.Bus.PPU.OAMBuffer
+	cd.RewindBuffer = cpu.rewindBuffer
+	cd.RewindBufferIdx = cpu.rewindBufferIdx
 	return cd
 }
 
@@ -286,10 +292,24 @@ func (cpu *CPU) Dump() {
 	fmt.Fprintf(f, "OAM:\n")
 	cd.PrintOAM(f)
 	fmt.Fprintf(f, "--------\n")
-
 	fmt.Printf("Last executed instructions:\n")
-	for i := (cpu.rewindBufferIdx + 1) % len(cpu.rewindBuffer); i != cpu.rewindBufferIdx; i = (i + 1) % len(cpu.rewindBuffer) {
-		fmt.Printf("[PC=%04x] %s\n", cpu.rewindBuffer[i].PC, cpu.rewindBuffer[i].Opcode)
+	cd.PrintRewindBuffer(f)
+	fmt.Fprintf(f, "--------\n")
+}
+
+func (cd *CoreDump) PrintRewindBuffer(f io.Writer) {
+	for i := (cd.RewindBufferIdx + 1) % len(cd.RewindBuffer); i != cd.RewindBufferIdx; i = (i + 1) % len(cd.RewindBuffer) {
+		entry := cd.RewindBuffer[i]
+		extra := ""
+		if entry.BranchResult == +1 {
+			extra = "(taken)"
+		} else if entry.BranchResult == -1 {
+			extra = "(not taken)"
+		}
+		fmt.Fprintf(f, "[PC=%04x] %s %s\n", entry.PC, entry.Opcode, extra)
 	}
-	fmt.Printf("--------\n")
+}
+
+func (cd *CoreDump) PrintDisassembly(f io.Writer) {
+
 }

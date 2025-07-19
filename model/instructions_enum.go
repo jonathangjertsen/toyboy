@@ -294,36 +294,41 @@ const (
 	OpcodeCPL
 	OpcodeCPHL
 	OpcodeCPA
-	OpcodePOPBC Opcode = iota + 18
+	OpcodeRETNZ
+	OpcodePOPBC
 	OpcodeJPNZnn
 	OpcodeJPnn
-	OpcodePUSHBC Opcode = iota + 19
+	OpcodePUSHBC Opcode = iota + 18
 	OpcodeADDn
-	OpcodeRET Opcode = iota + 21
+	OpcodeRETZ Opcode = iota + 19
+	OpcodeRET
 	OpcodeJPZnn
 	OpcodeCB
-	OpcodeCALLnn Opcode = iota + 22
+	OpcodeCALLnn Opcode = iota + 20
 	OpcodeADCn
-	OpcodeJPCnn  Opcode = iota + 33
-	OpcodeJPNCnn Opcode = iota + 24
-	OpcodeSUBn   Opcode = iota + 27
-	OpcodeSBCn   Opcode = iota + 34
-	OpcodeLDHnA  Opcode = iota + 35
-	OpcodeLDHCA  Opcode = iota + 36
-	OpcodeANDn   Opcode = iota + 39
-	OpcodeLDnnA  Opcode = iota + 42
-	OpcodeXORn   Opcode = iota + 45
-	OpcodeLDHAn  Opcode = iota + 46
-	OpcodeLDAnn  Opcode = iota + 55
-	OpcodeDI     Opcode = iota + 47
-	OpcodeORn    Opcode = iota + 49
-	OpcodeEI     Opcode = iota + 53
-	OpcodeCPn    Opcode = iota + 55
+	OpcodeRETNC Opcode = iota + 21
+	OpcodeRETC  Opcode = iota + 28
+	OpcodeRETI
+	OpcodeJPCnn
+	OpcodeJPNCnn Opcode = iota + 19
+	OpcodeSUBn   Opcode = iota + 22
+	OpcodeSBCn   Opcode = iota + 29
+	OpcodeLDHnA  Opcode = iota + 30
+	OpcodeLDHCA  Opcode = iota + 31
+	OpcodeANDn   Opcode = iota + 34
+	OpcodeLDnnA  Opcode = iota + 37
+	OpcodeXORn   Opcode = iota + 40
+	OpcodeLDHAn  Opcode = iota + 41
+	OpcodeLDAnn  Opcode = iota + 50
+	OpcodeDI     Opcode = iota + 42
+	OpcodeORn    Opcode = iota + 44
+	OpcodeEI     Opcode = iota + 48
+	OpcodeCPn    Opcode = iota + 50
 )
 
 var ErrInvalidOpcode = errors.New("not a valid Opcode")
 
-const _OpcodeName = "NopLDBCnnINCBCINCBDECBLDBnADDHLBCDECBCINCCDECCLDCnLDDEnnINCDEINCDDECDLDDnRLAJReADDHLDELDADEDECDEINCEDECELDEnJRNZeLDHLnnLDHLAIncINCHLINCHDECHLDHnJRZeADDHLHLDECHLINCLDECLLDLnJRNCeLDSPnnLDHLADecINCSPJRCeADDHLSPDECSPINCADECALDAnLDBBLDBCLDBDLDBELDBHLDBLLDBHLLDBALDCBLDCCLDCDLDCELDCHLDCLLDCHLLDCALDDBLDDCLDDDLDDELDDHLDDLLDDHLLDDALDEBLDECLDEDLDEELDEHLDELLDEHLLDEALDHBLDHCLDHDLDHELDHHLDHLLDHHLLDHALDLBLDLCLDLDLDLELDLHLDLLLDLHLLDLALDHLBLDHLCLDHLDLDHLELDHLHLDHLLHALTLDHLALDABLDACLDADLDAELDAHLDALLDAHLLDAAADDBADDCADDDADDEADDHADDLADDHLADDAADCBADCCADCDADCEADCHADCLADCHLADCASUBBSUBCSUBDSUBESUBHSUBLSUBHLSUBASBCBSBCCSBCDSBCESBCHSBCLSBCHLSBCAANDBANDCANDDANDEANDHANDLANDHLANDAXORBXORCXORDXOREXORHXORLXORHLXORAORBORCORDOREORHORLORHLORACPBCPCCPDCPECPHCPLCPHLCPAPOPBCJPNZnnJPnnPUSHBCADDnRETJPZnnCBCALLnnADCnJPCnnJPNCnnSUBnSBCnLDHnALDHCAANDnLDnnAXORnLDHAnLDAnnDIORnEICPn"
+const _OpcodeName = "NopLDBCnnINCBCINCBDECBLDBnADDHLBCDECBCINCCDECCLDCnLDDEnnINCDEINCDDECDLDDnRLAJReADDHLDELDADEDECDEINCEDECELDEnJRNZeLDHLnnLDHLAIncINCHLINCHDECHLDHnJRZeADDHLHLDECHLINCLDECLLDLnJRNCeLDSPnnLDHLADecINCSPJRCeADDHLSPDECSPINCADECALDAnLDBBLDBCLDBDLDBELDBHLDBLLDBHLLDBALDCBLDCCLDCDLDCELDCHLDCLLDCHLLDCALDDBLDDCLDDDLDDELDDHLDDLLDDHLLDDALDEBLDECLDEDLDEELDEHLDELLDEHLLDEALDHBLDHCLDHDLDHELDHHLDHLLDHHLLDHALDLBLDLCLDLDLDLELDLHLDLLLDLHLLDLALDHLBLDHLCLDHLDLDHLELDHLHLDHLLHALTLDHLALDABLDACLDADLDAELDAHLDALLDAHLLDAAADDBADDCADDDADDEADDHADDLADDHLADDAADCBADCCADCDADCEADCHADCLADCHLADCASUBBSUBCSUBDSUBESUBHSUBLSUBHLSUBASBCBSBCCSBCDSBCESBCHSBCLSBCHLSBCAANDBANDCANDDANDEANDHANDLANDHLANDAXORBXORCXORDXOREXORHXORLXORHLXORAORBORCORDOREORHORLORHLORACPBCPCCPDCPECPHCPLCPHLCPARETNZPOPBCJPNZnnJPnnPUSHBCADDnRETZRETJPZnnCBCALLnnADCnRETNCRETCRETIJPCnnJPNCnnSUBnSBCnLDHnALDHCAANDnLDnnAXORnLDHAnLDAnnDIORnEICPn"
 
 // OpcodeValues returns a list of the values for Opcode
 func OpcodeValues() []Opcode {
@@ -503,16 +508,21 @@ func OpcodeValues() []Opcode {
 		OpcodeCPL,
 		OpcodeCPHL,
 		OpcodeCPA,
+		OpcodeRETNZ,
 		OpcodePOPBC,
 		OpcodeJPNZnn,
 		OpcodeJPnn,
 		OpcodePUSHBC,
 		OpcodeADDn,
+		OpcodeRETZ,
 		OpcodeRET,
 		OpcodeJPZnn,
 		OpcodeCB,
 		OpcodeCALLnn,
 		OpcodeADCn,
+		OpcodeRETNC,
+		OpcodeRETC,
+		OpcodeRETI,
 		OpcodeJPCnn,
 		OpcodeJPNCnn,
 		OpcodeSUBn,
@@ -707,31 +717,36 @@ var _OpcodeMap = map[Opcode]string{
 	OpcodeCPL:      _OpcodeName[732:735],
 	OpcodeCPHL:     _OpcodeName[735:739],
 	OpcodeCPA:      _OpcodeName[739:742],
-	OpcodePOPBC:    _OpcodeName[742:747],
-	OpcodeJPNZnn:   _OpcodeName[747:753],
-	OpcodeJPnn:     _OpcodeName[753:757],
-	OpcodePUSHBC:   _OpcodeName[757:763],
-	OpcodeADDn:     _OpcodeName[763:767],
-	OpcodeRET:      _OpcodeName[767:770],
-	OpcodeJPZnn:    _OpcodeName[770:775],
-	OpcodeCB:       _OpcodeName[775:777],
-	OpcodeCALLnn:   _OpcodeName[777:783],
-	OpcodeADCn:     _OpcodeName[783:787],
-	OpcodeJPCnn:    _OpcodeName[787:792],
-	OpcodeJPNCnn:   _OpcodeName[792:798],
-	OpcodeSUBn:     _OpcodeName[798:802],
-	OpcodeSBCn:     _OpcodeName[802:806],
-	OpcodeLDHnA:    _OpcodeName[806:811],
-	OpcodeLDHCA:    _OpcodeName[811:816],
-	OpcodeANDn:     _OpcodeName[816:820],
-	OpcodeLDnnA:    _OpcodeName[820:825],
-	OpcodeXORn:     _OpcodeName[825:829],
-	OpcodeLDHAn:    _OpcodeName[829:834],
-	OpcodeLDAnn:    _OpcodeName[834:839],
-	OpcodeDI:       _OpcodeName[839:841],
-	OpcodeORn:      _OpcodeName[841:844],
-	OpcodeEI:       _OpcodeName[844:846],
-	OpcodeCPn:      _OpcodeName[846:849],
+	OpcodeRETNZ:    _OpcodeName[742:747],
+	OpcodePOPBC:    _OpcodeName[747:752],
+	OpcodeJPNZnn:   _OpcodeName[752:758],
+	OpcodeJPnn:     _OpcodeName[758:762],
+	OpcodePUSHBC:   _OpcodeName[762:768],
+	OpcodeADDn:     _OpcodeName[768:772],
+	OpcodeRETZ:     _OpcodeName[772:776],
+	OpcodeRET:      _OpcodeName[776:779],
+	OpcodeJPZnn:    _OpcodeName[779:784],
+	OpcodeCB:       _OpcodeName[784:786],
+	OpcodeCALLnn:   _OpcodeName[786:792],
+	OpcodeADCn:     _OpcodeName[792:796],
+	OpcodeRETNC:    _OpcodeName[796:801],
+	OpcodeRETC:     _OpcodeName[801:805],
+	OpcodeRETI:     _OpcodeName[805:809],
+	OpcodeJPCnn:    _OpcodeName[809:814],
+	OpcodeJPNCnn:   _OpcodeName[814:820],
+	OpcodeSUBn:     _OpcodeName[820:824],
+	OpcodeSBCn:     _OpcodeName[824:828],
+	OpcodeLDHnA:    _OpcodeName[828:833],
+	OpcodeLDHCA:    _OpcodeName[833:838],
+	OpcodeANDn:     _OpcodeName[838:842],
+	OpcodeLDnnA:    _OpcodeName[842:847],
+	OpcodeXORn:     _OpcodeName[847:851],
+	OpcodeLDHAn:    _OpcodeName[851:856],
+	OpcodeLDAnn:    _OpcodeName[856:861],
+	OpcodeDI:       _OpcodeName[861:863],
+	OpcodeORn:      _OpcodeName[863:866],
+	OpcodeEI:       _OpcodeName[866:868],
+	OpcodeCPn:      _OpcodeName[868:871],
 }
 
 // String implements the Stringer interface.
@@ -925,31 +940,36 @@ var _OpcodeValue = map[string]Opcode{
 	_OpcodeName[732:735]: OpcodeCPL,
 	_OpcodeName[735:739]: OpcodeCPHL,
 	_OpcodeName[739:742]: OpcodeCPA,
-	_OpcodeName[742:747]: OpcodePOPBC,
-	_OpcodeName[747:753]: OpcodeJPNZnn,
-	_OpcodeName[753:757]: OpcodeJPnn,
-	_OpcodeName[757:763]: OpcodePUSHBC,
-	_OpcodeName[763:767]: OpcodeADDn,
-	_OpcodeName[767:770]: OpcodeRET,
-	_OpcodeName[770:775]: OpcodeJPZnn,
-	_OpcodeName[775:777]: OpcodeCB,
-	_OpcodeName[777:783]: OpcodeCALLnn,
-	_OpcodeName[783:787]: OpcodeADCn,
-	_OpcodeName[787:792]: OpcodeJPCnn,
-	_OpcodeName[792:798]: OpcodeJPNCnn,
-	_OpcodeName[798:802]: OpcodeSUBn,
-	_OpcodeName[802:806]: OpcodeSBCn,
-	_OpcodeName[806:811]: OpcodeLDHnA,
-	_OpcodeName[811:816]: OpcodeLDHCA,
-	_OpcodeName[816:820]: OpcodeANDn,
-	_OpcodeName[820:825]: OpcodeLDnnA,
-	_OpcodeName[825:829]: OpcodeXORn,
-	_OpcodeName[829:834]: OpcodeLDHAn,
-	_OpcodeName[834:839]: OpcodeLDAnn,
-	_OpcodeName[839:841]: OpcodeDI,
-	_OpcodeName[841:844]: OpcodeORn,
-	_OpcodeName[844:846]: OpcodeEI,
-	_OpcodeName[846:849]: OpcodeCPn,
+	_OpcodeName[742:747]: OpcodeRETNZ,
+	_OpcodeName[747:752]: OpcodePOPBC,
+	_OpcodeName[752:758]: OpcodeJPNZnn,
+	_OpcodeName[758:762]: OpcodeJPnn,
+	_OpcodeName[762:768]: OpcodePUSHBC,
+	_OpcodeName[768:772]: OpcodeADDn,
+	_OpcodeName[772:776]: OpcodeRETZ,
+	_OpcodeName[776:779]: OpcodeRET,
+	_OpcodeName[779:784]: OpcodeJPZnn,
+	_OpcodeName[784:786]: OpcodeCB,
+	_OpcodeName[786:792]: OpcodeCALLnn,
+	_OpcodeName[792:796]: OpcodeADCn,
+	_OpcodeName[796:801]: OpcodeRETNC,
+	_OpcodeName[801:805]: OpcodeRETC,
+	_OpcodeName[805:809]: OpcodeRETI,
+	_OpcodeName[809:814]: OpcodeJPCnn,
+	_OpcodeName[814:820]: OpcodeJPNCnn,
+	_OpcodeName[820:824]: OpcodeSUBn,
+	_OpcodeName[824:828]: OpcodeSBCn,
+	_OpcodeName[828:833]: OpcodeLDHnA,
+	_OpcodeName[833:838]: OpcodeLDHCA,
+	_OpcodeName[838:842]: OpcodeANDn,
+	_OpcodeName[842:847]: OpcodeLDnnA,
+	_OpcodeName[847:851]: OpcodeXORn,
+	_OpcodeName[851:856]: OpcodeLDHAn,
+	_OpcodeName[856:861]: OpcodeLDAnn,
+	_OpcodeName[861:863]: OpcodeDI,
+	_OpcodeName[863:866]: OpcodeORn,
+	_OpcodeName[866:868]: OpcodeEI,
+	_OpcodeName[868:871]: OpcodeCPn,
 }
 
 // ParseOpcode attempts to convert a string to a Opcode.

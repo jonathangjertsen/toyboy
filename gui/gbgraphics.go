@@ -340,23 +340,12 @@ func oambuffer(vram []uint8, buf model.OAMBuffer) []model.Color {
 }
 
 func oam(vram []uint8, oam []uint8) []model.Color {
-	fb := make([]model.Color, 8*8*10*4)
-	objects := make([]model.Sprite, 40)
-	for i := 0; i < 40; i += 4 {
-		objects = append(objects, model.DecodeSprite(oam[i*4:(i+1)*4]))
+	tiles := make([]model.Tile, 40)
+	for i := 0; i < 40; i++ {
+		obj := model.DecodeSprite(oam[i*4 : (i+1)*4])
+		tileIndex := int(obj.TileIndex)
+		tile := model.DecodeTile(vram[16*tileIndex : 16*(tileIndex+1)])
+		tiles[i] = tile
 	}
-	for tileRow := range 4 {
-		for tileCol := range 10 {
-			obj := objects[tileRow*10+tileCol]
-			tileIndex := int(obj.TileIndex)
-			tile := model.DecodeTile(vram[16*tileIndex : 16*(tileIndex+1)])
-			for rowInTile := range 8 {
-				for colInTile := range 8 {
-					col := tile[rowInTile][colInTile].Color
-					fb[(tileRow*8+rowInTile)*(8*10)+tileCol*8+colInTile] = col
-				}
-			}
-		}
-	}
-	return fb
+	return placetiles(tiles, 10, 4)
 }

@@ -1,9 +1,14 @@
-all: emulator rom-hello-world rom-empty rom-unbricked
+all: emulator rom-hello-world rom-empty rom-unbricked disassembler
 
 .PHONY: run
 
-emulator:
+gen:
 	go generate ./...
+
+disassembler: gen
+	go build -o bin/disassembler github.com/jonathangjertsen/toyboy/cmd/disassembler
+
+emulator: gen
 	go build -o bin/emulator github.com/jonathangjertsen/toyboy/cmd/emulator
 
 rom-empty:
@@ -30,3 +35,6 @@ install-gio:
 
 run: emulator rom-empty rom-hello-world rom-unbricked
 	APP_ENV=development bin/emulator
+
+run-dis: disassembler
+	bin/disassembler

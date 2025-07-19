@@ -19,6 +19,7 @@ type ClockRT struct {
 	divided         []clockRTDivided
 	Onpanic         func()
 	pauseAfterCycle atomic.Int32
+	Running         atomic.Bool
 }
 
 // Executes the function in the clocks' goroutine
@@ -67,6 +68,7 @@ func (clockRT *ClockRT) Divide(top uint64) *Clock {
 }
 
 func (clockRT *ClockRT) wait() {
+	clockRT.Running.Store(false)
 	for {
 		resumed := false
 		select {
@@ -81,6 +83,7 @@ func (clockRT *ClockRT) wait() {
 			break
 		}
 	}
+	clockRT.Running.Store(true)
 }
 
 func (clockRT *ClockRT) setFreq(f float64) {
@@ -119,6 +122,7 @@ func (clockRT *ClockRT) run(initFreq float64) {
 		case job := <-clockRT.jobs:
 			job()
 		case <-clockRT.stop:
+			clockRT.Running.Store(false)
 			exit = true
 		}
 		if exit {

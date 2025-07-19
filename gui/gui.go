@@ -35,6 +35,7 @@ type GUI struct {
 	KeyboardControl *KeyboardControl
 
 	SpeedInput      widget.Editor
+	BreakPCInput    widget.Editor
 	BreakXInput     widget.Editor
 	BreakYInput     widget.Editor
 	StepCyclesInput widget.Editor
@@ -44,15 +45,17 @@ type GUI struct {
 	SoftResetButton widget.Clickable
 	Registers       widget.Label
 
-	VRAMScroll      widget.List
-	HRAMScroll      widget.List
-	OAMScroll       widget.List
-	OAMAttrScroll   widget.List
-	ProgramScroll   widget.List
-	RegistersScroll widget.List
-	PPUScroll       widget.List
-	APUScroll       widget.List
-	TimingScroll    widget.List
+	VRAMScroll         widget.List
+	WRAMScroll         widget.List
+	HRAMScroll         widget.List
+	OAMScroll          widget.List
+	OAMAttrScroll      widget.List
+	ProgramScroll      widget.List
+	RewindBufferScroll widget.List
+	RegistersScroll    widget.List
+	PPUScroll          widget.List
+	APUScroll          widget.List
+	TimingScroll       widget.List
 
 	TargetPercent float64
 	LastFrameCPS  float64
@@ -118,8 +121,10 @@ func (gui *GUI) Run() {
 	gui.BreakXInput.Filter = "0123456789"
 	gui.BreakYInput.Filter = "0123456789"
 	gui.VRAMScroll.List = layout.List{Axis: layout.Vertical}
+	gui.WRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.HRAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.ProgramScroll.List = layout.List{Axis: layout.Vertical}
+	gui.RewindBufferScroll.List = layout.List{Axis: layout.Vertical}
 	gui.OAMScroll.List = layout.List{Axis: layout.Vertical}
 	gui.OAMAttrScroll.List = layout.List{Axis: layout.Vertical}
 	gui.RegistersScroll.List = layout.List{Axis: layout.Vertical}
@@ -244,12 +249,28 @@ func (gui *GUI) Render(gtx C) {
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
+						Rigid(gui.label("WRAM")),
+						Rigid(gui.mem(cd.PrintWRAM, &gui.WRAMScroll, unit.Dp(660))),
+					)
+				}),
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
 						Rigid(gui.label("Program")),
 						Rigid(gui.mem(cd.PrintProgram, &gui.ProgramScroll, unit.Dp(200))),
 						Rigid(gui.label("HRAM")),
 						Rigid(gui.mem(cd.PrintHRAM, &gui.HRAMScroll, unit.Dp(200))),
 						Rigid(gui.label("OAM")),
 						Rigid(gui.mem(cd.PrintOAM, &gui.OAMScroll, unit.Dp(220))),
+					)
+				}),
+				Rigid(func(gtx C) D {
+					return Column(
+						gtx,
+						Rigid(gui.label("Last executed instructions")),
+						Rigid(gui.mem(cd.PrintRewindBuffer, &gui.RewindBufferScroll, unit.Dp(300))),
+						Rigid(gui.label("Disassembly")),
+						Rigid(gui.mem(cd.PrintDisassembly, &gui.RewindBufferScroll, unit.Dp(500))),
 					)
 				}),
 				Rigid(func(gtx C) D {
@@ -303,6 +324,14 @@ func (gui *GUI) Render(gtx C) {
 						Rigid(func(gtx C) D {
 							vp := gui.GB.GetViewport()
 							pixels := vp.Flatten()
+							var highlights []Highlight
+							if !gui.GB.CLK.Running.Load() {
+								highlights = append(highlights, Highlight{
+									BlockX: int(cd.PPU.PixelShifter.X) / 8,
+									BlockY: int(cd.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value) / 8,
+									Color:  color.RGBA{R: 255, A: 128},
+								})
+							}
 							return gui.GBGraphics(
 								gtx,
 								160,
@@ -310,16 +339,7 @@ func (gui *GUI) Render(gtx C) {
 								pixels[:],
 								4,
 								confViewport,
-								nil,
-								/*
-									[]Highlight{
-										{
-											BlockX: int(cd.PPU.PixelShifter.X) / 8,
-											BlockY: int(cd.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value) / 8,
-											Color:  color.RGBA{R: 255, A: 128},
-										},
-									},
-								*/
+								highlights,
 							)
 						}),
 						Rigid(gui.label(fmt.Sprintf("Joypad"))),
@@ -451,7 +471,7 @@ func (gui *GUI) Render(gtx C) {
 		Rigid(func(gtx C) D {
 			return Row(
 				gtx,
-				Rigid(gui.label(fmt.Sprintf("Running=%v", gui.GB.Running))),
+				Rigid(gui.label(fmt.Sprintf("Running=%v", gui.GB.CLK.Running.Load()))),
 				Rigid(func(gtx C) D {
 					return Column(
 						gtx,
@@ -468,6 +488,23 @@ func (gui *GUI) Render(gtx C) {
 												gui.Config.SystemClock.Frequency = targetPercent * 4194304.0 / 100
 												gui.GB.CLK.SetFrequency(gui.Config.SystemClock.Frequency)
 											}
+										}
+									})
+								}),
+							)
+						}),
+						Rigid(func(gtx C) D {
+							return Row(
+								gtx,
+								Rigid(gui.label("CPU breakpoint")),
+								Rigid(func(gtx C) D {
+									return gui.NumberInput(gtx, &gui.BreakPCInput, "breakPC", func(text string) {
+										breakPC, err := strconv.ParseInt(text, 10, 64)
+										if err != nil {
+											breakPC = -1
+										}
+										if gui.GB.Debugger.BreakPC.Load() != breakPC {
+											gui.GB.Debugger.BreakPC.Store(breakPC)
 										}
 									})
 								}),

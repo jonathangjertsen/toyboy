@@ -1,8 +1,7 @@
 package model
 
 type Gameboy struct {
-	Config  HWConfig
-	Running bool
+	Config HWConfig
 
 	CLK           *ClockRT
 	Debugger      *Debugger
@@ -15,12 +14,10 @@ type Gameboy struct {
 
 func (gb *Gameboy) Start() {
 	gb.CLK.Start()
-	gb.Running = true
 }
 
 func (gb *Gameboy) Pause() {
 	gb.CLK.Pause()
-	gb.Running = false
 }
 
 func (gb *Gameboy) Step() {
@@ -178,7 +175,7 @@ func (gb *Gameboy) init() {
 	bus.CartridgeSlot = &cartridgeSlot
 	bus.Joypad = joypad
 
-	cpu := NewCPU(cpuClock, bus)
+	cpu := NewCPU(cpuClock, bus, debugger)
 
 	gb.CLK = clk
 	gb.PHI = cpuClock

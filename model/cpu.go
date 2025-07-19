@@ -8,9 +8,9 @@ type Interrupts struct {
 }
 
 type CPU struct {
-	PHI *Clock
-
-	Bus *Bus
+	PHI      *Clock
+	Bus      *Bus
+	Debugger *Debugger
 
 	Regs       RegisterFile
 	Interrupts Interrupts
@@ -20,30 +20,39 @@ type CPU struct {
 	machineCycle int
 
 	clockCycle                 Cycle
-	inCoreDump                 bool
 	wroteToAddressBusThisCycle bool
 
 	handlers [256]InstructionHandling
 
-	rewindBuffer    [16]ExecLogEntry
+	rewindBuffer    []ExecLogEntry
 	rewindBufferIdx int
+
+	nopCount    int
+	nopCountMax int
+
+	lastBranchResult int
 }
 
 func (cpu *CPU) Reset() {
 	cpu.Regs = RegisterFile{}
+	cpu.Regs.SP = 0xfffe
 	cpu.Interrupts = Interrupts{}
 	cpu.CBOp = CBOp{}
 	cpu.machineCycle = 0
 	cpu.clockCycle = Cycle{}
-	cpu.inCoreDump = false
+	cpu.Bus.Address = 0
+	cpu.Bus.Data = 0
+	cpu.Bus.inCoreDump = false
 	cpu.wroteToAddressBusThisCycle = false
-	cpu.rewindBuffer = [16]ExecLogEntry{}
+	clear(cpu.rewindBuffer)
 	cpu.rewindBufferIdx = 0
+	cpu.nopCount = 0
 }
 
 type ExecLogEntry struct {
-	PC     uint16
-	Opcode Opcode
+	PC           uint16
+	Opcode       Opcode
+	BranchResult int
 }
 
 func (cpu *CPU) Sync(f func()) {
@@ -151,6 +160,7 @@ func (cpu *CPU) SetPC(pc uint16) {
 		panic("SetPC must be called on rising edge")
 	}
 	cpu.Regs.PC = pc
+	cpu.Debugger.SetPC(pc)
 }
 
 func (cpu *CPU) IncPC() {
@@ -158,15 +168,20 @@ func (cpu *CPU) IncPC() {
 		panic("IncPC must be called on rising edge")
 	}
 	cpu.Regs.PC++
+	cpu.Debugger.SetPC(cpu.Regs.PC)
 }
 
 func NewCPU(
 	phi *Clock,
 	bus *Bus,
+	debugger *Debugger,
 ) *CPU {
 	cpu := &CPU{
-		PHI: phi,
-		Bus: bus,
+		PHI:          phi,
+		Bus:          bus,
+		Debugger:     debugger,
+		nopCountMax:  4,
+		rewindBuffer: make([]ExecLogEntry, 16),
 	}
 	cpu.Reset()
 	cpu.handlers = handlers(cpu)
@@ -184,6 +199,22 @@ func (cpu *CPU) fsm(c Cycle) {
 	var fetch bool
 	if c.C > 0 {
 		opcode := cpu.Regs.IR
+
+		// Detect runaway code
+		nopCheck := opcode == OpcodeNop
+		if cpu.Regs.PC < 0x100 {
+			// In unmapped bootrom, allow NOPs here because soft reset puts PC at 0
+			nopCheck = false
+		}
+		if nopCheck {
+			cpu.nopCount++
+			if cpu.nopCount > cpu.nopCountMax {
+				panic("max nop count exceeded")
+			}
+		} else {
+			cpu.nopCount = 0
+		}
+
 		if handler := cpu.handlers[opcode]; handler != nil {
 			e := edge{cpu.machineCycle, c.Falling}
 			//cpu.Debug("Handler", "e=%v", e)
@@ -208,11 +239,18 @@ func (cpu *CPU) fsm(c Cycle) {
 			cpu.Regs.IR = Opcode(cpu.Bus.Data)
 			//cpu.Debug("ExecBegin", "%s", cpu.Regs.IR)
 			//cpu.Debug(fmt.Sprintf("ExecBegin%s", cpu.Regs.IR), "")
-
+			prevIdx := cpu.rewindBufferIdx
+			if prevIdx > 0 {
+				prevIdx--
+			} else {
+				prevIdx = len(cpu.rewindBuffer) - 1
+			}
+			cpu.rewindBuffer[prevIdx].BranchResult = cpu.lastBranchResult
 			cpu.rewindBuffer[cpu.rewindBufferIdx] = ExecLogEntry{
 				PC:     cpu.Regs.PC - 1,
 				Opcode: cpu.Regs.IR,
 			}
+			cpu.lastBranchResult = 0
 			cpu.rewindBufferIdx++
 			if cpu.rewindBufferIdx >= len(cpu.rewindBuffer) {
 				cpu.rewindBufferIdx = 0
@@ -224,7 +262,7 @@ func (cpu *CPU) fsm(c Cycle) {
 }
 
 func (cpu *CPU) writeAddressBus(addr uint16) {
-	if !cpu.inCoreDump {
+	if !cpu.Bus.inCoreDump {
 		if cpu.clockCycle.Falling {
 			panic("writeAddressBus must be called on rising edge")
 		}
