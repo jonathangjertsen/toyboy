@@ -39,7 +39,7 @@ func (di *DisInstruction) Asm() string {
 		return "LD (HL-), A"
 	case OpcodeLDHLn:
 		return fmt.Sprintf("LD (HL), $%02xh", di.Raw[1])
-	case OpcodeRET, OpcodeNop, OpcodeRLA:
+	case OpcodeRET, OpcodeNop, OpcodeRLA, OpcodeDAA:
 		return str
 	case OpcodeRETZ, OpcodeRETC:
 		return fmt.Sprintf("%s %s", str[:ln-1], str[ln-1:])

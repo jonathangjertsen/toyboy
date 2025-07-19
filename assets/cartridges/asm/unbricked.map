@@ -1,43 +1,45 @@
 SUMMARY:
-	ROM0: 1600 bytes used / 14784 free
-	WRAM0: 5 bytes used / 4091 free
+	ROM0: 1804 bytes used / 14580 free
+	WRAM0: 6 bytes used / 4090 free
 
 ROM0 bank #0:
 	EMPTY: $0000-$00ff ($0100 bytes)
-	SECTION: $0100-$073f ($0640 bytes) ["Header"]
+	SECTION: $0100-$080b ($070c bytes) ["Header"]
 	         $0150 = EntryPoint
 	         $0150 = WaitVBlank
 	         $0193 = ClearOam
-	         $01d5 = Main
-	         $01dd = WaitVBlank2
-	         $01fb = BounceOnTop
-	         $0219 = BounceOnRight
-	         $0237 = BounceOnLeft
-	         $0255 = BounceOnBottom
-	         $0273 = BounceDone
-	         $0296 = PaddleBounceDone
-	         $0299 = CheckLeft
-	         $02a1 = Left
-	         $02b0 = CheckRight
-	         $02b8 = Right
-	         $02c7 = GetTileByPixel
-	         $02e0 = IsWallTile
-	         $02f5 = CheckAndHandleBrick
-	         $02ff = CheckAndHandleBrickRight
-	         $0308 = Input
-	         $0328 = Input.onenibble
-	         $0335 = Input.knownret
-	         $0336 = Memcopy
-	         $0340 = Tiles
-	         $04e0 = TilesEnd
-	         $04e0 = Tilemap
-	         $0720 = TilemapEnd
-	         $0720 = Paddle
-	         $0730 = PaddleEnd
-	         $0730 = Ball
-	         $0740 = BallEnd
-	EMPTY: $0740-$3fff ($38c0 bytes)
-	TOTAL EMPTY: $39c0 bytes
+	         $01d8 = Main
+	         $01e0 = WaitVBlank2
+	         $01fe = BounceOnTop
+	         $021c = BounceOnRight
+	         $023a = BounceOnLeft
+	         $0258 = BounceOnBottom
+	         $0276 = BounceDone
+	         $0299 = PaddleBounceDone
+	         $029c = CheckLeft
+	         $02a4 = Left
+	         $02b3 = CheckRight
+	         $02bb = Right
+	         $02ca = GetTileByPixel
+	         $02e3 = IsWallTile
+	         $02f8 = IncreaseScorePackedBCD
+	         $0304 = UpdateScoreBoard
+	         $031b = CheckAndHandleBrick
+	         $0328 = CheckAndHandleBrickRight
+	         $0334 = Input
+	         $0354 = Input.onenibble
+	         $0361 = Input.knownret
+	         $0362 = Memcopy
+	         $036c = Tiles
+	         $05ac = TilesEnd
+	         $05ac = Tilemap
+	         $07ec = TilemapEnd
+	         $07ec = Paddle
+	         $07fc = PaddleEnd
+	         $07fc = Ball
+	         $080c = BallEnd
+	EMPTY: $080c-$3fff ($37f4 bytes)
+	TOTAL EMPTY: $38f4 bytes
 
 WRAM0 bank #0:
 	SECTION: $c000-$c001 ($0002 bytes) ["Ball Data"]
@@ -46,7 +48,9 @@ WRAM0 bank #0:
 	SECTION: $c002-$c003 ($0002 bytes) ["Input Variables"]
 	         $c002 = wCurKeys
 	         $c003 = wNewKeys
-	SECTION: $c004-$c004 ($0001 byte) ["Counter"]
-	         $c004 = wFrameCounter
-	EMPTY: $c005-$cfff ($0ffb bytes)
-	TOTAL EMPTY: $0ffb bytes
+	SECTION: $c004-$c004 ($0001 byte) ["Score"]
+	         $c004 = wScore
+	SECTION: $c005-$c005 ($0001 byte) ["Counter"]
+	         $c005 = wFrameCounter
+	EMPTY: $c006-$cfff ($0ffa bytes)
+	TOTAL EMPTY: $0ffa bytes

@@ -158,3 +158,23 @@ func RRCA(a uint8) ALUResult {
 func SWAP(a uint8) ALUResult {
 	return ALUResult{Value: ((a & 0x0f) << 4) | ((a & 0xf0) >> 4)}
 }
+
+func DAA(a uint8, c, n, h bool) ALUResult {
+	if n {
+		if c {
+			a -= 0x60
+		}
+		if h {
+			a -= 0x6
+		}
+	} else {
+		if c || a > 0x90 {
+			a += 0x60
+			c = true
+		}
+		if h || ((a & 0x0f) > 0x09) {
+			a += 0x6
+		}
+	}
+	return ALUResult{Value: a, C: c, N: n}
+}

@@ -38,6 +38,7 @@ package model
 // INCH     = 0x24,
 // DECH     = 0x25,
 // LDHn     = 0x26,
+// DAA      = 0x27,
 // JRZe     = 0x28,
 // ADDHLHL  = 0x29,
 // DECHL    = 0x2b,
@@ -341,6 +342,8 @@ var instSize = [256]uint16{
 
 	OpcodeLDHCA: 1,
 
+	OpcodeDAA: 1,
+
 	OpcodeCPA:  1,
 	OpcodeCPB:  1,
 	OpcodeCPC:  1,
@@ -608,20 +611,39 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeADCE:  cpu.adcreg(&cpu.Regs.E),
 		OpcodeADCH:  cpu.adcreg(&cpu.Regs.H),
 		OpcodeADCL:  cpu.adcreg(&cpu.Regs.L),
-		OpcodeDECA:  cpu.decreg(&cpu.Regs.A),
-		OpcodeDECB:  cpu.decreg(&cpu.Regs.B),
-		OpcodeDECC:  cpu.decreg(&cpu.Regs.C),
-		OpcodeDECD:  cpu.decreg(&cpu.Regs.D),
-		OpcodeDECE:  cpu.decreg(&cpu.Regs.E),
-		OpcodeDECH:  cpu.decreg(&cpu.Regs.H),
-		OpcodeDECL:  cpu.decreg(&cpu.Regs.L),
-		OpcodeINCA:  cpu.increg(&cpu.Regs.A),
-		OpcodeINCB:  cpu.increg(&cpu.Regs.B),
-		OpcodeINCC:  cpu.increg(&cpu.Regs.C),
-		OpcodeINCD:  cpu.increg(&cpu.Regs.D),
-		OpcodeINCE:  cpu.increg(&cpu.Regs.E),
-		OpcodeINCH:  cpu.increg(&cpu.Regs.H),
-		OpcodeINCL:  cpu.increg(&cpu.Regs.L),
+		OpcodeADCHL: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.GetHL())
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.Bus.Data
+			case edge{2, false}:
+				cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.TempZ, cpu.Regs.GetFlagC()))
+				return true
+			case edge{2, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeDAA: cpu.singleCycle(func() {
+			cpu.Regs.SetFlagsAndA(DAA(cpu.Regs.A, cpu.Regs.GetFlagC(), cpu.Regs.GetFlagN(), cpu.Regs.GetFlagH()))
+		}),
+		OpcodeDECA: cpu.decreg(&cpu.Regs.A),
+		OpcodeDECB: cpu.decreg(&cpu.Regs.B),
+		OpcodeDECC: cpu.decreg(&cpu.Regs.C),
+		OpcodeDECD: cpu.decreg(&cpu.Regs.D),
+		OpcodeDECE: cpu.decreg(&cpu.Regs.E),
+		OpcodeDECH: cpu.decreg(&cpu.Regs.H),
+		OpcodeDECL: cpu.decreg(&cpu.Regs.L),
+		OpcodeINCA: cpu.increg(&cpu.Regs.A),
+		OpcodeINCB: cpu.increg(&cpu.Regs.B),
+		OpcodeINCC: cpu.increg(&cpu.Regs.C),
+		OpcodeINCD: cpu.increg(&cpu.Regs.D),
+		OpcodeINCE: cpu.increg(&cpu.Regs.E),
+		OpcodeINCH: cpu.increg(&cpu.Regs.H),
+		OpcodeINCL: cpu.increg(&cpu.Regs.L),
 		OpcodeDI: cpu.singleCycle(func() {
 			cpu.Interrupts.setIMENextCycle = false
 			cpu.Interrupts.IME = false
