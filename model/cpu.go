@@ -56,9 +56,6 @@ type ExecLogEntry struct {
 	BranchResult int
 }
 
-func (cpu *CPU) Sync(f func()) {
-}
-
 func (cpu *CPU) SetHL(v uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetHL must be called on rising edge")
@@ -86,6 +83,9 @@ func (cpu *CPU) SetDE(v uint16) {
 func (cpu *CPU) SetSP(v uint16) {
 	if cpu.clockCycle.Falling {
 		panic("SetSP must be called on rising edge")
+	}
+	if v == 0 {
+		panic("stack underflow")
 	}
 	cpu.Regs.SP = v
 }

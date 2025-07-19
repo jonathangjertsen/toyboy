@@ -9,12 +9,14 @@ package model
 // INCB     = 0x04,
 // DECB     = 0x05,
 // LDBn     = 0x06,
+// RLCA     = 0x07,
 // ADDHLBC  = 0x09,
 // LDABC    = 0x0a,
 // DECBC    = 0x0b,
 // INCC     = 0x0c,
 // DECC     = 0x0d,
 // LDCn     = 0x0e,
+// RRCA     = 0x0f,
 // LDDEnn   = 0x11,
 // INCDE    = 0x13,
 // INCD     = 0x14,
@@ -28,6 +30,7 @@ package model
 // INCE     = 0x1c,
 // DECE     = 0x1d,
 // LDEn     = 0x1e,
+// RRA      = 0x1f,
 // JRNZe    = 0x20,
 // LDHLnn   = 0x21,
 // LDHLAInc = 0x22,
@@ -469,6 +472,9 @@ var instSize = [256]uint16{
 	OpcodePUSHBC: 1,
 	OpcodePOPBC:  1,
 	OpcodeRLA:    1,
+	OpcodeRLCA:   1,
+	OpcodeRRA:    1,
+	OpcodeRRCA:   1,
 	OpcodeRET:    1,
 	OpcodeRETZ:   1,
 	OpcodeRETNZ:  1,
@@ -489,8 +495,7 @@ var instSize = [256]uint16{
 
 func handlers(cpu *CPU) [256]InstructionHandling {
 	return [256]InstructionHandling{
-		OpcodeNop: cpu.singleCycle(func() {
-		}),
+		OpcodeNop:   cpu.singleCycle(func() {}),
 		OpcodeLDAA:  cpu.ld(&cpu.Regs.A, &cpu.Regs.A),
 		OpcodeLDAB:  cpu.ld(&cpu.Regs.A, &cpu.Regs.B),
 		OpcodeLDAC:  cpu.ld(&cpu.Regs.A, &cpu.Regs.C),
@@ -547,89 +552,78 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeLDLH:  cpu.ld(&cpu.Regs.L, &cpu.Regs.H),
 		OpcodeLDLL:  cpu.ld(&cpu.Regs.L, &cpu.Regs.L),
 		OpcodeLDLHL: cpu.ldrhl(&cpu.Regs.L),
-		OpcodeRLA: cpu.singleCycle(func() {
-			a := cpu.Regs.A
-			bit7 := a & 0x80
-			a <<= 1
-			if cpu.Regs.GetFlagC() {
-				a |= 0x01
-			}
-			cpu.Regs.SetFlagZ(false)
-			cpu.Regs.SetFlagN(false)
-			cpu.Regs.SetFlagH(false)
-			cpu.Regs.SetFlagC(bit7 != 0)
-			cpu.Regs.A = a
-		}),
-		OpcodeORA:  cpu.orreg(&cpu.Regs.A),
-		OpcodeORB:  cpu.orreg(&cpu.Regs.B),
-		OpcodeORC:  cpu.orreg(&cpu.Regs.C),
-		OpcodeORD:  cpu.orreg(&cpu.Regs.D),
-		OpcodeORE:  cpu.orreg(&cpu.Regs.E),
-		OpcodeORH:  cpu.orreg(&cpu.Regs.H),
-		OpcodeORL:  cpu.orreg(&cpu.Regs.L),
-		OpcodeANDA: cpu.andreg(&cpu.Regs.A),
-		OpcodeANDB: cpu.andreg(&cpu.Regs.B),
-		OpcodeANDC: cpu.andreg(&cpu.Regs.C),
-		OpcodeANDD: cpu.andreg(&cpu.Regs.D),
-		OpcodeANDE: cpu.andreg(&cpu.Regs.E),
-		OpcodeANDH: cpu.andreg(&cpu.Regs.H),
-		OpcodeANDL: cpu.andreg(&cpu.Regs.L),
-		OpcodeXORA: cpu.xorreg(&cpu.Regs.A),
-		OpcodeXORB: cpu.xorreg(&cpu.Regs.B),
-		OpcodeXORC: cpu.xorreg(&cpu.Regs.C),
-		OpcodeXORD: cpu.xorreg(&cpu.Regs.D),
-		OpcodeXORE: cpu.xorreg(&cpu.Regs.E),
-		OpcodeXORH: cpu.xorreg(&cpu.Regs.H),
-		OpcodeXORL: cpu.xorreg(&cpu.Regs.L),
-		OpcodeSUBA: cpu.subreg(&cpu.Regs.A),
-		OpcodeSUBB: cpu.subreg(&cpu.Regs.B),
-		OpcodeSUBC: cpu.subreg(&cpu.Regs.C),
-		OpcodeSUBD: cpu.subreg(&cpu.Regs.D),
-		OpcodeSUBE: cpu.subreg(&cpu.Regs.E),
-		OpcodeSUBH: cpu.subreg(&cpu.Regs.H),
-		OpcodeSUBL: cpu.subreg(&cpu.Regs.L),
-		OpcodeCPA:  cpu.cpreg(&cpu.Regs.A),
-		OpcodeCPB:  cpu.cpreg(&cpu.Regs.B),
-		OpcodeCPC:  cpu.cpreg(&cpu.Regs.C),
-		OpcodeCPD:  cpu.cpreg(&cpu.Regs.D),
-		OpcodeCPE:  cpu.cpreg(&cpu.Regs.E),
-		OpcodeCPH:  cpu.cpreg(&cpu.Regs.H),
-		OpcodeCPL:  cpu.cpreg(&cpu.Regs.L),
-		OpcodeADDA: cpu.addreg(&cpu.Regs.A),
-		OpcodeADDB: cpu.addreg(&cpu.Regs.B),
-		OpcodeADDC: cpu.addreg(&cpu.Regs.C),
-		OpcodeADDD: cpu.addreg(&cpu.Regs.D),
-		OpcodeADDE: cpu.addreg(&cpu.Regs.E),
-		OpcodeADDH: cpu.addreg(&cpu.Regs.H),
-		OpcodeADDL: cpu.addreg(&cpu.Regs.L),
-		OpcodeADCA: cpu.adcreg(&cpu.Regs.A),
-		OpcodeADCB: cpu.adcreg(&cpu.Regs.B),
-		OpcodeADCC: cpu.adcreg(&cpu.Regs.C),
-		OpcodeADCD: cpu.adcreg(&cpu.Regs.D),
-		OpcodeADCE: cpu.adcreg(&cpu.Regs.E),
-		OpcodeADCH: cpu.adcreg(&cpu.Regs.H),
-		OpcodeADCL: cpu.adcreg(&cpu.Regs.L),
-		OpcodeDECA: cpu.decreg(&cpu.Regs.A),
-		OpcodeDECB: cpu.decreg(&cpu.Regs.B),
-		OpcodeDECC: cpu.decreg(&cpu.Regs.C),
-		OpcodeDECD: cpu.decreg(&cpu.Regs.D),
-		OpcodeDECE: cpu.decreg(&cpu.Regs.E),
-		OpcodeDECH: cpu.decreg(&cpu.Regs.H),
-		OpcodeDECL: cpu.decreg(&cpu.Regs.L),
-		OpcodeINCA: cpu.increg(&cpu.Regs.A),
-		OpcodeINCB: cpu.increg(&cpu.Regs.B),
-		OpcodeINCC: cpu.increg(&cpu.Regs.C),
-		OpcodeINCD: cpu.increg(&cpu.Regs.D),
-		OpcodeINCE: cpu.increg(&cpu.Regs.E),
-		OpcodeINCH: cpu.increg(&cpu.Regs.H),
-		OpcodeINCL: cpu.increg(&cpu.Regs.L),
+		OpcodeRLA:   cpu.singleCycle(func() { cpu.Regs.SetFlagsAndA(RLA(cpu.Regs.A, cpu.Regs.GetFlagC())) }),
+		OpcodeRRA:   cpu.singleCycle(func() { cpu.Regs.SetFlagsAndA(RRA(cpu.Regs.A, cpu.Regs.GetFlagC())) }),
+		OpcodeRLCA:  cpu.singleCycle(func() { cpu.Regs.SetFlagsAndA(RLCA(cpu.Regs.A)) }),
+		OpcodeRRCA:  cpu.singleCycle(func() { cpu.Regs.SetFlagsAndA(RRCA(cpu.Regs.A)) }),
+		OpcodeORA:   cpu.orreg(&cpu.Regs.A),
+		OpcodeORB:   cpu.orreg(&cpu.Regs.B),
+		OpcodeORC:   cpu.orreg(&cpu.Regs.C),
+		OpcodeORD:   cpu.orreg(&cpu.Regs.D),
+		OpcodeORE:   cpu.orreg(&cpu.Regs.E),
+		OpcodeORH:   cpu.orreg(&cpu.Regs.H),
+		OpcodeORL:   cpu.orreg(&cpu.Regs.L),
+		OpcodeANDA:  cpu.andreg(&cpu.Regs.A),
+		OpcodeANDB:  cpu.andreg(&cpu.Regs.B),
+		OpcodeANDC:  cpu.andreg(&cpu.Regs.C),
+		OpcodeANDD:  cpu.andreg(&cpu.Regs.D),
+		OpcodeANDE:  cpu.andreg(&cpu.Regs.E),
+		OpcodeANDH:  cpu.andreg(&cpu.Regs.H),
+		OpcodeANDL:  cpu.andreg(&cpu.Regs.L),
+		OpcodeXORA:  cpu.xorreg(&cpu.Regs.A),
+		OpcodeXORB:  cpu.xorreg(&cpu.Regs.B),
+		OpcodeXORC:  cpu.xorreg(&cpu.Regs.C),
+		OpcodeXORD:  cpu.xorreg(&cpu.Regs.D),
+		OpcodeXORE:  cpu.xorreg(&cpu.Regs.E),
+		OpcodeXORH:  cpu.xorreg(&cpu.Regs.H),
+		OpcodeXORL:  cpu.xorreg(&cpu.Regs.L),
+		OpcodeSUBA:  cpu.subreg(&cpu.Regs.A),
+		OpcodeSUBB:  cpu.subreg(&cpu.Regs.B),
+		OpcodeSUBC:  cpu.subreg(&cpu.Regs.C),
+		OpcodeSUBD:  cpu.subreg(&cpu.Regs.D),
+		OpcodeSUBE:  cpu.subreg(&cpu.Regs.E),
+		OpcodeSUBH:  cpu.subreg(&cpu.Regs.H),
+		OpcodeSUBL:  cpu.subreg(&cpu.Regs.L),
+		OpcodeCPA:   cpu.cpreg(&cpu.Regs.A),
+		OpcodeCPB:   cpu.cpreg(&cpu.Regs.B),
+		OpcodeCPC:   cpu.cpreg(&cpu.Regs.C),
+		OpcodeCPD:   cpu.cpreg(&cpu.Regs.D),
+		OpcodeCPE:   cpu.cpreg(&cpu.Regs.E),
+		OpcodeCPH:   cpu.cpreg(&cpu.Regs.H),
+		OpcodeCPL:   cpu.cpreg(&cpu.Regs.L),
+		OpcodeADDA:  cpu.addreg(&cpu.Regs.A),
+		OpcodeADDB:  cpu.addreg(&cpu.Regs.B),
+		OpcodeADDC:  cpu.addreg(&cpu.Regs.C),
+		OpcodeADDD:  cpu.addreg(&cpu.Regs.D),
+		OpcodeADDE:  cpu.addreg(&cpu.Regs.E),
+		OpcodeADDH:  cpu.addreg(&cpu.Regs.H),
+		OpcodeADDL:  cpu.addreg(&cpu.Regs.L),
+		OpcodeADCA:  cpu.adcreg(&cpu.Regs.A),
+		OpcodeADCB:  cpu.adcreg(&cpu.Regs.B),
+		OpcodeADCC:  cpu.adcreg(&cpu.Regs.C),
+		OpcodeADCD:  cpu.adcreg(&cpu.Regs.D),
+		OpcodeADCE:  cpu.adcreg(&cpu.Regs.E),
+		OpcodeADCH:  cpu.adcreg(&cpu.Regs.H),
+		OpcodeADCL:  cpu.adcreg(&cpu.Regs.L),
+		OpcodeDECA:  cpu.decreg(&cpu.Regs.A),
+		OpcodeDECB:  cpu.decreg(&cpu.Regs.B),
+		OpcodeDECC:  cpu.decreg(&cpu.Regs.C),
+		OpcodeDECD:  cpu.decreg(&cpu.Regs.D),
+		OpcodeDECE:  cpu.decreg(&cpu.Regs.E),
+		OpcodeDECH:  cpu.decreg(&cpu.Regs.H),
+		OpcodeDECL:  cpu.decreg(&cpu.Regs.L),
+		OpcodeINCA:  cpu.increg(&cpu.Regs.A),
+		OpcodeINCB:  cpu.increg(&cpu.Regs.B),
+		OpcodeINCC:  cpu.increg(&cpu.Regs.C),
+		OpcodeINCD:  cpu.increg(&cpu.Regs.D),
+		OpcodeINCE:  cpu.increg(&cpu.Regs.E),
+		OpcodeINCH:  cpu.increg(&cpu.Regs.H),
+		OpcodeINCL:  cpu.increg(&cpu.Regs.L),
 		OpcodeDI: cpu.singleCycle(func() {
 			cpu.Interrupts.setIMENextCycle = false
 			cpu.Interrupts.IME = false
 		}),
-		OpcodeEI: cpu.singleCycle(func() {
-			cpu.Interrupts.setIMENextCycle = true
-		}),
+		OpcodeEI: cpu.singleCycle(func() { cpu.Interrupts.setIMENextCycle = true }),
 		OpcodeJRe: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
@@ -754,28 +748,28 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{2, false}:
 				if f() {
 					cpu.lastBranchResult = +1
-					cpu.SetSP(cpu.Regs.SP + 1)
 					cpu.writeAddressBus(cpu.Regs.SP)
+					cpu.SetSP(cpu.Regs.SP + 1)
 				} else {
 					cpu.lastBranchResult = -1
 					return true
 				}
 			case edge{2, true}:
 				if cpu.lastBranchResult == +1 {
-					cpu.Regs.TempW = cpu.Bus.Data
+					cpu.Regs.TempZ = cpu.Bus.Data
 				} else {
 					return true
 				}
 			case edge{3, false}:
 				if cpu.lastBranchResult == +1 {
-					cpu.SetSP(cpu.Regs.SP + 1)
 					cpu.writeAddressBus(cpu.Regs.SP)
+					cpu.SetSP(cpu.Regs.SP + 1)
 				} else {
 					panicv(e)
 				}
 			case edge{3, true}:
 				if cpu.lastBranchResult == +1 {
-					cpu.Regs.TempZ = cpu.Bus.Data
+					cpu.Regs.TempW = cpu.Bus.Data
 				} else {
 					panicv(e)
 				}
@@ -880,14 +874,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, false}:
 				cpu.writeAddressBus(cpu.GetHL())
 			case edge{1, true}:
-				data := cpu.Bus.Data
-				carry := uint16(cpu.Regs.A)+uint16(data) > 256
-				result := cpu.Regs.A + data
-				cpu.Regs.A = result
-				cpu.Regs.SetFlagZ(result == 0)
-				cpu.Regs.SetFlagN(false)
-				cpu.Regs.TODOFlagH()
-				cpu.Regs.SetFlagC(carry)
+				cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Bus.Data, false))
 			case edge{2, false}, edge{2, true}:
 				return true
 			default:
@@ -900,13 +887,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, false}:
 				cpu.writeAddressBus(cpu.GetHL())
 			case edge{1, true}:
-				data := cpu.Bus.Data
-				carry := data > cpu.Regs.A
-				result := cpu.Regs.A - data
-				cpu.Regs.SetFlagZ(result == 0)
-				cpu.Regs.SetFlagN(true)
-				cpu.Regs.TODOFlagH()
-				cpu.Regs.SetFlagC(carry)
+				cpu.Regs.SetFlags(SUB(cpu.Regs.A, cpu.Bus.Data, false))
 			case edge{2, false}, edge{2, true}:
 				return true
 			default:
@@ -960,44 +941,11 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			}
 			return false
 		},
-		OpcodeCPn: cpu.alun(func(imm uint8) {
-			carry := cpu.Regs.A < imm
-			result := cpu.Regs.A - imm
-			cpu.Regs.SetFlagZ(result == 0)
-			cpu.Regs.SetFlagN(true)
-			cpu.Regs.TODOFlagH()
-			cpu.Regs.SetFlagC(carry)
-		}),
-		OpcodeSUBn: cpu.alun(func(imm uint8) {
-			carry := cpu.Regs.A < imm
-			cpu.Regs.A -= imm
-			cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-			cpu.Regs.SetFlagN(true)
-			cpu.Regs.TODOFlagH()
-			cpu.Regs.SetFlagC(carry)
-		}),
-		OpcodeORn: cpu.alun(func(imm uint8) {
-			cpu.Regs.A |= imm
-			cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-			cpu.Regs.SetFlagN(false)
-			cpu.Regs.SetFlagH(false)
-			cpu.Regs.SetFlagC(false)
-		}),
-		OpcodeANDn: cpu.alun(func(imm uint8) {
-			cpu.Regs.A &= imm
-			cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-			cpu.Regs.SetFlagN(false)
-			cpu.Regs.SetFlagH(false)
-			cpu.Regs.SetFlagC(false)
-		}),
-		OpcodeADDn: cpu.alun(func(imm uint8) {
-			carry := uint16(cpu.Regs.A)+uint16(imm) > 0xff
-			cpu.Regs.A += imm
-			cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-			cpu.Regs.SetFlagN(false)
-			cpu.Regs.TODOFlagH()
-			cpu.Regs.SetFlagC(carry)
-		}),
+		OpcodeCPn:  cpu.alun(func(imm uint8) { cpu.Regs.SetFlags(SUB(cpu.Regs.A, imm, false)) }),
+		OpcodeSUBn: cpu.alun(func(imm uint8) { cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, imm, false)) }),
+		OpcodeORn:  cpu.alun(func(imm uint8) { cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, imm)) }),
+		OpcodeANDn: cpu.alun(func(imm uint8) { cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, imm)) }),
+		OpcodeADDn: cpu.alun(func(imm uint8) { cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, imm, false)) }),
 		OpcodeLDHnA: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
@@ -1094,28 +1042,21 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				}
 				switch cpu.CBOp.Op {
 				case CbRL:
-					bit7 := val & 0x80
-					val <<= 1
-					if cpu.Regs.GetFlagC() {
-						val |= 0x01
-					}
-					cpu.Regs.SetFlagZ(val == 0)
-					cpu.Regs.SetFlagN(false)
-					cpu.Regs.SetFlagH(false)
-					cpu.Regs.SetFlagC(bit7 != 0)
+					res := RL(val, cpu.Regs.GetFlagC())
+					val = res.Value
+					cpu.Regs.SetFlags(res)
+				case CbRR:
+					res := RR(val, cpu.Regs.GetFlagC())
+					val = res.Value
+					cpu.Regs.SetFlags(res)
 				case CbSRL:
-					bit0 := val & 1
-					val >>= 1
-					cpu.Regs.SetFlagZ(val == 0)
-					cpu.Regs.SetFlagN(false)
-					cpu.Regs.SetFlagH(false)
-					cpu.Regs.SetFlagC(bit0 != 0)
+					res := SRL(val)
+					val = res.Value
+					cpu.Regs.SetFlags(res)
 				case CbSWAP:
-					val = ((val & 0x0f) << 4) | ((val & 0xf0) >> 4)
-					cpu.Regs.SetFlagZ(val == 0)
-					cpu.Regs.SetFlagN(false)
-					cpu.Regs.SetFlagH(false)
-					cpu.Regs.SetFlagC(false)
+					res := SWAP(val)
+					val = res.Value
+					cpu.Regs.SetFlags(res)
 				case CbBit0:
 					cbbit(cpu, val, 0x01)
 				case CbBit1:
@@ -1274,97 +1215,65 @@ func (cpu *CPU) ld(dst *uint8, src *uint8) func(e edge) bool {
 
 func (cpu *CPU) andreg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		cpu.Regs.A &= *reg
-		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-		cpu.Regs.SetFlagN(false)
-		cpu.Regs.SetFlagH(true)
-		cpu.Regs.SetFlagC(false)
+		cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, *reg))
 	})
 }
 
 func (cpu *CPU) xorreg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		cpu.Regs.A ^= *reg
-		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-		cpu.Regs.SetFlagN(false)
-		cpu.Regs.SetFlagH(false)
-		cpu.Regs.SetFlagC(false)
+		cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, *reg))
 	})
 }
 
 func (cpu *CPU) orreg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		cpu.Regs.A |= *reg
-		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-		cpu.Regs.SetFlagN(false)
-		cpu.Regs.SetFlagH(false)
-		cpu.Regs.SetFlagC(false)
+		cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, *reg))
 	})
 }
 
 func (cpu *CPU) addreg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		carry := uint16(*reg)+uint16(cpu.Regs.A) > 256
-		cpu.Regs.A += *reg
-		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-		cpu.Regs.SetFlagN(false)
-		cpu.Regs.TODOFlagH()
-		cpu.Regs.SetFlagC(carry)
+		cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, *reg, false))
 	})
 }
 
 func (cpu *CPU) adcreg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		vCarry := 0
-		if cpu.Regs.GetFlagC() {
-			vCarry = 1
-		}
-		carry := uint16(*reg)+uint16(cpu.Regs.A)+uint16(vCarry) > 256
-		cpu.Regs.A += *reg + uint8(vCarry)
-		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-		cpu.Regs.SetFlagN(false)
-		cpu.Regs.TODOFlagH()
-		cpu.Regs.SetFlagC(carry)
+		cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, *reg, cpu.Regs.GetFlagC()))
 	})
 }
 
 func (cpu *CPU) subreg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		carry := *reg > cpu.Regs.A
-		cpu.Regs.A -= *reg
-		cpu.Regs.SetFlagZ(cpu.Regs.A == 0)
-		cpu.Regs.SetFlagN(true)
-		cpu.Regs.TODOFlagH()
-		cpu.Regs.SetFlagC(carry)
+		cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, *reg, false))
+	})
+}
+
+func (cpu *CPU) sbcreg(reg *uint8) func(e edge) bool {
+	return cpu.singleCycle(func() {
+		cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, *reg, cpu.Regs.GetFlagC()))
 	})
 }
 
 func (cpu *CPU) cpreg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		carry := *reg > cpu.Regs.A
-		result := cpu.Regs.A - *reg
-		cpu.Regs.SetFlagZ(result == 0)
-		cpu.Regs.SetFlagN(true)
-		cpu.Regs.TODOFlagH()
-		cpu.Regs.SetFlagC(carry)
+		cpu.Regs.SetFlags(SUB(cpu.Regs.A, *reg, false))
 	})
 }
 
 func (cpu *CPU) decreg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		*reg -= 1
-		cpu.Regs.SetFlagZ(*reg == 0)
-		cpu.Regs.SetFlagN(true)
-		cpu.Regs.TODOFlagH()
+		result := SUB(*reg, 1, false)
+		*reg = result.Value
+		cpu.Regs.SetFlags(result)
 	})
 }
 
 func (cpu *CPU) increg(reg *uint8) func(e edge) bool {
 	return cpu.singleCycle(func() {
-		*reg += 1
-		cpu.Regs.SetFlagZ(*reg == 0)
-		cpu.Regs.SetFlagN(false)
-		cpu.Regs.TODOFlagH()
+		result := ADD(*reg, 1, false)
+		*reg = result.Value
+		cpu.Regs.SetFlags(result)
 	})
 }
 
@@ -1464,22 +1373,14 @@ func (cpu *CPU) addhlrr(hi, lo *uint8) func(e edge) bool {
 	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
-			carry := uint16(cpu.Regs.L)+uint16(*lo) > 256
-			cpu.Regs.L += *lo
-			cpu.Regs.SetFlagN(false)
-			cpu.Regs.TODOFlagH()
-			cpu.Regs.SetFlagC(carry)
+			result := ADD(cpu.Regs.L, *lo, false)
+			cpu.Regs.L = result.Value
+			cpu.Regs.SetFlags(result)
 		case edge{1, true}:
 		case edge{2, false}:
-			vCarry := 0
-			if cpu.Regs.GetFlagC() {
-				vCarry = 1
-			}
-			carry := uint16(cpu.Regs.H)+uint16(*hi)+uint16(vCarry) > 256
-			cpu.Regs.H += *hi + uint8(vCarry)
-			cpu.Regs.SetFlagN(false)
-			cpu.Regs.TODOFlagH()
-			cpu.Regs.SetFlagC(carry)
+			result := ADD(cpu.Regs.H, *hi, cpu.Regs.GetFlagC())
+			cpu.Regs.H = result.Value
+			cpu.Regs.SetFlags(result)
 			return true
 		case edge{2, true}:
 			return true

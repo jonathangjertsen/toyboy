@@ -1,0 +1,2 @@
+../unbricked.o: unbricked.asm
+../unbricked.o: hardware.inc

@@ -28,9 +28,9 @@ func (di *DisInstruction) Asm() string {
 	switch di.Opcode {
 	default:
 	case OpcodeLDAnn:
-		return fmt.Sprintf("%s %s, $%04xh", str[:ln-3], str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("%s %s, [$%04xh]", str[:ln-3], str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
 	case OpcodeLDBCnn, OpcodeLDDEnn, OpcodeLDHLnn, OpcodeLDSPnn:
-		return fmt.Sprintf("%s %s, $%04xh", str[:ln-4], str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("%s %s, [$%04xh]", str[:ln-4], str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
 	case OpcodeLDnnA:
 		return fmt.Sprintf("%s [$%04xh], %s", str[:ln-3], join16(di.Raw[2], di.Raw[1]), str[ln-1:])
 	case OpcodeLDHLAInc:

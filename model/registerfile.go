@@ -34,6 +34,18 @@ func (regs *RegisterFile) GetFlagZ() bool {
 	return v
 }
 
+func (regs *RegisterFile) SetFlags(res ALUResult) {
+	regs.SetFlagZ(res.Z())
+	regs.SetFlagC(res.C)
+	regs.SetFlagH(res.H)
+	regs.SetFlagN(res.N)
+}
+
+func (regs *RegisterFile) SetFlagsAndA(res ALUResult) {
+	regs.A = res.Value
+	regs.SetFlags(res)
+}
+
 func (regs *RegisterFile) SetFlagZ(v bool) {
 	regs.setFlag(0x80, v)
 }
@@ -52,14 +64,6 @@ func (regs *RegisterFile) GetFlagH() bool {
 
 func (regs *RegisterFile) SetFlagH(v bool) {
 	regs.setFlag(0x20, v)
-}
-
-func (regs *RegisterFile) TODOFlagN() {
-	// NotImplemented
-}
-
-func (regs *RegisterFile) TODOFlagH() {
-	// NotImplemented
 }
 
 func (regs *RegisterFile) GetFlagC() bool {

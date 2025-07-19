@@ -1,4 +1,6 @@
-all: emulator rom-hello-world rom-empty rom-unbricked disassembler
+all: emulator roms disassembler
+
+roms: rom-hello-world rom-empty rom-unbricked
 
 .PHONY: run
 
@@ -26,7 +28,7 @@ rom-hello-world:
 rom-unbricked:
 	cd assets/cartridges/asm;\
 	rgbasm -o unbricked.o unbricked.asm;\
-	rgblink -o ../unbricked.gb unbricked.o;\
+	rgblink -o ../unbricked.gb -m unbricked.map -n unbricked.sym unbricked.o;\
 	rgbfix -v -p 0xFF ../unbricked.gb
 
 install-gio:
