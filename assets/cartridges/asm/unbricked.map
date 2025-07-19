@@ -1,41 +1,43 @@
 SUMMARY:
-	ROM0: 1569 bytes used / 14815 free
+	ROM0: 1600 bytes used / 14784 free
 	WRAM0: 5 bytes used / 4091 free
 
 ROM0 bank #0:
 	EMPTY: $0000-$00ff ($0100 bytes)
-	SECTION: $0100-$0720 ($0621 bytes) ["Header"]
+	SECTION: $0100-$073f ($0640 bytes) ["Header"]
 	         $0150 = EntryPoint
 	         $0150 = WaitVBlank
 	         $0193 = ClearOam
 	         $01d5 = Main
 	         $01dd = WaitVBlank2
 	         $01fb = BounceOnTop
-	         $0216 = BounceOnRight
-	         $0231 = BounceOnLeft
-	         $024c = BounceOnBottom
-	         $0267 = BounceDone
-	         $028a = PaddleBounceDone
-	         $028d = CheckLeft
-	         $0295 = Left
-	         $02a4 = CheckRight
-	         $02ac = Right
-	         $02bb = GetTileByPixel
-	         $02d4 = IsWallTile
-	         $02e9 = UpdateKeys
-	         $0309 = UpdateKeys.onenibble
-	         $0316 = UpdateKeys.knownret
-	         $0317 = Memcopy
-	         $0321 = Tiles
-	         $04c1 = TilesEnd
-	         $04c1 = Tilemap
-	         $0701 = TilemapEnd
-	         $0701 = Paddle
-	         $0711 = PaddleEnd
-	         $0711 = Ball
-	         $0721 = BallEnd
-	EMPTY: $0721-$3fff ($38df bytes)
-	TOTAL EMPTY: $39df bytes
+	         $0219 = BounceOnRight
+	         $0237 = BounceOnLeft
+	         $0255 = BounceOnBottom
+	         $0273 = BounceDone
+	         $0296 = PaddleBounceDone
+	         $0299 = CheckLeft
+	         $02a1 = Left
+	         $02b0 = CheckRight
+	         $02b8 = Right
+	         $02c7 = GetTileByPixel
+	         $02e0 = IsWallTile
+	         $02f5 = CheckAndHandleBrick
+	         $02ff = CheckAndHandleBrickRight
+	         $0308 = Input
+	         $0328 = Input.onenibble
+	         $0335 = Input.knownret
+	         $0336 = Memcopy
+	         $0340 = Tiles
+	         $04e0 = TilesEnd
+	         $04e0 = Tilemap
+	         $0720 = TilemapEnd
+	         $0720 = Paddle
+	         $0730 = PaddleEnd
+	         $0730 = Ball
+	         $0740 = BallEnd
+	EMPTY: $0740-$3fff ($38c0 bytes)
+	TOTAL EMPTY: $39c0 bytes
 
 WRAM0 bank #0:
 	SECTION: $c000-$c001 ($0002 bytes) ["Ball Data"]

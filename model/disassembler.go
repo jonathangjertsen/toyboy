@@ -37,10 +37,14 @@ func (di *DisInstruction) Asm() string {
 		return "LD (HL+), A"
 	case OpcodeLDHLADec:
 		return "LD (HL-), A"
+	case OpcodeLDHLn:
+		return fmt.Sprintf("LD (HL), $%02xh", di.Raw[1])
 	case OpcodeRET, OpcodeNop, OpcodeRLA:
 		return str
-	case OpcodeRETZ:
+	case OpcodeRETZ, OpcodeRETC:
 		return fmt.Sprintf("%s %s", str[:ln-1], str[ln-1:])
+	case OpcodeRETNZ, OpcodeRETNC:
+		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
 	case OpcodePUSHBC, OpcodePOPBC:
 		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
 	case OpcodeXORn, OpcodeADDn, OpcodeANDn, OpcodeORn, OpcodeADCn, OpcodeSBCn, OpcodeCPn, OpcodeSUBn:

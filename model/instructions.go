@@ -48,6 +48,7 @@ package model
 // LDSPnn   = 0x31,
 // LDHLADec = 0x32,
 // INCSP    = 0x33,
+// LDHLn    = 0x36,
 // JRCe     = 0x38,
 // ADDHLSP  = 0x39,
 // DECSP    = 0x3b,
@@ -274,6 +275,8 @@ var instSize = [256]uint16{
 	OpcodeLDBCnn: 3,
 	OpcodeLDDEnn: 3,
 	OpcodeLDAnn:  3,
+
+	OpcodeLDHLn: 2,
 
 	OpcodeCALLnn: 3,
 	OpcodeJPnn:   3,
@@ -740,67 +743,10 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			}
 			return false
 		},
-		OpcodeRETZ: func(e edge) bool {
-			f := func() bool { return cpu.Regs.GetFlagZ() }
-			switch e {
-			case edge{1, false}:
-			case edge{1, true}:
-			case edge{2, false}:
-				if f() {
-					cpu.lastBranchResult = +1
-					cpu.writeAddressBus(cpu.Regs.SP)
-					cpu.SetSP(cpu.Regs.SP + 1)
-				} else {
-					cpu.lastBranchResult = -1
-					return true
-				}
-			case edge{2, true}:
-				if cpu.lastBranchResult == +1 {
-					cpu.Regs.TempZ = cpu.Bus.Data
-				} else {
-					return true
-				}
-			case edge{3, false}:
-				if cpu.lastBranchResult == +1 {
-					cpu.writeAddressBus(cpu.Regs.SP)
-					cpu.SetSP(cpu.Regs.SP + 1)
-				} else {
-					panicv(e)
-				}
-			case edge{3, true}:
-				if cpu.lastBranchResult == +1 {
-					cpu.Regs.TempW = cpu.Bus.Data
-				} else {
-					panicv(e)
-				}
-			case edge{4, false}:
-				if cpu.lastBranchResult == +1 {
-					cpu.SetPC(cpu.Regs.GetWZ())
-				} else {
-					panicv(e)
-				}
-			case edge{4, true}:
-				if cpu.lastBranchResult == +1 {
-				} else {
-					panicv(e)
-				}
-			case edge{5, false}:
-				if cpu.lastBranchResult == +1 {
-					return true
-				} else {
-					panicv(e)
-				}
-			case edge{5, true}:
-				if cpu.lastBranchResult == +1 {
-					return true
-				} else {
-					panicv(e)
-				}
-			default:
-				panicv(e)
-			}
-			return false
-		},
+		OpcodeRETZ:  cpu.retcc(func() bool { return cpu.Regs.GetFlagZ() }),
+		OpcodeRETNZ: cpu.retcc(func() bool { return !cpu.Regs.GetFlagZ() }),
+		OpcodeRETC:  cpu.retcc(func() bool { return cpu.Regs.GetFlagC() }),
+		OpcodeRETNC: cpu.retcc(func() bool { return !cpu.Regs.GetFlagC() }),
 		OpcodePUSHBC: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
@@ -846,13 +792,31 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			}
 			return false
 		},
-		OpcodeADDHLHL:  cpu.addhlrr(&cpu.Regs.H, &cpu.Regs.L),
-		OpcodeADDHLBC:  cpu.addhlrr(&cpu.Regs.B, &cpu.Regs.C),
-		OpcodeADDHLDE:  cpu.addhlrr(&cpu.Regs.D, &cpu.Regs.E),
-		OpcodeLDBCnn:   cpu.ldxxnn(func(wz uint16) { cpu.SetBC(wz) }),
-		OpcodeLDDEnn:   cpu.ldxxnn(func(wz uint16) { cpu.SetDE(wz) }),
-		OpcodeLDHLnn:   cpu.ldxxnn(func(wz uint16) { cpu.SetHL(wz) }),
-		OpcodeLDSPnn:   cpu.ldxxnn(func(wz uint16) { cpu.SetSP(wz) }),
+		OpcodeADDHLHL: cpu.addhlrr(&cpu.Regs.H, &cpu.Regs.L),
+		OpcodeADDHLBC: cpu.addhlrr(&cpu.Regs.B, &cpu.Regs.C),
+		OpcodeADDHLDE: cpu.addhlrr(&cpu.Regs.D, &cpu.Regs.E),
+		OpcodeLDBCnn:  cpu.ldxxnn(func(wz uint16) { cpu.SetBC(wz) }),
+		OpcodeLDDEnn:  cpu.ldxxnn(func(wz uint16) { cpu.SetDE(wz) }),
+		OpcodeLDHLnn:  cpu.ldxxnn(func(wz uint16) { cpu.SetHL(wz) }),
+		OpcodeLDSPnn:  cpu.ldxxnn(func(wz uint16) { cpu.SetSP(wz) }),
+		OpcodeLDHLn: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.Bus.Data
+			case edge{2, false}:
+				cpu.writeAddressBus(cpu.GetHL())
+			case edge{2, true}:
+				cpu.Bus.WriteData(cpu.Regs.TempZ)
+			case edge{3, false}, edge{3, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
 		OpcodeLDHLAInc: cpu.ldhla(func() { cpu.SetHL(cpu.GetHL() + 1) }),
 		OpcodeLDHLADec: cpu.ldhla(func() { cpu.SetHL(cpu.GetHL() - 1) }),
 		OpcodeLDHLA:    cpu.ldhla(func() {}),
@@ -1195,6 +1159,69 @@ func (cpu *CPU) jpccnn(f func() bool) func(e edge) bool {
 				panicv(e)
 			}
 		case edge{4, true}:
+			if cpu.lastBranchResult == +1 {
+				return true
+			} else {
+				panicv(e)
+			}
+		default:
+			panicv(e)
+		}
+		return false
+	}
+}
+
+func (cpu *CPU) retcc(cond func() bool) func(e edge) bool {
+	return func(e edge) bool {
+		switch e {
+		case edge{1, false}:
+		case edge{1, true}:
+		case edge{2, false}:
+			if cond() {
+				cpu.lastBranchResult = +1
+				cpu.writeAddressBus(cpu.Regs.SP)
+				cpu.SetSP(cpu.Regs.SP + 1)
+			} else {
+				cpu.lastBranchResult = -1
+				return true
+			}
+		case edge{2, true}:
+			if cpu.lastBranchResult == +1 {
+				cpu.Regs.TempZ = cpu.Bus.Data
+			} else {
+				return true
+			}
+		case edge{3, false}:
+			if cpu.lastBranchResult == +1 {
+				cpu.writeAddressBus(cpu.Regs.SP)
+				cpu.SetSP(cpu.Regs.SP + 1)
+			} else {
+				panicv(e)
+			}
+		case edge{3, true}:
+			if cpu.lastBranchResult == +1 {
+				cpu.Regs.TempW = cpu.Bus.Data
+			} else {
+				panicv(e)
+			}
+		case edge{4, false}:
+			if cpu.lastBranchResult == +1 {
+				cpu.SetPC(cpu.Regs.GetWZ())
+			} else {
+				panicv(e)
+			}
+		case edge{4, true}:
+			if cpu.lastBranchResult == +1 {
+			} else {
+				panicv(e)
+			}
+		case edge{5, false}:
+			if cpu.lastBranchResult == +1 {
+				return true
+			} else {
+				panicv(e)
+			}
+		case edge{5, true}:
 			if cpu.lastBranchResult == +1 {
 				return true
 			} else {
