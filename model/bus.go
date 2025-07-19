@@ -16,6 +16,7 @@ type Bus struct {
 	PPU           *PPU
 	CartridgeSlot *MemoryRegion
 	Joypad        *Joypad
+	Interrupts    *Interrupts
 }
 
 func (b *Bus) WriteAddress(addr uint16) {
@@ -43,6 +44,8 @@ func (b *Bus) WriteAddress(addr uint16) {
 		b.Data = b.PPU.Read(addr)
 	} else if addr == AddrJoypad {
 		b.Data = b.Joypad.Read(addr)
+	} else if addr == uint16(AddrIF) || addr == uint16(AddrIE) {
+		b.Data = b.Interrupts.Read(addr)
 	} else if addr == AddrBootROMLock {
 		b.Data = b.BootROMLock.Read(addr)
 	} else {
@@ -68,6 +71,8 @@ func (b *Bus) WriteData(v uint8) {
 		b.BootROMLock.Write(addr, v)
 	} else if addr == AddrJoypad {
 		b.Joypad.Write(addr, v)
+	} else if addr == uint16(AddrIF) || addr == uint16(AddrIE) {
+		b.Interrupts.Write(addr, v)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		b.VRAM.Write(addr, v)
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
@@ -136,6 +141,8 @@ func (b *Bus) GetCounters(addr uint16) (uint64, uint64) {
 		return b.OAM.GetCounters(addr)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		return b.PPU.GetCounters(addr)
+	} else if addr == uint16(AddrIF) || addr == uint16(AddrIE) {
+		return b.Interrupts.GetCounters(addr)
 	}
 	if !b.inCoreDump {
 		panicf("GetCounters for unmapped address 0x%04x", addr)

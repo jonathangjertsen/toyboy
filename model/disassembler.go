@@ -11,7 +11,8 @@ type Disassembler struct {
 	Trace   bool
 	PC      uint16
 
-	recursion         int
+	stack             []uint16
+	stackIdx          int
 	cachedDisassembly *Disassembly
 }
 
@@ -32,21 +33,39 @@ func (di *DisInstruction) Asm() string {
 	case OpcodeLDBCnn, OpcodeLDDEnn, OpcodeLDHLnn, OpcodeLDSPnn:
 		return fmt.Sprintf("%s %s, [$%04xh]", str[:ln-4], str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
 	case OpcodeLDnnA:
-		return fmt.Sprintf("%s [$%04xh], %s", str[:ln-3], join16(di.Raw[2], di.Raw[1]), str[ln-1:])
+		return fmt.Sprintf("LD [$%04xh], A", join16(di.Raw[2], di.Raw[1]))
+	case OpcodeLDnnSP:
+		return fmt.Sprintf("LD [$%04xh], SP", join16(di.Raw[2], di.Raw[1]))
 	case OpcodeLDHLAInc:
 		return "LD (HL+), A"
 	case OpcodeLDHLADec:
 		return "LD (HL-), A"
+	case OpcodeLDAHLInc:
+		return "LD A, (HL+)"
+	case OpcodeLDAHLDec:
+		return "LD A, (HL-)"
+	case OpcodeDECHLInd:
+		return "DEC (HL)"
+	case OpcodeINCHLInd:
+		return "DEC (HL)"
+	case OpcodeRST0x00, OpcodeRST0x08, OpcodeRST0x10, OpcodeRST0x18, OpcodeRST0x20, OpcodeRST0x28, OpcodeRST0x30, OpcodeRST0x38:
+		return fmt.Sprintf("RST $00%sh", str[ln-2:])
+	case OpcodeUndefD3, OpcodeUndefDB, OpcodeUndefDD, OpcodeUndefE3, OpcodeUndefE4, OpcodeUndefEB, OpcodeUndefEC, OpcodeUndefED, OpcodeUndefF4, OpcodeUndefFC, OpcodeUndefFD:
+		return fmt.Sprintf("Undefined instruction 0x%02x", di.Raw[0])
+	case OpcodeLDBCA, OpcodeLDDEA:
+		return fmt.Sprintf("LD (%s), A", str[ln-3:ln-1])
 	case OpcodeLDHLn:
 		return fmt.Sprintf("LD (HL), $%02xh", di.Raw[1])
-	case OpcodeRET, OpcodeNop, OpcodeRLA, OpcodeDAA:
+	case OpcodeRET, OpcodeNop, OpcodeRLA, OpcodeRLCA, OpcodeRRA, OpcodeRRCA, OpcodeDAA, OpcodeDI, OpcodeEI, OpcodeSTOP, OpcodeCCF, OpcodeRETI:
 		return str
 	case OpcodeRETZ, OpcodeRETC:
 		return fmt.Sprintf("%s %s", str[:ln-1], str[ln-1:])
 	case OpcodeRETNZ, OpcodeRETNC:
 		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
-	case OpcodePUSHBC, OpcodePOPBC:
+	case OpcodePUSHBC, OpcodePUSHDE, OpcodePUSHHL, OpcodePUSHAF, OpcodePOPBC, OpcodePOPDE, OpcodePOPHL, OpcodePOPAF:
 		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
+	case OpcodeCPLaka2f:
+		return "CPL"
 	case OpcodeXORn, OpcodeADDn, OpcodeANDn, OpcodeORn, OpcodeADCn, OpcodeSBCn, OpcodeCPn, OpcodeSUBn:
 		return fmt.Sprintf("%s A, $%02xh", str[:ln-1], di.Raw[1])
 	case OpcodeLDAA, OpcodeLDAB, OpcodeLDAC, OpcodeLDAD, OpcodeLDAE, OpcodeLDAH, OpcodeLDAL,
@@ -84,6 +103,10 @@ func (di *DisInstruction) Asm() string {
 		return fmt.Sprintf("%s %s, $%04xh", str[:ln-3], str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
 	case OpcodeJPNZnn, OpcodeJPNCnn:
 		return fmt.Sprintf("%s %s, $%04xh", str[:ln-4], str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
+	case OpcodeCALLZnn, OpcodeCALLCnn:
+		return fmt.Sprintf("CALL %s, $%04xh", str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
+	case OpcodeCALLNZnn, OpcodeCALLNCnn:
+		return fmt.Sprintf("CALL %s, $%04xh", str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
 	case OpcodeJRNZe, OpcodeJRNCe:
 		return fmt.Sprintf("%s %s, PC+$%02xh", str[:ln-3], str[ln-3:ln-1], int8(di.Raw[1]))
 	case OpcodeJRZe, OpcodeJRCe:
@@ -98,13 +121,23 @@ func (di *DisInstruction) Asm() string {
 		return fmt.Sprintf("LDH ($%02xh),A; eff. LD $%04x, A", di.Raw[1], 0xff00+int(di.Raw[1]))
 	case OpcodeLDHAn:
 		return fmt.Sprintf("LDH A,($%02xh); eff. LD A,$%04x", di.Raw[1], 0xff00+int(di.Raw[1]))
+	case OpcodeLDHAC:
+		return "LDH A,(C); eff. LD A, [C+$0xff00]"
 	case OpcodeLDHCA:
-		return "LDH A,(C); eff. LD A,C+$0xff00"
+		return "LDH (C), A; eff. LD [C+$0xff00], a"
+	case OpcodeLDHLSPe:
+		if di.Raw[1]&0x80 == 0 {
+			return fmt.Sprintf("LD HL,SP+$%02xh", di.Raw[1])
+		} else {
+			return fmt.Sprintf("LD HL,SP-$%02xh", -int8(di.Raw[1]))
+		}
 	case OpcodeCB:
 		cbop := CBOp{Op: cb((di.Raw[0] & 0xf8) >> 3), Target: CBTarget(di.Raw[0] & 0x7)}
 		return fmt.Sprintf("%s %s", cbop.Op, cbop.Target)
+	case OpcodeJPHL:
+		return "JP HL"
 	}
-	panicf("%v\n", di.Opcode)
+	panicf("CAN'T FMT %v\n", di.Opcode)
 	return ""
 }
 
@@ -229,44 +262,60 @@ func (dis *Disassembler) SetProgram(program []uint8) {
 	dis.Program = program
 	dis.Decoded = make([]DisInstruction, len(program))
 	dis.cachedDisassembly = nil
-	dis.printf("setProgram with len=%d\n", len(program))
+	dis.printf("setProgram with len=%d", len(program))
 }
 
 func (dis *Disassembler) printf(format string, args ...any) {
 	if !dis.Trace {
 		return
 	}
-	for range dis.recursion {
+	for range dis.stackIdx {
 		fmt.Printf("  ")
 	}
+	if dis.stackIdx > 0 {
+		fmt.Printf("%04xh ", dis.stack[dis.stackIdx-1])
+	}
 	fmt.Printf(format, args...)
+	fmt.Printf("\n")
 }
 
 func (dis *Disassembler) SetPC(address uint16) {
-	dis.recursion++
+	dis.printf("SetPC %04xh", address)
+	dis.stack = append(dis.stack, address)
+	dis.stackIdx++
 	defer func() {
-		dis.recursion--
+		dis.stackIdx--
+		dis.stack = dis.stack[:dis.stackIdx]
 		dis.PC = address
 	}()
 
 	for {
 		if int(address) >= len(dis.Program) {
-			dis.printf("reached address outside of program (addr=%04x, len=%0x)\n", address, len(dis.Program))
+			dis.printf("reached address outside of program (len=%0x)", len(dis.Program))
 			return
 		}
 
 		if dis.Decoded[address].Size > 0 {
-			dis.printf("already decoded %x\n", address)
+			dis.printf("already seen this address")
 			return
 		}
 
 		di, err := dis.readNewInstruction(address)
 		if err != nil {
-			panicf("failed decoding at %x: %v\n", address, err)
+			panicf("failed decoding at %x: %v", address, err)
 			return
 		}
-		dis.add(di)
+
+		for i := range di.Size {
+			if dis.Decoded[address+i].Size > 0 {
+				dis.printf("at offset %d there is an existing instruction, returning", i)
+				return
+			}
+		}
+
+		dis.insert(di)
 		address += di.Size
+		dis.stack[dis.stackIdx-1] = address
 
 		if dis.checkBranches(di) {
 			return
@@ -317,8 +366,8 @@ func (dis *Disassembler) Disassembly() *Disassembly {
 	return &out
 }
 
-func (dis *Disassembler) add(di DisInstruction) {
-	dis.printf("added %v at %v\n", di.Opcode, di.Address)
+func (dis *Disassembler) insert(di DisInstruction) {
+	dis.printf("insert %v at %04xh:%04xh", di.Opcode, di.Address, di.Address+di.Size-1)
 	for addr := di.Address; addr != di.Address+di.Size; addr++ {
 		dis.Decoded[addr] = di
 	}
@@ -332,6 +381,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 		e := int8(di.Raw[1])
 
 		// branch taken
+		dis.printf("checking branch-taken for relative jump")
 		if e > 0 {
 			dis.SetPC(di.Address + di.Size + uint16(e))
 		} else {
@@ -340,25 +390,53 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 
 		// branch not taken will be inspected after this
 		if di.Opcode == OpcodeJRe {
-			// unconditional branch, can never fall through
+			dis.printf("unconditional branch, can never fall through")
 			return true
 		}
 	case OpcodeJPnn, OpcodeJPCnn, OpcodeJPNCnn, OpcodeJPZnn, OpcodeJPNZnn, OpcodeCALLnn:
 		addr := join16(di.Raw[2], di.Raw[1])
+		dis.printf("checking branch-taken for absolute jump")
 		dis.SetPC(addr)
-		if di.Opcode == OpcodeJPnn {
-			// unconditional branch, can never fall through
+		if di.Opcode == OpcodeJPnn || di.Opcode == OpcodeJPHL {
+			dis.printf("unconditional branch, can never fall through")
 			return true
 		} else if di.Opcode == OpcodeCALLnn {
+			dis.printf("will probably return here")
 			// We don't fall thru here, but structured programs would return here from RET.
 			// Unless the code adjusts the return address in stack memory.
 			// If that happens AND there is data just after this section, it will be interpreted as code
 		}
-	case OpcodeRET:
+	case OpcodeRST0x00:
+		dis.doRST(0x00)
+	case OpcodeRST0x08:
+		dis.doRST(0x08)
+	case OpcodeRST0x10:
+		dis.doRST(0x10)
+	case OpcodeRST0x18:
+		dis.doRST(0x18)
+	case OpcodeRST0x20:
+		dis.doRST(0x20)
+	case OpcodeRST0x28:
+		dis.doRST(0x28)
+	case OpcodeRST0x30:
+		dis.doRST(0x30)
+	case OpcodeRST0x38:
+		dis.doRST(0x38)
+	case OpcodeUndefD3, OpcodeUndefDB, OpcodeUndefDD, OpcodeUndefE3, OpcodeUndefE4, OpcodeUndefEB, OpcodeUndefEC, OpcodeUndefED, OpcodeUndefF4, OpcodeUndefFC, OpcodeUndefFD:
+		dis.printf("dropping undefined instruction %02x", di.Opcode)
+		dis.Decoded[di.Address] = DisInstruction{}
+		return true
+	case OpcodeRET, OpcodeRETI, OpcodeJPHL:
 		return true
 	}
 
 	return false
+}
+
+func (dis *Disassembler) doRST(vec uint16) {
+	dis.printf("unconditional function call to %04x", vec)
+	dis.SetPC(vec)
+	dis.printf("will probably return here")
 }
 
 func (dis *Disassembler) readNewInstruction(addr uint16) (DisInstruction, error) {

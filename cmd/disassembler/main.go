@@ -7,12 +7,13 @@ import (
 )
 
 func main() {
-	rom := "assets/cartridges/unbricked.gb"
+	rom := "assets/cartridges/tetris.gb"
 	bytes, err := os.ReadFile(rom)
 	if err != nil {
 		panic(err)
 	}
 	dis := model.NewDisassembler()
+	dis.Trace = true
 	dis.SetProgram(bytes)
 	dis.SetPC(0x0100)
 	out := dis.Disassembly()

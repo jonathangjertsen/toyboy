@@ -1,10 +1,11 @@
 package model
 
 type Joypad struct {
-	clk       *ClockRT
-	Written   MemoryRegion
-	Action    uint8
-	Direction uint8
+	clk        *ClockRT
+	Interrupts *Interrupts
+	Written    MemoryRegion
+	Action     uint8
+	Direction  uint8
 }
 
 type JoypadState struct {
@@ -18,18 +19,20 @@ type JoypadState struct {
 	Select bool
 }
 
-func NewJoypad(clock *ClockRT) *Joypad {
+func NewJoypad(clock *ClockRT, ints *Interrupts) *Joypad {
 	jp := &Joypad{
-		clk:       clock,
-		Written:   NewMemoryRegion(clock, 0xff00, 0x0001),
-		Action:    0xf,
-		Direction: 0xf,
+		clk:        clock,
+		Interrupts: ints,
+		Written:    NewMemoryRegion(clock, 0xff00, 0x0001),
+		Action:     0xf,
+		Direction:  0xf,
 	}
 	jp.Written.Data[0] = 0x1f
 	return jp
 }
 
 func (jp *Joypad) Write(addr uint16, v uint8) {
+	// TODO: can this trigger an interrupt?
 	jp.Written.Write(addr, v)
 }
 
@@ -47,6 +50,7 @@ func (jp *Joypad) Read(addr uint16) uint8 {
 }
 
 func (jp *Joypad) SetState(jps JoypadState) {
+	// TODO:
 	jp.clk.Sync(func() {
 		actionMask := uint8(0b0000)
 		directionMask := uint8(0b0000)
@@ -74,7 +78,22 @@ func (jp *Joypad) SetState(jps JoypadState) {
 		if jps.Down {
 			directionMask |= 0b1000
 		}
-		jp.Action = 0xf ^ actionMask
-		jp.Direction = 0xf ^ directionMask
+
+		newAction := 0xf ^ actionMask
+		newDirection := 0xf ^ directionMask
+
+		doJoypadInterrupt := false
+		if jp.Written.Data[0]&0x20 == 0 {
+			doJoypadInterrupt = (jp.Action & ^newAction) != 0
+		} else {
+			doJoypadInterrupt = (jp.Direction & ^newDirection) != 0
+		}
+
+		jp.Action = newAction
+		jp.Direction = newDirection
+
+		if doJoypadInterrupt {
+			jp.Interrupts.IRQSet(0x10)
+		}
 	})
 }

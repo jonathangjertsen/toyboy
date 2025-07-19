@@ -5,11 +5,13 @@ package model
 // ENUM(
 // Nop      = 0x00,
 // LDBCnn   = 0x01,
+// LDBCA    = 0x02,
 // INCBC    = 0x03,
 // INCB     = 0x04,
 // DECB     = 0x05,
 // LDBn     = 0x06,
 // RLCA     = 0x07,
+// LDnnSP   = 0x08,
 // ADDHLBC  = 0x09,
 // LDABC    = 0x0a,
 // DECBC    = 0x0b,
@@ -17,7 +19,9 @@ package model
 // DECC     = 0x0d,
 // LDCn     = 0x0e,
 // RRCA     = 0x0f,
+// STOP     = 0x10,
 // LDDEnn   = 0x11,
+// LDDEA    = 0x12
 // INCDE    = 0x13,
 // INCD     = 0x14,
 // DECD     = 0x15,
@@ -41,21 +45,27 @@ package model
 // DAA      = 0x27,
 // JRZe     = 0x28,
 // ADDHLHL  = 0x29,
+// LDAHLInc = 0x2a,
 // DECHL    = 0x2b,
 // INCL     = 0x2C,
 // DECL     = 0x2D,
 // LDLn     = 0x2e,
+// CPLaka2f = 0x2f, // namespace collision with CP L
 // JRNCe    = 0x30,
 // LDSPnn   = 0x31,
 // LDHLADec = 0x32,
 // INCSP    = 0x33,
+// INCHLInd = 0x34,
+// DECHLInd = 0x35,
 // LDHLn    = 0x36,
 // JRCe     = 0x38,
 // ADDHLSP  = 0x39,
+// LDAHLDec = 0x3a,
 // DECSP    = 0x3b,
 // INCA     = 0x3c,
 // DECA     = 0x3d,
 // LDAn     = 0x3e,
+// CCF      = 0x3f,
 // LDBB     = 0x40,
 // LDBC     = 0x41,
 // LDBD     = 0x42,
@@ -188,32 +198,64 @@ package model
 // POPBC    = 0xC1,
 // JPNZnn   = 0xC2,
 // JPnn     = 0xC3,
+// CALLNZnn = 0xC4,
 // PUSHBC   = 0xC5,
 // ADDn     = 0xC6,
 // RETZ     = 0xC8,
+// RST0x00  = 0xc7,
 // RET      = 0xC9,
 // JPZnn    = 0xCA,
 // CB       = 0xCB,
+// CALLZnn  = 0xCC,
 // CALLnn   = 0xCD,
 // ADCn     = 0xCE,
+// RST0x08  = 0xcf,
 // RETNC    = 0xD0,
+// POPDE    = 0xD1,
+// JPNCnn   = 0xD2,
+// UndefD3  = 0xD3,
+// CALLNCnn = 0xD4,
+// PUSHDE   = 0xD5,
+// SUBn     = 0xD6,
+// RST0x10  = 0xD7,
 // RETC     = 0xD8,
 // RETI     = 0xD9,
 // JPCnn    = 0xDA,
-// JPNCnn   = 0xD2,
-// SUBn     = 0xD6
+// UndefDB  = 0xDB,
+// CALLCnn  = 0xDC,
+// UndefDD  = 0xDD,
 // SBCn     = 0xDE,
+// RST0x18  = 0xDF,
 // LDHnA    = 0xE0,
+// POPHL    = 0XE1,
 // LDHCA    = 0xE2,
+// UndefE3  = 0xE3,
+// UndefE4  = 0xE4,
+// PUSHHL   = 0xe5,
 // ANDn     = 0xE6,
+// RST0x20  = 0xE7,
+// JPHL     = 0xe9,
 // LDnnA    = 0xEA,
+// UndefEB  = 0xEB,
+// UndefEC  = 0xEC,
+// UndefED  = 0xED,
 // XORn     = 0xEE,
+// RST0x28  = 0xEF,
 // LDHAn    = 0xF0,
-// LDAnn    = 0xFA,
+// POPAF    = 0xf1,
+// LDHAC    = 0xf2,
 // DI       = 0xF3,
+// UndefF4  = 0xF4,
+// PUSHAF   = 0xf5,
 // ORn      = 0xF6,
+// RST0x30  = 0xF7,
+// LDHLSPe  = 0xF8,
+// LDAnn    = 0xFA,
 // EI       = 0xFB,
+// UndefFC  = 0xFC,
+// UndefFD  = 0xFD,
 // CPn      = 0xFE,
+// RST0x38  = 0xFF,
 // )
 type Opcode uint8
 
@@ -271,6 +313,20 @@ type InstructionHandling func(e edge) bool
 var instSize = [256]uint16{
 	OpcodeNop: 1,
 
+	OpcodeRST0x00: 1,
+	OpcodeRST0x08: 1,
+	OpcodeRST0x10: 1,
+	OpcodeRST0x18: 1,
+	OpcodeRST0x20: 1,
+	OpcodeRST0x28: 1,
+	OpcodeRST0x30: 1,
+	OpcodeRST0x38: 1,
+
+	OpcodeLDHLSPe: 2,
+
+	OpcodeLDBCA: 1,
+	OpcodeLDDEA: 1,
+
 	OpcodeLDSPnn: 3,
 	OpcodeLDHLnn: 3,
 	OpcodeLDBCnn: 3,
@@ -279,26 +335,39 @@ var instSize = [256]uint16{
 
 	OpcodeLDHLn: 2,
 
-	OpcodeCALLnn: 3,
-	OpcodeJPnn:   3,
-	OpcodeJPCnn:  3,
-	OpcodeJPNCnn: 3,
-	OpcodeJPZnn:  3,
-	OpcodeJPNZnn: 3,
-	OpcodeJRe:    2,
-	OpcodeJRNZe:  2,
-	OpcodeJRZe:   2,
+	OpcodeCALLnn:   3,
+	OpcodeCALLZnn:  3,
+	OpcodeCALLCnn:  3,
+	OpcodeCALLNZnn: 3,
+	OpcodeCALLNCnn: 3,
+	OpcodeJPnn:     3,
+	OpcodeJPCnn:    3,
+	OpcodeJPNCnn:   3,
+	OpcodeJPZnn:    3,
+	OpcodeJPNZnn:   3,
+	OpcodeJRe:      2,
+	OpcodeJRNZe:    2,
+	OpcodeJRZe:     2,
+	OpcodeJRNCe:    2,
+	OpcodeJRCe:     2,
 
-	OpcodeLDADE: 1,
-	OpcodeLDAn:  2,
-	OpcodeLDBn:  2,
-	OpcodeLDCn:  2,
-	OpcodeLDDn:  2,
-	OpcodeLDEn:  2,
-	OpcodeLDHn:  2,
-	OpcodeLDLn:  2,
+	OpcodeLDADE:    1,
+	OpcodeLDABC:    1,
+	OpcodeLDAHL:    1,
+	OpcodeLDAHLDec: 1,
+	OpcodeLDAHLInc: 1,
+
+	OpcodeLDAn: 2,
+	OpcodeLDBn: 2,
+	OpcodeLDCn: 2,
+	OpcodeLDDn: 2,
+	OpcodeLDEn: 2,
+	OpcodeLDHn: 2,
+	OpcodeLDLn: 2,
+
 	OpcodeLDHnA: 2,
 	OpcodeLDHAn: 2,
+	OpcodeLDHAC: 2,
 
 	OpcodeXORA:  1,
 	OpcodeXORB:  1,
@@ -342,7 +411,23 @@ var instSize = [256]uint16{
 
 	OpcodeLDHCA: 1,
 
-	OpcodeDAA: 1,
+	OpcodeUndefD3: 1,
+	OpcodeUndefDB: 1,
+	OpcodeUndefDD: 1,
+	OpcodeUndefE3: 1,
+	OpcodeUndefE4: 1,
+	OpcodeUndefEB: 1,
+	OpcodeUndefEC: 1,
+	OpcodeUndefED: 1,
+	OpcodeUndefF4: 1,
+	OpcodeUndefFC: 1,
+	OpcodeUndefFD: 1,
+
+	OpcodeCPLaka2f: 1,
+	OpcodeCCF:      1,
+	OpcodeDAA:      1,
+	OpcodeEI:       1,
+	OpcodeDI:       1,
 
 	OpcodeCPA:  1,
 	OpcodeCPB:  1,
@@ -389,29 +474,31 @@ var instSize = [256]uint16{
 	OpcodeADCL:  1,
 	OpcodeADCHL: 1,
 
-	OpcodeINCA:  1,
-	OpcodeINCB:  1,
-	OpcodeINCC:  1,
-	OpcodeINCD:  1,
-	OpcodeINCE:  1,
-	OpcodeINCH:  1,
-	OpcodeINCL:  1,
-	OpcodeINCHL: 1,
-	OpcodeINCBC: 1,
-	OpcodeINCDE: 1,
-	OpcodeINCSP: 1,
+	OpcodeINCA:     1,
+	OpcodeINCB:     1,
+	OpcodeINCC:     1,
+	OpcodeINCD:     1,
+	OpcodeINCE:     1,
+	OpcodeINCH:     1,
+	OpcodeINCL:     1,
+	OpcodeINCHL:    1,
+	OpcodeINCBC:    1,
+	OpcodeINCDE:    1,
+	OpcodeINCSP:    1,
+	OpcodeINCHLInd: 1,
 
-	OpcodeDECA:  1,
-	OpcodeDECB:  1,
-	OpcodeDECC:  1,
-	OpcodeDECD:  1,
-	OpcodeDECE:  1,
-	OpcodeDECH:  1,
-	OpcodeDECL:  1,
-	OpcodeDECHL: 1,
-	OpcodeDECBC: 1,
-	OpcodeDECDE: 1,
-	OpcodeDECSP: 1,
+	OpcodeDECA:     1,
+	OpcodeDECB:     1,
+	OpcodeDECC:     1,
+	OpcodeDECD:     1,
+	OpcodeDECE:     1,
+	OpcodeDECH:     1,
+	OpcodeDECL:     1,
+	OpcodeDECHL:    1,
+	OpcodeDECBC:    1,
+	OpcodeDECDE:    1,
+	OpcodeDECSP:    1,
+	OpcodeDECHLInd: 1,
 
 	OpcodeADDHLBC: 1,
 	OpcodeADDHLDE: 1,
@@ -425,7 +512,6 @@ var instSize = [256]uint16{
 	OpcodeLDAE:  1,
 	OpcodeLDAH:  1,
 	OpcodeLDAL:  1,
-	OpcodeLDAHL: 1,
 	OpcodeLDBA:  1,
 	OpcodeLDBB:  1,
 	OpcodeLDBC:  1,
@@ -475,17 +561,28 @@ var instSize = [256]uint16{
 	OpcodeLDLL:  1,
 	OpcodeLDLHL: 1,
 
-	OpcodePUSHBC: 1,
 	OpcodePOPBC:  1,
-	OpcodeRLA:    1,
-	OpcodeRLCA:   1,
-	OpcodeRRA:    1,
-	OpcodeRRCA:   1,
-	OpcodeRET:    1,
-	OpcodeRETZ:   1,
-	OpcodeRETNZ:  1,
-	OpcodeRETC:   1,
-	OpcodeRETNC:  1,
+	OpcodePOPDE:  1,
+	OpcodePOPHL:  1,
+	OpcodePOPAF:  1,
+	OpcodePUSHBC: 1,
+	OpcodePUSHDE: 1,
+	OpcodePUSHHL: 1,
+	OpcodePUSHAF: 1,
+
+	OpcodeRLA:   1,
+	OpcodeRLCA:  1,
+	OpcodeRRA:   1,
+	OpcodeRRCA:  1,
+	OpcodeRET:   1,
+	OpcodeRETZ:  1,
+	OpcodeRETNZ: 1,
+	OpcodeRETC:  1,
+	OpcodeRETNC: 1,
+	OpcodeRETI:  1,
+
+	OpcodeSTOP: 1,
+	OpcodeJPHL: 1,
 
 	OpcodeADDn: 2,
 	OpcodeSUBn: 2,
@@ -496,7 +593,8 @@ var instSize = [256]uint16{
 	OpcodeXORn: 2,
 	OpcodeCPn:  2,
 
-	OpcodeLDnnA: 3,
+	OpcodeLDnnA:  3,
+	OpcodeLDnnSP: 3,
 }
 
 func handlers(cpu *CPU) [256]InstructionHandling {
@@ -510,6 +608,38 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeLDAH:  cpu.ld(&cpu.Regs.A, &cpu.Regs.H),
 		OpcodeLDAL:  cpu.ld(&cpu.Regs.A, &cpu.Regs.L),
 		OpcodeLDAHL: cpu.ldrhl(&cpu.Regs.A),
+		OpcodeLDAHLInc: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.GetHL())
+				cpu.SetHL(cpu.GetHL() + 1)
+			case edge{1, true}:
+			case edge{2, false}:
+				cpu.Regs.A = cpu.Bus.Data
+				return true
+			case edge{2, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDAHLDec: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.GetHL())
+				cpu.SetHL(cpu.GetHL() - 1)
+			case edge{1, true}:
+			case edge{2, false}:
+				cpu.Regs.A = cpu.Bus.Data
+				return true
+			case edge{2, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
 		OpcodeLDBA:  cpu.ld(&cpu.Regs.B, &cpu.Regs.A),
 		OpcodeLDBB:  cpu.ld(&cpu.Regs.B, &cpu.Regs.B),
 		OpcodeLDBC:  cpu.ld(&cpu.Regs.B, &cpu.Regs.C),
@@ -630,6 +760,16 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeDAA: cpu.singleCycle(func() {
 			cpu.Regs.SetFlagsAndA(DAA(cpu.Regs.A, cpu.Regs.GetFlagC(), cpu.Regs.GetFlagN(), cpu.Regs.GetFlagH()))
 		}),
+		OpcodeCPLaka2f: cpu.singleCycle(func() {
+			cpu.Regs.A ^= 0xff
+			cpu.Regs.SetFlagN(true)
+			cpu.Regs.SetFlagH(true)
+		}),
+		OpcodeCCF: cpu.singleCycle(func() {
+			cpu.Regs.SetFlagC(!cpu.Regs.GetFlagC())
+			cpu.Regs.SetFlagN(false)
+			cpu.Regs.SetFlagH(false)
+		}),
 		OpcodeDECA: cpu.decreg(&cpu.Regs.A),
 		OpcodeDECB: cpu.decreg(&cpu.Regs.B),
 		OpcodeDECC: cpu.decreg(&cpu.Regs.C),
@@ -646,9 +786,11 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeINCL: cpu.increg(&cpu.Regs.L),
 		OpcodeDI: cpu.singleCycle(func() {
 			cpu.Interrupts.setIMENextCycle = false
-			cpu.Interrupts.IME = false
+			cpu.Interrupts.SetIME(false)
 		}),
-		OpcodeEI: cpu.singleCycle(func() { cpu.Interrupts.setIMENextCycle = true }),
+		OpcodeEI: cpu.singleCycle(func() {
+			cpu.Interrupts.setIMENextCycle = true
+		}),
 		OpcodeJRe: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
@@ -839,9 +981,63 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			}
 			return false
 		},
+		OpcodeLDHLSPe: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.Bus.Data
+			case edge{2, false}:
+				res := ADD(lsb(cpu.Regs.SP), cpu.Regs.TempZ, false)
+				cpu.Regs.L = res.Value
+				res.Z0 = true
+				cpu.Regs.SetFlags(res)
+			case edge{2, true}:
+			case edge{3, false}:
+				res := ADD(msb(cpu.Regs.SP), cpu.Regs.TempZ&0x80, cpu.Regs.GetFlagZ())
+				cpu.Regs.H = res.Value
+				return true
+			case edge{3, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
 		OpcodeLDHLAInc: cpu.ldhla(func() { cpu.SetHL(cpu.GetHL() + 1) }),
 		OpcodeLDHLADec: cpu.ldhla(func() { cpu.SetHL(cpu.GetHL() - 1) }),
 		OpcodeLDHLA:    cpu.ldhla(func() {}),
+		OpcodeLDBCA: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.GetBC())
+			case edge{1, true}:
+				cpu.Bus.WriteData(cpu.Regs.A)
+			case edge{2, false}:
+				return true
+			case edge{2, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDDEA: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.GetDE())
+			case edge{1, true}:
+				cpu.Bus.WriteData(cpu.Regs.A)
+			case edge{2, false}:
+				return true
+			case edge{2, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
 		OpcodeLDHCA: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
@@ -875,6 +1071,34 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, true}:
 				cpu.Regs.SetFlags(SUB(cpu.Regs.A, cpu.Bus.Data, false))
 			case edge{2, false}, edge{2, true}:
+				return true
+			default:
+				panicv(e)
+			}
+			return false
+		},
+		OpcodeLDnnSP: func(e edge) bool {
+			switch e {
+			case edge{1, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{1, true}:
+				cpu.Regs.TempZ = cpu.Bus.Data
+			case edge{2, false}:
+				cpu.writeAddressBus(cpu.Regs.PC)
+				cpu.IncPC()
+			case edge{2, true}:
+				cpu.Regs.TempW = cpu.Bus.Data
+			case edge{3, false}:
+				cpu.writeAddressBus(cpu.Regs.GetWZ())
+			case edge{3, true}:
+				cpu.Bus.WriteData(lsb(cpu.Regs.SP))
+				cpu.Regs.SetWZ(cpu.Regs.GetWZ() + 1)
+			case edge{4, false}:
+				cpu.writeAddressBus(cpu.Regs.GetWZ())
+			case edge{4, true}:
+				cpu.Bus.WriteData(msb(cpu.Regs.SP))
+			case edge{5, false}, edge{5, true}:
 				return true
 			default:
 				panicv(e)

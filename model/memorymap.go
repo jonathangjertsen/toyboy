@@ -94,5 +94,6 @@ const (
 // NR50 = 0xff24
 // NR51 = 0xff25
 // NR52 = 0xff26
+// IE   = 0xffff
 // )
 type Addr uint16

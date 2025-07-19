@@ -88,7 +88,8 @@ func DecodeSprite(data []uint8) Sprite {
 type PPU struct {
 	MemoryRegion
 
-	Debugger *Debugger
+	Interrupts *Interrupts
+	Debugger   *Debugger
 
 	RegLCDC uint8
 	RegSTAT uint8
@@ -204,7 +205,6 @@ func (ppu *PPU) SetSCY(v uint8) {
 func (ppu *PPU) SetSCX(v uint8) {
 	ppu.Debug("SetSCX", "%02x", v)
 	ppu.RegSCX = v
-	panic("not implemented: SetSCX")
 }
 
 func (ppu *PPU) SetWY(v uint8) {
@@ -261,11 +261,12 @@ func (ppu *PPU) SetOBP1(v uint8) {
 	ppu.OBJPalette1[3] = Color((v >> 6) & 0x3)
 }
 
-func NewPPU(rtClock *ClockRT, clock *Clock, bus *Bus, debugger *Debugger) *PPU {
+func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, debugger *Debugger) *PPU {
 	ppu := &PPU{
 		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, AddrPPUEnd),
 		Bus:          bus,
 		Debugger:     debugger,
+		Interrupts:   interrupts,
 	}
 	ppu.BackgroundFetcher.PPU = ppu
 	ppu.SpriteFetcher.PPU = ppu
@@ -359,6 +360,9 @@ func (ppu *PPU) beginVBlank() {
 	ppu.setMode(PPUModeVBlank)
 
 	ppu.VBlankLineRemainingCycles = 456
+
+	// TODO: do we ever clear the VBlank interrupt?
+	ppu.Interrupts.IRQSet(0x01)
 }
 
 func (ppu *PPU) fsmOAMScan() {
@@ -446,6 +450,7 @@ func (ppu *PPU) fsmVBlank() {
 
 	ppu.LastFrame = ppu.FBViewport
 	ppu.IncRegLY()
+
 	if ppu.RegLY == 0 {
 		ppu.beginFrame()
 	}

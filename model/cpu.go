@@ -1,12 +1,5 @@
 package model
 
-type Interrupts struct {
-	IF              uint8
-	IE              uint8
-	IME             bool
-	setIMENextCycle bool
-}
-
 type CPU struct {
 	PHI          *Clock
 	Bus          *Bus
@@ -14,7 +7,7 @@ type CPU struct {
 	Disassembler *Disassembler
 
 	Regs       RegisterFile
-	Interrupts Interrupts
+	Interrupts *Interrupts
 
 	CBOp CBOp
 
@@ -37,7 +30,9 @@ type CPU struct {
 func (cpu *CPU) Reset() {
 	cpu.Regs = RegisterFile{}
 	cpu.Regs.SP = 0xfffe
-	cpu.Interrupts = Interrupts{}
+	cpu.Interrupts.MemIE.Data[0] = 0
+	cpu.Interrupts.MemIF.Data[0] = 0
+	cpu.Interrupts.IME = false
 	cpu.CBOp = CBOp{}
 	cpu.machineCycle = 0
 	cpu.clockCycle = Cycle{}
@@ -169,6 +164,7 @@ func (cpu *CPU) IncPC() {
 
 func NewCPU(
 	phi *Clock,
+	interrupts *Interrupts,
 	bus *Bus,
 	debugger *Debugger,
 	disassembler *Disassembler,
@@ -178,6 +174,7 @@ func NewCPU(
 		Bus:          bus,
 		Debugger:     debugger,
 		Disassembler: disassembler,
+		Interrupts:   interrupts,
 		nopCountMax:  4,
 		rewindBuffer: make([]ExecLogEntry, 16),
 	}
@@ -276,6 +273,6 @@ func (cpu *CPU) writeAddressBus(addr uint16) {
 func (cpu *CPU) applyPendingIME() {
 	if cpu.Interrupts.setIMENextCycle {
 		cpu.Interrupts.setIMENextCycle = false
-		cpu.Interrupts.IME = true
+		cpu.Interrupts.SetIME(true)
 	}
 }

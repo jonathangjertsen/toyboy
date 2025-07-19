@@ -1,7 +1,5 @@
 package model
 
-import "fmt"
-
 type Bit uint8
 
 func (b Bit) Bool() bool {
@@ -55,44 +53,24 @@ func Unpack(b8 uint8) Bits {
 	return out
 }
 
-func ADD(a, b uint8, carryIn bool) ALUResult {
-	carry := NewBit(carryIn)
-	aBits := Unpack(a)
-	bBits := Unpack(b)
-	var dBits Bits
-	var result ALUResult
-	for i := range 8 {
-		ai := aBits[i]
-		bi := bBits[i]
-
-		// full adder circuit
-		di := ai ^ bi ^ carry
-		nextCarry := (ai & bi) | ((ai ^ bi) & carry)
-
-		dBits[i] = di
-		if i == 3 {
-			result.H = nextCarry.Bool()
-		} else if i == 7 {
-			result.C = nextCarry.Bool()
-		}
-		carry = nextCarry
+func ADD(a, b uint8, carry bool) ALUResult {
+	cint := 0
+	if carry {
+		cint = 1
 	}
-	result.Value = dBits.Pack()
-	if expected := a + b + uint8(NewBit(carryIn)); result.Value != expected {
-		panic(fmt.Sprintf("invalid calc: a=%v b=%v carry=%v, a+b+carry=%v, got %v", a, b, carryIn, expected, result.Value))
-	}
-	return result
+	v := int(a) + int(b) + cint
+	hv := int(a&0xf) + int(b&0xf) + cint
+	return ALUResult{Value: uint8(v), C: v > 0xff, H: hv > 0xf}
 }
 
 func SUB(a, b uint8, carry bool) ALUResult {
-	result := ADD(a, ^b, !carry)
-	result.N = true
-	result.C = !result.C
-	result.H = !result.H
-	if result.Value != uint8(int(a)-int(b)-int(NewBit(carry))) {
-		panic("invalid calc")
+	cint := 0
+	if carry {
+		cint = 1
 	}
-	return result
+	v := int(a) - int(b) - cint
+	hv := int(a&0xf) - int(b&0xf) - cint
+	return ALUResult{Value: uint8(v), C: v < 0, H: hv < 0, N: true}
 }
 
 func OR(a, b uint8) ALUResult {

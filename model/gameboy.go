@@ -70,8 +70,7 @@ func (gb *Gameboy) init() {
 	debugger := NewDebugger(clk)
 	disassembler := NewDisassembler()
 
-	ppuClock := clk.Divide(2)
-	cpuClock := clk.Divide(4)
+	interrupts := NewInterrupts(clk)
 
 	bootROMLock := NewBootROMLock(clk)
 	bootROM := NewBootROM(clk, gb.Config.Model)
@@ -83,7 +82,7 @@ func (gb *Gameboy) init() {
 	apu := NewAPU(clk)
 	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
 	cartridgeSlot := NewMemoryRegion(clk, AddrCartridgeBank0Begin, AddrCartridgeBank0Size)
-	joypad := NewJoypad(clk)
+	joypad := NewJoypad(clk, interrupts)
 
 	bootROMLock.OnUnlock = func() {
 		disassembler.SetProgram(cartridgeSlot.Data)
@@ -91,7 +90,12 @@ func (gb *Gameboy) init() {
 	}
 
 	bus := &Bus{}
-	ppu := NewPPU(clk, ppuClock, bus, debugger)
+
+	cpuClock := clk.Divide(4)
+	cpu := NewCPU(cpuClock, interrupts, bus, debugger, disassembler)
+
+	ppuClock := clk.Divide(2)
+	ppu := NewPPU(clk, ppuClock, interrupts, bus, debugger)
 
 	bus.BootROMLock = bootROMLock
 	bus.BootROM = &bootROM
@@ -103,8 +107,7 @@ func (gb *Gameboy) init() {
 	bus.PPU = ppu
 	bus.CartridgeSlot = &cartridgeSlot
 	bus.Joypad = joypad
-
-	cpu := NewCPU(cpuClock, bus, debugger, disassembler)
+	bus.Interrupts = interrupts
 
 	gb.CLK = clk
 	gb.Disassembler = disassembler

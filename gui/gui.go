@@ -91,7 +91,7 @@ func New(config model.HWConfig) *GUI {
 
 func (gui *GUI) initGameboy() {
 	gb := model.NewGameboy(gui.Config)
-	f, err := os.ReadFile("assets/cartridges/unbricked.gb")
+	f, err := os.ReadFile("assets/cartridges/tetris.gb")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load cartridge: %v", err))
 	} else if len(f) != 0x8000 {
