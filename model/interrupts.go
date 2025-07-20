@@ -66,6 +66,9 @@ func (ints *Interrupts) ExecInterrupt(in uint8) {
 }
 
 func (ints *Interrupts) IRQSet(in uint8) {
+	if ints.MemIF.Data[0]&in != 0 {
+		return
+	}
 	ints.MemIF.Data[0] |= in
 	ints.IRQCheck()
 }

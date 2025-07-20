@@ -92,7 +92,7 @@ type PPU struct {
 	Debugger   *Debugger
 
 	RegLCDC uint8
-	RegSTAT uint8
+	Stat    Stat
 	RegSCY  uint8
 	RegSCX  uint8
 	RegWY   uint8
@@ -191,12 +191,6 @@ func (ppu *PPU) SetLCDC(v uint8) {
 	ppu.RegLCDC = v
 }
 
-func (ppu *PPU) SetSTAT(v uint8) {
-	ppu.Debug("SetSTAT", "%02x", v)
-	ppu.RegSTAT = maskedWrite(ppu.RegSTAT, v, 0xf8)
-	panic("not implemented: SetSTAT")
-}
-
 func (ppu *PPU) SetSCY(v uint8) {
 	ppu.Debug("SetSCY", "%02x", v)
 	ppu.RegSCY = v
@@ -267,6 +261,7 @@ func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, de
 		Bus:          bus,
 		Debugger:     debugger,
 		Interrupts:   interrupts,
+		Stat:         Stat{Interrupts: interrupts},
 	}
 	ppu.BackgroundFetcher.PPU = ppu
 	ppu.SpriteFetcher.PPU = ppu
@@ -306,7 +301,7 @@ func (ppu *PPU) fsm(c Cycle) {
 
 func (ppu *PPU) setMode(mode PPUMode) {
 	ppu.Mode = mode
-	ppu.RegSTAT = maskedWrite(ppu.RegSTAT, uint8(mode), 0x7)
+	ppu.Stat.SetMode(mode)
 }
 
 func (ppu *PPU) beginFrame() {
@@ -481,11 +476,7 @@ func (ppu *PPU) IncRegLY() {
 	if ppu.RegLY >= 153 {
 		ppu.RegLY = 0
 	}
-	if ppu.RegLY == ppu.RegLYC {
-		ppu.RegSTAT |= uint8(1 << 2)
-	} else {
-		ppu.RegSTAT &= ^uint8(1 << 2)
-	}
+	ppu.Stat.SetLYCEqLY(ppu.RegLY == ppu.RegLYC)
 	ppu.Debugger.SetY(ppu.RegLY)
 }
 
@@ -494,7 +485,7 @@ func (ppu *PPU) Read(addr uint16) uint8 {
 	case AddrLCDC:
 		return ppu.RegLCDC
 	case AddrSTAT:
-		return ppu.RegSTAT
+		return ppu.Stat.Reg
 	case AddrSCY:
 		return ppu.RegSCY
 	case AddrSCX:
@@ -522,7 +513,7 @@ func (ppu *PPU) Write(addr uint16, v uint8) {
 	case AddrLCDC:
 		ppu.SetLCDC(v)
 	case AddrSTAT:
-		ppu.SetSTAT(v)
+		ppu.Stat.Write(v)
 	case AddrSCY:
 		ppu.SetSCY(v)
 	case AddrSCX:

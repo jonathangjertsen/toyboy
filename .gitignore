@@ -2,7 +2,7 @@ vendor/
 bin/
 
 // ethically sources ROMs only
-cartridges/*.gb
-!cartridges/empty.gb
-!cartridges/hello-world.gb
-!cartridges/unbricked.gb
+assets/cartridges/*.gb
+!assets/cartridges/empty.gb
+!assets/cartridges/hello-world.gb
+!assets/cartridges/unbricked.gb
