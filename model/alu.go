@@ -22,16 +22,16 @@ func NewBit(b bool) Bit {
 
 type Bits [8]Bit
 
-func (bi Bits) Pack() uint8 {
-	var out uint8
+func (bi Bits) Pack() Data8 {
+	var out Data8
 	for i := range 8 {
-		out |= uint8(bi[i]) << i
+		out |= Data8(bi[i]) << i
 	}
 	return out
 }
 
 type ALUResult struct {
-	Value uint8
+	Value Data8
 	Z0    bool
 	N     bool
 	H     bool
@@ -45,7 +45,7 @@ func (res ALUResult) Z() bool {
 	return res.Value == 0
 }
 
-func Unpack(b8 uint8) Bits {
+func Unpack(b8 Data8) Bits {
 	var out Bits
 	for i := range 8 {
 		out[i] = Bit((b8 & (1 << i)) >> i)
@@ -53,91 +53,91 @@ func Unpack(b8 uint8) Bits {
 	return out
 }
 
-func ADD(a, b uint8, carry bool) ALUResult {
+func ADD(a, b Data8, carry bool) ALUResult {
 	cint := 0
 	if carry {
 		cint = 1
 	}
 	v := int(a) + int(b) + cint
 	hv := int(a&0xf) + int(b&0xf) + cint
-	return ALUResult{Value: uint8(v), C: v > 0xff, H: hv > 0xf}
+	return ALUResult{Value: Data8(v), C: v > 0xff, H: hv > 0xf}
 }
 
-func SUB(a, b uint8, carry bool) ALUResult {
+func SUB(a, b Data8, carry bool) ALUResult {
 	cint := 0
 	if carry {
 		cint = 1
 	}
 	v := int(a) - int(b) - cint
 	hv := int(a&0xf) - int(b&0xf) - cint
-	return ALUResult{Value: uint8(v), C: v < 0, H: hv < 0, N: true}
+	return ALUResult{Value: Data8(v), C: v < 0, H: hv < 0, N: true}
 }
 
-func OR(a, b uint8) ALUResult {
+func OR(a, b Data8) ALUResult {
 	return ALUResult{Value: a | b}
 }
 
-func AND(a, b uint8) ALUResult {
+func AND(a, b Data8) ALUResult {
 	return ALUResult{Value: a & b, H: true}
 }
 
-func XOR(a, b uint8) ALUResult {
+func XOR(a, b Data8) ALUResult {
 	return ALUResult{Value: a ^ b}
 }
 
-func RL(a uint8, carry bool) ALUResult {
-	var mask uint8
+func RL(a Data8, carry bool) ALUResult {
+	var mask Data8
 	if carry {
 		mask = 0x01
 	}
 	return ALUResult{Value: a<<1 | mask, C: a&0x80 != 0}
 }
 
-func SRL(a uint8) ALUResult {
+func SRL(a Data8) ALUResult {
 	return ALUResult{Value: a >> 1, C: a&0x01 != 0}
 }
 
-func RLA(a uint8, carry bool) ALUResult {
+func RLA(a Data8, carry bool) ALUResult {
 	res := RL(a, carry)
 	res.Z0 = true
 	return res
 }
 
-func RR(a uint8, carry bool) ALUResult {
-	var mask uint8
+func RR(a Data8, carry bool) ALUResult {
+	var mask Data8
 	if carry {
 		mask = 0x80
 	}
 	return ALUResult{Value: a>>1 | mask, C: a&1 != 0}
 }
 
-func RRA(a uint8, carry bool) ALUResult {
+func RRA(a Data8, carry bool) ALUResult {
 	res := RR(a, carry)
 	res.Z0 = true
 	return res
 }
 
-func RLCA(a uint8) ALUResult {
-	var mask uint8
+func RLCA(a Data8) ALUResult {
+	var mask Data8
 	if a&80 != 0 {
 		mask = 1
 	}
 	return ALUResult{Value: a<<1 | mask, C: a&0x80 != 0, Z0: true}
 }
 
-func RRCA(a uint8) ALUResult {
-	var mask uint8
+func RRCA(a Data8) ALUResult {
+	var mask Data8
 	if a&1 != 0 {
 		mask = 0x80
 	}
 	return ALUResult{Value: a>>1 | mask, C: a&1 != 0, Z0: true}
 }
 
-func SWAP(a uint8) ALUResult {
+func SWAP(a Data8) ALUResult {
 	return ALUResult{Value: ((a & 0x0f) << 4) | ((a & 0xf0) >> 4)}
 }
 
-func DAA(a uint8, c, n, h bool) ALUResult {
+func DAA(a Data8, c, n, h bool) ALUResult {
 	if n {
 		if c {
 			a -= 0x60

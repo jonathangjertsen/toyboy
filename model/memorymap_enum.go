@@ -12,15 +12,32 @@ import (
 )
 
 const (
-	AddrP1 Addr = iota + 65280
+	AddrZero              Addr = iota
+	AddrBootROMEnd        Addr = iota + 254
+	AddrCartridgeBank0End Addr = iota + 16381
+	AddrTileDataBegin     Addr = iota + 32765
+	AddrTileDataEnd       Addr = iota + 38907
+	AddrTileMap0Begin
+	AddrTileMap0End Addr = iota + 39929
+	AddrTileMap1Begin
+	AddrTileMap1End Addr = iota + 40951
+	AddrRAMBegin
+	AddrRAMEnd Addr = iota + 49141
+	AddrWRAMBegin
+	AddrWRAMEnd Addr = iota + 57331
+	AddrEchoRAMBegin
+	AddrEchoRAMEnd Addr = iota + 65009
+	AddrOAMBegin
+	AddrOAMEnd Addr = iota + 65167
+	AddrP1     Addr = iota + 65263
 	AddrSB
 	AddrSC
-	AddrDIV Addr = iota + 65281
+	AddrDIV Addr = iota + 65264
 	AddrTIMA
 	AddrTMA
 	AddrTAC
-	AddrIF   Addr = iota + 65288
-	AddrLCDC Addr = iota + 65336
+	AddrIF   Addr = iota + 65271
+	AddrLCDC Addr = iota + 65319
 	AddrSTAT
 	AddrSCY
 	AddrSCX
@@ -32,12 +49,12 @@ const (
 	AddrOBP1
 	AddrWY
 	AddrWX
-	AddrNR10 Addr = iota + 65276
+	AddrNR10 Addr = iota + 65259
 	AddrNR11
 	AddrNR12
 	AddrNR13
 	AddrNR14
-	AddrNR21 Addr = iota + 65277
+	AddrNR21 Addr = iota + 65260
 	AddrNR22
 	AddrNR23
 	AddrNR24
@@ -46,111 +63,86 @@ const (
 	AddrNR32
 	AddrNR33
 	AddrNR34
-	AddrNR41 Addr = iota + 65278
+	AddrNR41 Addr = iota + 65261
 	AddrNR42
 	AddrNR43
 	AddrNR44
 	AddrNR50
 	AddrNR51
 	AddrNR52
-	AddrIE Addr = iota + 65494
+	AddrBootROMLock Addr = iota + 65302
+	AddrHRAMBegin   Addr = iota + 65349
+	AddrHRAMEnd     Addr = iota + 65474
+	AddrIE
 )
 
 var ErrInvalidAddr = errors.New("not a valid Addr")
 
-const _AddrName = "P1SBSCDIVTIMATMATACIFLCDCSTATSCYSCXLYLYCDMABGPOBP0OBP1WYWXNR10NR11NR12NR13NR14NR21NR22NR23NR24NR30NR31NR32NR33NR34NR41NR42NR43NR44NR50NR51NR52IE"
-
-// AddrValues returns a list of the values for Addr
-func AddrValues() []Addr {
-	return []Addr{
-		AddrP1,
-		AddrSB,
-		AddrSC,
-		AddrDIV,
-		AddrTIMA,
-		AddrTMA,
-		AddrTAC,
-		AddrIF,
-		AddrLCDC,
-		AddrSTAT,
-		AddrSCY,
-		AddrSCX,
-		AddrLY,
-		AddrLYC,
-		AddrDMA,
-		AddrBGP,
-		AddrOBP0,
-		AddrOBP1,
-		AddrWY,
-		AddrWX,
-		AddrNR10,
-		AddrNR11,
-		AddrNR12,
-		AddrNR13,
-		AddrNR14,
-		AddrNR21,
-		AddrNR22,
-		AddrNR23,
-		AddrNR24,
-		AddrNR30,
-		AddrNR31,
-		AddrNR32,
-		AddrNR33,
-		AddrNR34,
-		AddrNR41,
-		AddrNR42,
-		AddrNR43,
-		AddrNR44,
-		AddrNR50,
-		AddrNR51,
-		AddrNR52,
-		AddrIE,
-	}
-}
+const _AddrName = "ZeroBootROMEndCartridgeBank0EndTileDataBeginTileDataEndTileMap0BeginTileMap0EndTileMap1BeginTileMap1EndRAMBeginRAMEndWRAMBeginWRAMEndEchoRAMBeginEchoRAMEndOAMBeginOAMEndP1SBSCDIVTIMATMATACIFLCDCSTATSCYSCXLYLYCDMABGPOBP0OBP1WYWXNR10NR11NR12NR13NR14NR21NR22NR23NR24NR30NR31NR32NR33NR34NR41NR42NR43NR44NR50NR51NR52BootROMLockHRAMBeginHRAMEndIE"
 
 var _AddrMap = map[Addr]string{
-	AddrP1:   _AddrName[0:2],
-	AddrSB:   _AddrName[2:4],
-	AddrSC:   _AddrName[4:6],
-	AddrDIV:  _AddrName[6:9],
-	AddrTIMA: _AddrName[9:13],
-	AddrTMA:  _AddrName[13:16],
-	AddrTAC:  _AddrName[16:19],
-	AddrIF:   _AddrName[19:21],
-	AddrLCDC: _AddrName[21:25],
-	AddrSTAT: _AddrName[25:29],
-	AddrSCY:  _AddrName[29:32],
-	AddrSCX:  _AddrName[32:35],
-	AddrLY:   _AddrName[35:37],
-	AddrLYC:  _AddrName[37:40],
-	AddrDMA:  _AddrName[40:43],
-	AddrBGP:  _AddrName[43:46],
-	AddrOBP0: _AddrName[46:50],
-	AddrOBP1: _AddrName[50:54],
-	AddrWY:   _AddrName[54:56],
-	AddrWX:   _AddrName[56:58],
-	AddrNR10: _AddrName[58:62],
-	AddrNR11: _AddrName[62:66],
-	AddrNR12: _AddrName[66:70],
-	AddrNR13: _AddrName[70:74],
-	AddrNR14: _AddrName[74:78],
-	AddrNR21: _AddrName[78:82],
-	AddrNR22: _AddrName[82:86],
-	AddrNR23: _AddrName[86:90],
-	AddrNR24: _AddrName[90:94],
-	AddrNR30: _AddrName[94:98],
-	AddrNR31: _AddrName[98:102],
-	AddrNR32: _AddrName[102:106],
-	AddrNR33: _AddrName[106:110],
-	AddrNR34: _AddrName[110:114],
-	AddrNR41: _AddrName[114:118],
-	AddrNR42: _AddrName[118:122],
-	AddrNR43: _AddrName[122:126],
-	AddrNR44: _AddrName[126:130],
-	AddrNR50: _AddrName[130:134],
-	AddrNR51: _AddrName[134:138],
-	AddrNR52: _AddrName[138:142],
-	AddrIE:   _AddrName[142:144],
+	AddrZero:              _AddrName[0:4],
+	AddrBootROMEnd:        _AddrName[4:14],
+	AddrCartridgeBank0End: _AddrName[14:31],
+	AddrTileDataBegin:     _AddrName[31:44],
+	AddrTileDataEnd:       _AddrName[44:55],
+	AddrTileMap0Begin:     _AddrName[55:68],
+	AddrTileMap0End:       _AddrName[68:79],
+	AddrTileMap1Begin:     _AddrName[79:92],
+	AddrTileMap1End:       _AddrName[92:103],
+	AddrRAMBegin:          _AddrName[103:111],
+	AddrRAMEnd:            _AddrName[111:117],
+	AddrWRAMBegin:         _AddrName[117:126],
+	AddrWRAMEnd:           _AddrName[126:133],
+	AddrEchoRAMBegin:      _AddrName[133:145],
+	AddrEchoRAMEnd:        _AddrName[145:155],
+	AddrOAMBegin:          _AddrName[155:163],
+	AddrOAMEnd:            _AddrName[163:169],
+	AddrP1:                _AddrName[169:171],
+	AddrSB:                _AddrName[171:173],
+	AddrSC:                _AddrName[173:175],
+	AddrDIV:               _AddrName[175:178],
+	AddrTIMA:              _AddrName[178:182],
+	AddrTMA:               _AddrName[182:185],
+	AddrTAC:               _AddrName[185:188],
+	AddrIF:                _AddrName[188:190],
+	AddrLCDC:              _AddrName[190:194],
+	AddrSTAT:              _AddrName[194:198],
+	AddrSCY:               _AddrName[198:201],
+	AddrSCX:               _AddrName[201:204],
+	AddrLY:                _AddrName[204:206],
+	AddrLYC:               _AddrName[206:209],
+	AddrDMA:               _AddrName[209:212],
+	AddrBGP:               _AddrName[212:215],
+	AddrOBP0:              _AddrName[215:219],
+	AddrOBP1:              _AddrName[219:223],
+	AddrWY:                _AddrName[223:225],
+	AddrWX:                _AddrName[225:227],
+	AddrNR10:              _AddrName[227:231],
+	AddrNR11:              _AddrName[231:235],
+	AddrNR12:              _AddrName[235:239],
+	AddrNR13:              _AddrName[239:243],
+	AddrNR14:              _AddrName[243:247],
+	AddrNR21:              _AddrName[247:251],
+	AddrNR22:              _AddrName[251:255],
+	AddrNR23:              _AddrName[255:259],
+	AddrNR24:              _AddrName[259:263],
+	AddrNR30:              _AddrName[263:267],
+	AddrNR31:              _AddrName[267:271],
+	AddrNR32:              _AddrName[271:275],
+	AddrNR33:              _AddrName[275:279],
+	AddrNR34:              _AddrName[279:283],
+	AddrNR41:              _AddrName[283:287],
+	AddrNR42:              _AddrName[287:291],
+	AddrNR43:              _AddrName[291:295],
+	AddrNR44:              _AddrName[295:299],
+	AddrNR50:              _AddrName[299:303],
+	AddrNR51:              _AddrName[303:307],
+	AddrNR52:              _AddrName[307:311],
+	AddrBootROMLock:       _AddrName[311:322],
+	AddrHRAMBegin:         _AddrName[322:331],
+	AddrHRAMEnd:           _AddrName[331:338],
+	AddrIE:                _AddrName[338:340],
 }
 
 // String implements the Stringer interface.
@@ -169,48 +161,68 @@ func (x Addr) IsValid() bool {
 }
 
 var _AddrValue = map[string]Addr{
-	_AddrName[0:2]:     AddrP1,
-	_AddrName[2:4]:     AddrSB,
-	_AddrName[4:6]:     AddrSC,
-	_AddrName[6:9]:     AddrDIV,
-	_AddrName[9:13]:    AddrTIMA,
-	_AddrName[13:16]:   AddrTMA,
-	_AddrName[16:19]:   AddrTAC,
-	_AddrName[19:21]:   AddrIF,
-	_AddrName[21:25]:   AddrLCDC,
-	_AddrName[25:29]:   AddrSTAT,
-	_AddrName[29:32]:   AddrSCY,
-	_AddrName[32:35]:   AddrSCX,
-	_AddrName[35:37]:   AddrLY,
-	_AddrName[37:40]:   AddrLYC,
-	_AddrName[40:43]:   AddrDMA,
-	_AddrName[43:46]:   AddrBGP,
-	_AddrName[46:50]:   AddrOBP0,
-	_AddrName[50:54]:   AddrOBP1,
-	_AddrName[54:56]:   AddrWY,
-	_AddrName[56:58]:   AddrWX,
-	_AddrName[58:62]:   AddrNR10,
-	_AddrName[62:66]:   AddrNR11,
-	_AddrName[66:70]:   AddrNR12,
-	_AddrName[70:74]:   AddrNR13,
-	_AddrName[74:78]:   AddrNR14,
-	_AddrName[78:82]:   AddrNR21,
-	_AddrName[82:86]:   AddrNR22,
-	_AddrName[86:90]:   AddrNR23,
-	_AddrName[90:94]:   AddrNR24,
-	_AddrName[94:98]:   AddrNR30,
-	_AddrName[98:102]:  AddrNR31,
-	_AddrName[102:106]: AddrNR32,
-	_AddrName[106:110]: AddrNR33,
-	_AddrName[110:114]: AddrNR34,
-	_AddrName[114:118]: AddrNR41,
-	_AddrName[118:122]: AddrNR42,
-	_AddrName[122:126]: AddrNR43,
-	_AddrName[126:130]: AddrNR44,
-	_AddrName[130:134]: AddrNR50,
-	_AddrName[134:138]: AddrNR51,
-	_AddrName[138:142]: AddrNR52,
-	_AddrName[142:144]: AddrIE,
+	_AddrName[0:4]:     AddrZero,
+	_AddrName[4:14]:    AddrBootROMEnd,
+	_AddrName[14:31]:   AddrCartridgeBank0End,
+	_AddrName[31:44]:   AddrTileDataBegin,
+	_AddrName[44:55]:   AddrTileDataEnd,
+	_AddrName[55:68]:   AddrTileMap0Begin,
+	_AddrName[68:79]:   AddrTileMap0End,
+	_AddrName[79:92]:   AddrTileMap1Begin,
+	_AddrName[92:103]:  AddrTileMap1End,
+	_AddrName[103:111]: AddrRAMBegin,
+	_AddrName[111:117]: AddrRAMEnd,
+	_AddrName[117:126]: AddrWRAMBegin,
+	_AddrName[126:133]: AddrWRAMEnd,
+	_AddrName[133:145]: AddrEchoRAMBegin,
+	_AddrName[145:155]: AddrEchoRAMEnd,
+	_AddrName[155:163]: AddrOAMBegin,
+	_AddrName[163:169]: AddrOAMEnd,
+	_AddrName[169:171]: AddrP1,
+	_AddrName[171:173]: AddrSB,
+	_AddrName[173:175]: AddrSC,
+	_AddrName[175:178]: AddrDIV,
+	_AddrName[178:182]: AddrTIMA,
+	_AddrName[182:185]: AddrTMA,
+	_AddrName[185:188]: AddrTAC,
+	_AddrName[188:190]: AddrIF,
+	_AddrName[190:194]: AddrLCDC,
+	_AddrName[194:198]: AddrSTAT,
+	_AddrName[198:201]: AddrSCY,
+	_AddrName[201:204]: AddrSCX,
+	_AddrName[204:206]: AddrLY,
+	_AddrName[206:209]: AddrLYC,
+	_AddrName[209:212]: AddrDMA,
+	_AddrName[212:215]: AddrBGP,
+	_AddrName[215:219]: AddrOBP0,
+	_AddrName[219:223]: AddrOBP1,
+	_AddrName[223:225]: AddrWY,
+	_AddrName[225:227]: AddrWX,
+	_AddrName[227:231]: AddrNR10,
+	_AddrName[231:235]: AddrNR11,
+	_AddrName[235:239]: AddrNR12,
+	_AddrName[239:243]: AddrNR13,
+	_AddrName[243:247]: AddrNR14,
+	_AddrName[247:251]: AddrNR21,
+	_AddrName[251:255]: AddrNR22,
+	_AddrName[255:259]: AddrNR23,
+	_AddrName[259:263]: AddrNR24,
+	_AddrName[263:267]: AddrNR30,
+	_AddrName[267:271]: AddrNR31,
+	_AddrName[271:275]: AddrNR32,
+	_AddrName[275:279]: AddrNR33,
+	_AddrName[279:283]: AddrNR34,
+	_AddrName[283:287]: AddrNR41,
+	_AddrName[287:291]: AddrNR42,
+	_AddrName[291:295]: AddrNR43,
+	_AddrName[295:299]: AddrNR44,
+	_AddrName[299:303]: AddrNR50,
+	_AddrName[303:307]: AddrNR51,
+	_AddrName[307:311]: AddrNR52,
+	_AddrName[311:322]: AddrBootROMLock,
+	_AddrName[322:331]: AddrHRAMBegin,
+	_AddrName[331:338]: AddrHRAMEnd,
+	_AddrName[338:340]: AddrIE,
 }
 
 // ParseAddr attempts to convert a string to a Addr.

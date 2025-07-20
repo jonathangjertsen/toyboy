@@ -4,8 +4,8 @@ type Joypad struct {
 	clk        *ClockRT
 	Interrupts *Interrupts
 	Written    MemoryRegion
-	Action     uint8
-	Direction  uint8
+	Action     Data8
+	Direction  Data8
 }
 
 type JoypadState struct {
@@ -31,14 +31,14 @@ func NewJoypad(clock *ClockRT, ints *Interrupts) *Joypad {
 	return jp
 }
 
-func (jp *Joypad) Write(addr uint16, v uint8) {
+func (jp *Joypad) Write(addr Addr, v Data8) {
 	// TODO: can this trigger an interrupt?
 	jp.Written.Write(addr, v)
 }
 
-func (jp *Joypad) Read(addr uint16) uint8 {
+func (jp *Joypad) Read(addr Addr) Data8 {
 	written := jp.Written.Read(addr)
-	out := uint8(0x0f)
+	out := Data8(0x0f)
 	if written&0x20 == 0 {
 		out &= jp.Action
 	}
@@ -52,8 +52,8 @@ func (jp *Joypad) Read(addr uint16) uint8 {
 func (jp *Joypad) SetState(jps JoypadState) {
 	// TODO:
 	jp.clk.Sync(func() {
-		actionMask := uint8(0b0000)
-		directionMask := uint8(0b0000)
+		actionMask := Data8(0b0000)
+		directionMask := Data8(0b0000)
 		if jps.A {
 			actionMask |= 0b0001
 		}

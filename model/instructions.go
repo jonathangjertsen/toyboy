@@ -310,7 +310,7 @@ type edge struct {
 
 type InstructionHandling func(e edge) bool
 
-var instSize = [256]uint16{
+var instSize = [256]Addr{
 	OpcodeNop: 1,
 
 	OpcodeRST0x00: 1,
@@ -611,7 +611,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeLDAHLInc: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(cpu.GetHL())
+				cpu.writeAddressBus(Addr(cpu.GetHL()))
 				cpu.SetHL(cpu.GetHL() + 1)
 			case edge{1, true}:
 			case edge{2, false}:
@@ -627,7 +627,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeLDAHLDec: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(cpu.GetHL())
+				cpu.writeAddressBus(Addr(cpu.GetHL()))
 				cpu.SetHL(cpu.GetHL() - 1)
 			case edge{1, true}:
 			case edge{2, false}:
@@ -744,7 +744,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeADCHL: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(cpu.GetHL())
+				cpu.writeAddressBus(Addr(cpu.GetHL()))
 			case edge{1, true}:
 				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
@@ -802,7 +802,11 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{2, false}:
 			case edge{2, true}:
 			case edge{3, false}:
-				cpu.SetPC(uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ))))
+				if cpu.Regs.TempZ.SignBit() {
+					cpu.SetPC(cpu.Regs.PC - Addr(cpu.Regs.TempZ.SignedAbs()))
+				} else {
+					cpu.SetPC(cpu.Regs.PC + Addr(cpu.Regs.TempZ))
+				}
 				return true
 			case edge{3, true}:
 				return true
@@ -826,7 +830,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{3, false}:
 			case edge{3, true}:
 			case edge{4, false}:
-				cpu.SetPC(cpu.Regs.GetWZ())
+				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 				return true
 			case edge{4, true}:
 				return true
@@ -870,13 +874,13 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP - 1)
 			case edge{4, true}:
-				cpu.Bus.WriteData(msb(cpu.Regs.PC))
+				cpu.Bus.WriteData(cpu.Regs.PC.MSB())
 			case edge{5, false}:
 				cpu.writeAddressBus(cpu.Regs.SP)
 			case edge{5, true}:
-				cpu.Bus.WriteData(lsb(cpu.Regs.PC))
+				cpu.Bus.WriteData(cpu.Regs.PC.LSB())
 			case edge{6, false}:
-				cpu.SetPC(cpu.Regs.GetWZ())
+				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 				return true
 			case edge{6, true}:
 				return true
@@ -898,7 +902,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{2, true}:
 				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
-				cpu.SetPC(cpu.Regs.GetWZ())
+				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 			case edge{3, true}:
 			case edge{4, false}, edge{4, true}:
 				return true
@@ -959,10 +963,10 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeADDHLHL: cpu.addhlrr(&cpu.Regs.H, &cpu.Regs.L),
 		OpcodeADDHLBC: cpu.addhlrr(&cpu.Regs.B, &cpu.Regs.C),
 		OpcodeADDHLDE: cpu.addhlrr(&cpu.Regs.D, &cpu.Regs.E),
-		OpcodeLDBCnn:  cpu.ldxxnn(func(wz uint16) { cpu.SetBC(wz) }),
-		OpcodeLDDEnn:  cpu.ldxxnn(func(wz uint16) { cpu.SetDE(wz) }),
-		OpcodeLDHLnn:  cpu.ldxxnn(func(wz uint16) { cpu.SetHL(wz) }),
-		OpcodeLDSPnn:  cpu.ldxxnn(func(wz uint16) { cpu.SetSP(wz) }),
+		OpcodeLDBCnn:  cpu.ldxxnn(func(wz Data16) { cpu.SetBC(wz) }),
+		OpcodeLDDEnn:  cpu.ldxxnn(func(wz Data16) { cpu.SetDE(wz) }),
+		OpcodeLDHLnn:  cpu.ldxxnn(func(wz Data16) { cpu.SetHL(wz) }),
+		OpcodeLDSPnn:  cpu.ldxxnn(func(wz Data16) { cpu.SetSP(Addr(wz)) }),
 		OpcodeLDHLn: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
@@ -971,7 +975,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, true}:
 				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
-				cpu.writeAddressBus(cpu.GetHL())
+				cpu.writeAddressBus(Addr(cpu.GetHL()))
 			case edge{2, true}:
 				cpu.Bus.WriteData(cpu.Regs.TempZ)
 			case edge{3, false}, edge{3, true}:
@@ -989,13 +993,13 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, true}:
 				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
-				res := ADD(lsb(cpu.Regs.SP), cpu.Regs.TempZ, false)
+				res := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
 				cpu.Regs.L = res.Value
 				res.Z0 = true
 				cpu.Regs.SetFlags(res)
 			case edge{2, true}:
 			case edge{3, false}:
-				res := ADD(msb(cpu.Regs.SP), cpu.Regs.TempZ&0x80, cpu.Regs.GetFlagZ())
+				res := ADD(cpu.Regs.SP.MSB(), cpu.Regs.TempZ&0x80, cpu.Regs.GetFlagZ())
 				cpu.Regs.H = res.Value
 				return true
 			case edge{3, true}:
@@ -1011,7 +1015,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeLDBCA: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(cpu.GetBC())
+				cpu.writeAddressBus(Addr(cpu.GetBC()))
 			case edge{1, true}:
 				cpu.Bus.WriteData(cpu.Regs.A)
 			case edge{2, false}:
@@ -1026,7 +1030,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeLDDEA: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(cpu.GetDE())
+				cpu.writeAddressBus(Addr(cpu.GetDE()))
 			case edge{1, true}:
 				cpu.Bus.WriteData(cpu.Regs.A)
 			case edge{2, false}:
@@ -1041,7 +1045,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeLDHCA: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(join16(0xff, cpu.Regs.C))
+				cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.C)))
 			case edge{1, true}:
 				cpu.Bus.WriteData(cpu.Regs.A)
 			case edge{2, false}, edge{2, true}:
@@ -1054,7 +1058,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeADDHL: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(cpu.GetHL())
+				cpu.writeAddressBus(Addr(cpu.GetHL()))
 			case edge{1, true}:
 				cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Bus.Data, false))
 			case edge{2, false}, edge{2, true}:
@@ -1067,7 +1071,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeCPHL: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(cpu.GetHL())
+				cpu.writeAddressBus(Addr(cpu.GetHL()))
 			case edge{1, true}:
 				cpu.Regs.SetFlags(SUB(cpu.Regs.A, cpu.Bus.Data, false))
 			case edge{2, false}, edge{2, true}:
@@ -1090,14 +1094,14 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{2, true}:
 				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
-				cpu.writeAddressBus(cpu.Regs.GetWZ())
+				cpu.writeAddressBus(Addr(cpu.Regs.GetWZ()))
 			case edge{3, true}:
-				cpu.Bus.WriteData(lsb(cpu.Regs.SP))
+				cpu.Bus.WriteData(cpu.Regs.SP.LSB())
 				cpu.Regs.SetWZ(cpu.Regs.GetWZ() + 1)
 			case edge{4, false}:
-				cpu.writeAddressBus(cpu.Regs.GetWZ())
+				cpu.writeAddressBus(Addr(cpu.Regs.GetWZ()))
 			case edge{4, true}:
-				cpu.Bus.WriteData(msb(cpu.Regs.SP))
+				cpu.Bus.WriteData(cpu.Regs.SP.MSB())
 			case edge{5, false}, edge{5, true}:
 				return true
 			default:
@@ -1118,7 +1122,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{2, true}:
 				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
-				cpu.writeAddressBus(cpu.Regs.GetWZ())
+				cpu.writeAddressBus(Addr(cpu.Regs.GetWZ()))
 			case edge{3, true}:
 				cpu.Bus.WriteData(cpu.Regs.A)
 			case edge{4, false}, edge{4, true}:
@@ -1141,7 +1145,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{2, true}:
 				cpu.Regs.TempW = cpu.Bus.Data
 			case edge{3, false}:
-				cpu.writeAddressBus(cpu.Regs.GetWZ())
+				cpu.writeAddressBus(Addr(cpu.Regs.GetWZ()))
 			case edge{3, true}:
 				cpu.Regs.A = cpu.Bus.Data
 			case edge{4, false}, edge{4, true}:
@@ -1151,11 +1155,11 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			}
 			return false
 		},
-		OpcodeCPn:  cpu.alun(func(imm uint8) { cpu.Regs.SetFlags(SUB(cpu.Regs.A, imm, false)) }),
-		OpcodeSUBn: cpu.alun(func(imm uint8) { cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, imm, false)) }),
-		OpcodeORn:  cpu.alun(func(imm uint8) { cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, imm)) }),
-		OpcodeANDn: cpu.alun(func(imm uint8) { cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, imm)) }),
-		OpcodeADDn: cpu.alun(func(imm uint8) { cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, imm, false)) }),
+		OpcodeCPn:  cpu.alun(func(imm Data8) { cpu.Regs.SetFlags(SUB(cpu.Regs.A, imm, false)) }),
+		OpcodeSUBn: cpu.alun(func(imm Data8) { cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, imm, false)) }),
+		OpcodeORn:  cpu.alun(func(imm Data8) { cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, imm)) }),
+		OpcodeANDn: cpu.alun(func(imm Data8) { cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, imm)) }),
+		OpcodeADDn: cpu.alun(func(imm Data8) { cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, imm, false)) }),
 		OpcodeLDHnA: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
@@ -1163,7 +1167,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, true}:
 				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
-				cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
+				cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.TempZ)))
 				cpu.IncPC()
 			case edge{2, true}:
 				cpu.Bus.WriteData(cpu.Regs.A)
@@ -1182,7 +1186,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{1, true}:
 				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
-				cpu.writeAddressBus(join16(0xff, cpu.Regs.TempZ))
+				cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.TempZ)))
 			case edge{2, true}:
 				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{3, false}:
@@ -1198,7 +1202,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeLDADE: func(e edge) bool {
 			switch e {
 			case edge{1, false}:
-				cpu.writeAddressBus(join16(cpu.Regs.D, cpu.Regs.E))
+				cpu.writeAddressBus(Addr(join16(cpu.Regs.D, cpu.Regs.E)))
 			case edge{1, true}:
 				cpu.Regs.TempZ = cpu.Bus.Data
 			case edge{2, false}:
@@ -1229,7 +1233,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			case edge{2, false}:
 				return true
 			case edge{2, true}:
-				var val uint8
+				var val Data8
 				switch cpu.CBOp.Target {
 				case CBTargetB:
 					val = cpu.Regs.B
@@ -1347,14 +1351,14 @@ func (cpu *CPU) jrcce(f func() bool) func(e edge) bool {
 			}
 		case edge{2, true}:
 			if cpu.lastBranchResult == +1 {
-				newPC := uint16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ)))
+				newPC := Data16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ)))
 				cpu.Regs.SetWZ(newPC)
 			} else {
 				return true
 			}
 		case edge{3, false}:
 			if cpu.lastBranchResult == +1 {
-				cpu.SetPC(cpu.Regs.GetWZ())
+				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 				return true
 			} else {
 				panicv(e)
@@ -1388,7 +1392,7 @@ func (cpu *CPU) jpccnn(f func() bool) func(e edge) bool {
 		case edge{3, false}:
 			if f() {
 				cpu.lastBranchResult = +1
-				cpu.SetPC(cpu.Regs.GetWZ())
+				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 			} else {
 				cpu.lastBranchResult = -1
 				return true
@@ -1452,7 +1456,7 @@ func (cpu *CPU) retcc(cond func() bool) func(e edge) bool {
 			}
 		case edge{4, false}:
 			if cpu.lastBranchResult == +1 {
-				cpu.SetPC(cpu.Regs.GetWZ())
+				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 			} else {
 				panicv(e)
 			}
@@ -1480,61 +1484,61 @@ func (cpu *CPU) retcc(cond func() bool) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ld(dst *uint8, src *uint8) func(e edge) bool {
+func (cpu *CPU) ld(dst *Data8, src *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		*dst = *src
 	})
 }
 
-func (cpu *CPU) andreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) andreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) xorreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) xorreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) orreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) orreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) addreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) addreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) adcreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) adcreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, *reg, cpu.Regs.GetFlagC()))
 	})
 }
 
-func (cpu *CPU) subreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) subreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) sbcreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) sbcreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, *reg, cpu.Regs.GetFlagC()))
 	})
 }
 
-func (cpu *CPU) cpreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) cpreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		cpu.Regs.SetFlags(SUB(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) decreg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) decreg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		result := SUB(*reg, 1, false)
 		*reg = result.Value
@@ -1542,7 +1546,7 @@ func (cpu *CPU) decreg(reg *uint8) func(e edge) bool {
 	})
 }
 
-func (cpu *CPU) increg(reg *uint8) func(e edge) bool {
+func (cpu *CPU) increg(reg *Data8) func(e edge) bool {
 	return cpu.singleCycle(func() {
 		result := ADD(*reg, 1, false)
 		*reg = result.Value
@@ -1565,7 +1569,7 @@ func (cpu *CPU) iduOp(f func()) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) alun(f func(imm uint8)) func(e edge) bool {
+func (cpu *CPU) alun(f func(imm Data8)) func(e edge) bool {
 	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
@@ -1585,7 +1589,7 @@ func (cpu *CPU) alun(f func(imm uint8)) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldrn(reg *uint8) func(e edge) bool {
+func (cpu *CPU) ldrn(reg *Data8) func(e edge) bool {
 	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
@@ -1605,11 +1609,11 @@ func (cpu *CPU) ldrn(reg *uint8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldrhl(reg *uint8) func(e edge) bool {
+func (cpu *CPU) ldrhl(reg *Data8) func(e edge) bool {
 	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
-			cpu.writeAddressBus(cpu.GetHL())
+			cpu.writeAddressBus(Addr(cpu.GetHL()))
 		case edge{1, true}:
 		case edge{2, false}:
 			*reg = cpu.Bus.Data
@@ -1627,7 +1631,7 @@ func (cpu *CPU) ldhla(f func()) func(e edge) bool {
 	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
-			cpu.writeAddressBus(cpu.GetHL())
+			cpu.writeAddressBus(Addr(cpu.GetHL()))
 			f()
 		case edge{1, true}:
 			cpu.Bus.WriteData(cpu.Regs.A)
@@ -1642,7 +1646,7 @@ func (cpu *CPU) ldhla(f func()) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) addhlrr(hi, lo *uint8) func(e edge) bool {
+func (cpu *CPU) addhlrr(hi, lo *Data8) func(e edge) bool {
 	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
@@ -1664,7 +1668,7 @@ func (cpu *CPU) addhlrr(hi, lo *uint8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldxxnn(f func(wz uint16)) func(e edge) bool {
+func (cpu *CPU) ldxxnn(f func(wz Data16)) func(e edge) bool {
 	return func(e edge) bool {
 		switch e {
 		case edge{1, false}:
@@ -1689,7 +1693,7 @@ func (cpu *CPU) ldxxnn(f func(wz uint16)) func(e edge) bool {
 	}
 }
 
-func cbbit(cpu *CPU, val, mask uint8) {
+func cbbit(cpu *CPU, val, mask Data8) {
 	cpu.Regs.SetFlagZ(val&mask == 0)
 	cpu.Regs.SetFlagN(false)
 	cpu.Regs.SetFlagH(true)

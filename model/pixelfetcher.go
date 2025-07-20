@@ -3,11 +3,11 @@ package model
 type PixelFetcher struct {
 	Cycle       uint64
 	State       PixelFetcherState
-	X           uint8
-	TileIndex   uint8
-	TileLSBAddr uint16
-	TileLSB     uint8
-	TileMSB     uint8
+	X           Data8
+	TileIndex   Data8
+	TileLSBAddr Addr
+	TileLSB     Data8
+	TileMSB     Data8
 	Suspended   bool
 
 	PPU *PPU
@@ -15,14 +15,14 @@ type PixelFetcher struct {
 
 type BackgroundFetcher struct {
 	PixelFetcher
-	TileIndexAddr uint16
+	TileIndexAddr Addr
 
-	TileOffsetX uint16
-	TileOffsetY uint16
+	TileOffsetX Addr
+	TileOffsetY Addr
 
 	WindowYReached    bool
 	WindowFetching    bool
-	WindowLineCounter uint16
+	WindowLineCounter Data8
 }
 
 func (bgf *BackgroundFetcher) fsm() {
@@ -67,7 +67,7 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 	// GBEDG: During the first step the fetcher fetches and stores the tile number of the tile which should be used.
 	// Which Tilemap is used depends on whether the PPU is currently rendering Background or Window pixels
 	// and on the bits 3 and 5 of the LCDC register.
-	var addr uint16
+	var addr Addr
 	if bgf.WindowFetching {
 		addr = bgf.PPU.WindowTilemapArea()
 	} else {
@@ -76,23 +76,23 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 
 	// GBEDG: Additionally, the address which the tile number is read from is offset by the fetcher-internal X-Position-Counter,
 	//        which is incremented each time the last step is completed.
-	offsetX := uint16(bgf.X)
+	offsetX := Addr(bgf.X)
 	if !bgf.WindowFetching {
 		// GBEDG: The value of SCX / 8 is also added if the Fetcher is not fetching Window pixels.
 		//        In order to make the wrap-around with SCX work, this offset is ANDed with 0x1f
-		offsetX += uint16((bgf.PPU.RegSCX / 8))
+		offsetX += Addr((bgf.PPU.RegSCX / 8))
 		offsetX &= 0x1f
 	}
 
-	var offsetY uint16
+	var offsetY Addr
 	if !bgf.WindowFetching {
 		// GBEDG: An offset of 32 * (((LY + SCY) & 0xFF) / 8) is also added if background pixels are being fetched,
-		offs := bgf.PPU.RegLY + bgf.PPU.RegSCY // implicitly &ed with 0xff since they are uint8
+		offs := (bgf.PPU.RegLY + bgf.PPU.RegSCY) & 0xff
 		offs /= 8
-		offsetY = 32 * uint16(offs)
+		offsetY = 32 * Addr(offs)
 	} else {
 		// GBEDG: otherwise, if window pixels are being fetched, this offset is determined by 32 * (WINDOW_LINE_COUNTER / 8)
-		offsetY = 32 * (bgf.WindowLineCounter / 8)
+		offsetY = 32 * Addr(bgf.WindowLineCounter/8)
 	}
 
 	// GBEDG: Note: The sum of [...] the X-POS+SCX [...] is ANDed with 0x3ff in order to ensure that the address stays within the Tilemap memory regions.
@@ -105,19 +105,22 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 }
 
 func (bgf *BackgroundFetcher) fetchTileLSB() {
-	var idx uint8 = bgf.TileIndex
-	signedAddressing := bgf.PPU.RegLCDC&0x10 == 0
-	var offset uint16
+	idx := bgf.TileIndex
+	signedAddressing := !bgf.PPU.RegLCDC.Bit(4)
+	var addr Addr
 	if signedAddressing {
-		offset = uint16(int32(0x1000) + 16*int32(int8(idx)))
+		if idx < 128 {
+			addr = Addr(0x9000 + 16*Addr(idx))
+		} else {
+			addr = Addr(0x8800 + 16*Addr(idx-128))
+		}
 	} else {
-		offset = 16 * uint16(bgf.TileIndex)
+		addr = Addr(0x8000 + 16*Addr(idx))
 	}
-	addr := 0x8000 + offset
 	if bgf.WindowFetching {
-		addr += 2 * uint16(bgf.WindowLineCounter%8)
+		addr += 2 * Addr(bgf.WindowLineCounter%8)
 	} else {
-		addr += 2 * uint16((bgf.PPU.RegLY+bgf.PPU.RegSCY)%8)
+		addr += 2 * Addr((bgf.PPU.RegLY+bgf.PPU.RegSCY)%8)
 	}
 	bgf.TileLSBAddr = addr
 	bgf.TileLSB = bgf.PPU.Bus.VRAM.Read(addr)
@@ -154,7 +157,7 @@ func (bgf *BackgroundFetcher) pushFIFO() bool {
 type SpriteFetcher struct {
 	PixelFetcher
 	SpriteIDX int
-	DoneX     uint8
+	DoneX     Data8
 }
 
 func (sf *SpriteFetcher) fsm() {
@@ -201,8 +204,8 @@ func (sf *SpriteFetcher) fetchTileNo() {
 
 func (sf *SpriteFetcher) fetchTileLSB() {
 	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
-	addr := 0x8000 + 16*uint16(sf.TileIndex)
-	addr += 2 * uint16((sf.PPU.RegLY+sf.PPU.RegSCY-obj.Y)%8)
+	addr := 0x8000 + 16*Addr(sf.TileIndex)
+	addr += 2 * Addr((sf.PPU.RegLY+sf.PPU.RegSCY-obj.Y)%8)
 	sf.TileLSBAddr = addr
 	sf.TileLSB = sf.PPU.Bus.VRAM.Read(addr)
 }

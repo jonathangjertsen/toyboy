@@ -6,20 +6,20 @@ import (
 )
 
 type Disassembler struct {
-	Program []uint8
+	Program []Data8
 	Decoded []DisInstruction
 	Trace   bool
-	PC      uint16
+	PC      Addr
 
-	stack             []uint16
+	stack             []Addr
 	stackIdx          int
 	cachedDisassembly *Disassembly
 }
 
 type DisInstruction struct {
-	Raw     [3]uint8
-	Size    uint16
-	Address uint16
+	Raw     [3]Data8
+	Size    Addr
+	Address Addr
 	Opcode  Opcode
 }
 
@@ -29,13 +29,13 @@ func (di *DisInstruction) Asm() string {
 	switch di.Opcode {
 	default:
 	case OpcodeLDAnn:
-		return fmt.Sprintf("%s %s, [$%04xh]", str[:ln-3], str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("LD A, [$%s]", join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeLDBCnn, OpcodeLDDEnn, OpcodeLDHLnn, OpcodeLDSPnn:
-		return fmt.Sprintf("%s %s, [$%04xh]", str[:ln-4], str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("LD %s, [$%s]", str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeLDnnA:
-		return fmt.Sprintf("LD [$%04xh], A", join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("LD [$%s], A", join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeLDnnSP:
-		return fmt.Sprintf("LD [$%04xh], SP", join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("LD [$%s], SP", join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeLDHLAInc:
 		return "LD (HL+), A"
 	case OpcodeLDHLADec:
@@ -51,23 +51,23 @@ func (di *DisInstruction) Asm() string {
 	case OpcodeRST0x00, OpcodeRST0x08, OpcodeRST0x10, OpcodeRST0x18, OpcodeRST0x20, OpcodeRST0x28, OpcodeRST0x30, OpcodeRST0x38:
 		return fmt.Sprintf("RST $00%sh", str[ln-2:])
 	case OpcodeUndefD3, OpcodeUndefDB, OpcodeUndefDD, OpcodeUndefE3, OpcodeUndefE4, OpcodeUndefEB, OpcodeUndefEC, OpcodeUndefED, OpcodeUndefF4, OpcodeUndefFC, OpcodeUndefFD:
-		return fmt.Sprintf("Undefined instruction 0x%02x", di.Raw[0])
+		return fmt.Sprintf("Undefined instruction %s", di.Raw[0].Hex())
 	case OpcodeLDBCA, OpcodeLDDEA:
 		return fmt.Sprintf("LD (%s), A", str[ln-3:ln-1])
 	case OpcodeLDHLn:
-		return fmt.Sprintf("LD (HL), $%02xh", di.Raw[1])
+		return fmt.Sprintf("LD (HL), $%s", di.Raw[1].Hex())
 	case OpcodeRET, OpcodeNop, OpcodeRLA, OpcodeRLCA, OpcodeRRA, OpcodeRRCA, OpcodeDAA, OpcodeDI, OpcodeEI, OpcodeSTOP, OpcodeCCF, OpcodeRETI:
 		return str
 	case OpcodeRETZ, OpcodeRETC:
-		return fmt.Sprintf("%s %s", str[:ln-1], str[ln-1:])
+		return fmt.Sprintf("RET %s", str[ln-1:])
 	case OpcodeRETNZ, OpcodeRETNC:
-		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
+		return fmt.Sprintf("RET %s", str[ln-2:])
 	case OpcodePUSHBC, OpcodePUSHDE, OpcodePUSHHL, OpcodePUSHAF, OpcodePOPBC, OpcodePOPDE, OpcodePOPHL, OpcodePOPAF:
 		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
 	case OpcodeCPLaka2f:
 		return "CPL"
 	case OpcodeXORn, OpcodeADDn, OpcodeANDn, OpcodeORn, OpcodeADCn, OpcodeSBCn, OpcodeCPn, OpcodeSUBn:
-		return fmt.Sprintf("%s A, $%02xh", str[:ln-1], di.Raw[1])
+		return fmt.Sprintf("%s A, $%s", str[:ln-1], di.Raw[1].Hex())
 	case OpcodeLDAA, OpcodeLDAB, OpcodeLDAC, OpcodeLDAD, OpcodeLDAE, OpcodeLDAH, OpcodeLDAL,
 		OpcodeLDBA, OpcodeLDBB, OpcodeLDBC, OpcodeLDBD, OpcodeLDBE, OpcodeLDBH, OpcodeLDBL,
 		OpcodeLDCA, OpcodeLDCB, OpcodeLDCC, OpcodeLDCD, OpcodeLDCE, OpcodeLDCH, OpcodeLDCL,
@@ -75,7 +75,7 @@ func (di *DisInstruction) Asm() string {
 		OpcodeLDEA, OpcodeLDEB, OpcodeLDEC, OpcodeLDED, OpcodeLDEE, OpcodeLDEH, OpcodeLDEL,
 		OpcodeLDHA, OpcodeLDHB, OpcodeLDHC, OpcodeLDHD, OpcodeLDHE, OpcodeLDHH, OpcodeLDHL,
 		OpcodeLDLA, OpcodeLDLB, OpcodeLDLC, OpcodeLDLD, OpcodeLDLE, OpcodeLDLH, OpcodeLDLL:
-		return fmt.Sprintf("%s %s, %s", str[:ln-2], str[ln-2:ln-1], str[ln-1:])
+		return fmt.Sprintf("LD %s, %s", str[ln-2:ln-1], str[ln-1:])
 	case OpcodeXORA, OpcodeXORB, OpcodeXORC, OpcodeXORD, OpcodeXORE, OpcodeXORH, OpcodeXORL,
 		OpcodeORA, OpcodeORB, OpcodeORC, OpcodeORD, OpcodeORE, OpcodeORH, OpcodeORL,
 		OpcodeANDA, OpcodeANDB, OpcodeANDC, OpcodeANDD, OpcodeANDE, OpcodeANDH, OpcodeANDL,
@@ -89,48 +89,47 @@ func (di *DisInstruction) Asm() string {
 		return fmt.Sprintf("%s A, (HL)", str[:ln-2])
 	case OpcodeLDABC, OpcodeLDADE,
 		OpcodeLDAHL, OpcodeLDBHL, OpcodeLDCHL, OpcodeLDDHL, OpcodeLDEHL, OpcodeLDHHL, OpcodeLDLHL:
-		return fmt.Sprintf("%s %s, (HL)", str[:ln-3], str[ln-3:ln-2])
+		return fmt.Sprintf("LD %s, (HL)", str[ln-3:ln-2])
 	case OpcodeLDHLA, OpcodeLDHLB, OpcodeLDHLC, OpcodeLDHLD, OpcodeLDHLE, OpcodeLDHLH, OpcodeLDHLL:
-		return fmt.Sprintf("%s (HL), %s", str[:ln-3], str[ln-1:])
-	case OpcodeDECA, OpcodeDECB, OpcodeDECC, OpcodeDECD, OpcodeDECE, OpcodeDECH, OpcodeDECL,
-		OpcodeINCA, OpcodeINCB, OpcodeINCC, OpcodeINCD, OpcodeINCE, OpcodeINCH, OpcodeINCL:
-		return fmt.Sprintf("%s %s", str[:ln-1], str[ln-1:])
-	case OpcodeINCBC, OpcodeINCDE, OpcodeINCHL, OpcodeINCSP, OpcodeDECBC, OpcodeDECDE, OpcodeDECHL, OpcodeDECSP:
-		return fmt.Sprintf("%s %s", str[:ln-2], str[ln-2:])
+		return fmt.Sprintf("LD (HL), %s", str[ln-1:])
+	case OpcodeDECA, OpcodeDECB, OpcodeDECC, OpcodeDECD, OpcodeDECE, OpcodeDECH, OpcodeDECL:
+		return fmt.Sprintf("DEC %c", str[ln-1])
+	case OpcodeINCA, OpcodeINCB, OpcodeINCC, OpcodeINCD, OpcodeINCE, OpcodeINCH, OpcodeINCL:
+		return fmt.Sprintf("INC %c", str[ln-1])
+	case OpcodeINCBC, OpcodeINCDE, OpcodeINCHL, OpcodeINCSP:
+		return fmt.Sprintf("INC %s", str[ln-2:])
+	case OpcodeDECBC, OpcodeDECDE, OpcodeDECHL, OpcodeDECSP:
+		return fmt.Sprintf("DEC %s", str[ln-2:])
 	case OpcodeJPnn, OpcodeCALLnn:
-		return fmt.Sprintf("%s $%04xh", str[:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("%s $%s", str[:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeJPCnn, OpcodeJPZnn:
-		return fmt.Sprintf("%s %s, $%04xh", str[:ln-3], str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("JP %s, $%s", str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeJPNZnn, OpcodeJPNCnn:
-		return fmt.Sprintf("%s %s, $%04xh", str[:ln-4], str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("JP %s, $%s", str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeCALLZnn, OpcodeCALLCnn:
-		return fmt.Sprintf("CALL %s, $%04xh", str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("CALL %s, $%s", str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeCALLNZnn, OpcodeCALLNCnn:
-		return fmt.Sprintf("CALL %s, $%04xh", str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("CALL %s, $%s", str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
 	case OpcodeJRNZe, OpcodeJRNCe:
-		return fmt.Sprintf("%s %s, PC+$%02xh", str[:ln-3], str[ln-3:ln-1], int8(di.Raw[1]))
+		return fmt.Sprintf("JR %s, PC%s", str[ln-3:ln-1], fmtSignedOffset(di.Raw[1]))
 	case OpcodeJRZe, OpcodeJRCe:
-		return fmt.Sprintf("%s %s, PC+$%02xh", str[:ln-2], str[ln-2:ln-1], int8(di.Raw[1]))
+		return fmt.Sprintf("JR %s, PC%s", str[ln-2:ln-1], fmtSignedOffset(di.Raw[1]))
 	case OpcodeJRe:
-		return fmt.Sprintf("%s PC+$%02xh", str[:ln-1], int8(di.Raw[1]))
+		return fmt.Sprintf("JR PC%s", fmtSignedOffset(di.Raw[1]))
 	case OpcodeLDAn, OpcodeLDBn, OpcodeLDCn, OpcodeLDDn, OpcodeLDEn, OpcodeLDHn, OpcodeLDLn:
-		return fmt.Sprintf("%s %s, $%02xh", str[:ln-2], str[ln-2:ln-1], join16(di.Raw[2], di.Raw[1]))
+		return fmt.Sprintf("LD %s, $%s", str[ln-2:ln-1], di.Raw[1].Hex())
 	case OpcodeADDHLHL, OpcodeADDHLDE, OpcodeADDHLBC, OpcodeADDHLSP:
-		return fmt.Sprintf("%s %s, %s", str[:ln-4], str[ln-4:ln-2], str[ln-2:])
+		return fmt.Sprintf("ADD %s, %s", str[ln-4:ln-2], str[ln-2:])
 	case OpcodeLDHnA:
-		return fmt.Sprintf("LDH ($%02xh),A; eff. LD $%04x, A", di.Raw[1], 0xff00+int(di.Raw[1]))
+		return fmt.Sprintf("LDH ($%s),A; eff. LD $%s, A", di.Raw[1].Hex(), join16(0xff, di.Raw[1]).Hex())
 	case OpcodeLDHAn:
-		return fmt.Sprintf("LDH A,($%02xh); eff. LD A,$%04x", di.Raw[1], 0xff00+int(di.Raw[1]))
+		return fmt.Sprintf("LDH A,($%s); eff. LD A,$%s", di.Raw[1].Hex(), join16(0xff, di.Raw[1]).Hex())
 	case OpcodeLDHAC:
 		return "LDH A,(C); eff. LD A, [C+$0xff00]"
 	case OpcodeLDHCA:
 		return "LDH (C), A; eff. LD [C+$0xff00], a"
 	case OpcodeLDHLSPe:
-		if di.Raw[1]&0x80 == 0 {
-			return fmt.Sprintf("LD HL,SP+$%02xh", di.Raw[1])
-		} else {
-			return fmt.Sprintf("LD HL,SP-$%02xh", -int8(di.Raw[1]))
-		}
+		return fmt.Sprintf("LD HL,SP%s", fmtSignedOffset(di.Raw[1]))
 	case OpcodeCB:
 		cbop := CBOp{Op: cb((di.Raw[0] & 0xf8) >> 3), Target: CBTarget(di.Raw[0] & 0x7)}
 		return fmt.Sprintf("%s %s", cbop.Op, cbop.Target)
@@ -141,43 +140,50 @@ func (di *DisInstruction) Asm() string {
 	return ""
 }
 
+func fmtSignedOffset(offs Data8) string {
+	if offs.SignBit() {
+		return fmt.Sprintf("-$%s", offs.SignedAbs().Hex())
+	}
+	return fmt.Sprintf("$%s", offs.Hex())
+}
+
 type DataSection struct {
-	Raw     []uint8
-	Address uint16
+	Raw     []Data8
+	Address Addr
 }
 
 type CodeSection struct {
 	Instructions []DisInstruction
 }
 
-func (cs CodeSection) Address() uint16 {
+func (cs CodeSection) Address() Addr {
 	return cs.Instructions[0].Address
 }
 
 type Disassembly struct {
-	PC   uint16
+	PC   Addr
 	Code []CodeSection
 	Data []DataSection
 }
 
 func (d *Disassembly) Print(w io.Writer) {
 	for _, section := range d.Code {
-		fmt.Fprintf(w, "\nCode section at 0x%04x\n", section.Address())
+		fmt.Fprintf(w, "\nCode section at %s\n", section.Address().Hex())
 		for _, inst := range section.Instructions {
 			if inst.Address == d.PC {
-				fmt.Fprintf(w, "[%04x]->%s\n", inst.Address, inst.Asm())
+				fmt.Fprintf(w, "[%s]->%s\n", inst.Address.Hex(), inst.Asm())
 			} else {
-				fmt.Fprintf(w, "%04xh | %s\n", inst.Address, inst.Asm())
+				fmt.Fprintf(w, "%sh | %s\n", inst.Address.Hex(), inst.Asm())
 			}
 		}
 	}
 	data := splitSections(d.Data)
-	prevEndAddr := uint16(0xffff)
+	prevEndAddr := Addr(0xffff)
 	for _, section := range data {
 		if prevEndAddr != section.Address {
-			fmt.Fprintf(w, "\nData section at 0x%04x\n", section.Address)
+			fmt.Fprintf(w, "\nData section at %s\n", section.Address.Hex())
 		}
-		prevEndAddr = section.Address + uint16(len(section.Raw))
+		prevEndAddr = section.Address + Addr(len(section.Raw))
 		allEqual := true
 		testByte := section.Raw[0]
 		for _, b := range section.Raw {
@@ -187,18 +193,18 @@ func (d *Disassembly) Print(w io.Writer) {
 			}
 		}
 		if allEqual {
-			fmt.Fprintf(w, "0x%0x bytes of 0x%02x\n", len(section.Raw), testByte)
+			fmt.Fprintf(w, "%0x bytes of %s\n", len(section.Raw), testByte.Hex())
 			continue
 		}
 
 		i := 0
 		for line := range (len(section.Raw) + 15) / 16 {
-			fmt.Fprintf(w, "%04xh | ", int(section.Address)+line*16)
+			fmt.Fprintf(w, "%s | ", (section.Address + Addr(line*16)).Hex())
 			for range 16 {
 				if i >= len(section.Raw) {
 					break
 				}
-				fmt.Fprintf(w, "%02x ", section.Raw[i])
+				fmt.Fprintf(w, "%s ", section.Raw[i].Hex())
 				i++
 			}
 			fmt.Fprintf(w, "\n")
@@ -231,12 +237,12 @@ func splitSections(sections []DataSection) []DataSection {
 				}
 				// Add the uniform run
 				result = append(result, DataSection{
-					Address: section.Address + uint16(runStart),
+					Address: section.Address + Addr(runStart),
 					Raw:     raw[runStart : runStart+runLen],
 				})
 				// Continue after the run
 				raw = raw[runStart+runLen:]
-				section.Address += uint16(runStart + runLen)
+				section.Address += Addr(runStart + runLen)
 				start = 0
 			} else {
 				start++
@@ -258,8 +264,8 @@ func NewDisassembler() *Disassembler {
 	return &Disassembler{}
 }
 
-func (dis *Disassembler) SetProgram(program []uint8) {
-	dis.Program = program
+func (dis *Disassembler) SetProgram(program []byte) {
+	dis.Program = Data8Slice(program)
 	dis.Decoded = make([]DisInstruction, len(program))
 	dis.cachedDisassembly = nil
 	dis.printf("setProgram with len=%d", len(program))
@@ -273,14 +279,14 @@ func (dis *Disassembler) printf(format string, args ...any) {
 		fmt.Printf("  ")
 	}
 	if dis.stackIdx > 0 {
-		fmt.Printf("%04xh ", dis.stack[dis.stackIdx-1])
+		fmt.Printf("%s ", dis.stack[dis.stackIdx-1].Hex())
 	}
 	fmt.Printf(format, args...)
 	fmt.Printf("\n")
 }
 
-func (dis *Disassembler) SetPC(address uint16) {
-	dis.printf("SetPC %04xh", address)
+func (dis *Disassembler) SetPC(address Addr) {
+	dis.printf("SetPC %s", address.Hex())
 	dis.stack = append(dis.stack, address)
 	dis.stackIdx++
 	defer func() {
@@ -291,7 +297,7 @@ func (dis *Disassembler) SetPC(address uint16) {
 
 	for {
 		if int(address) >= len(dis.Program) {
-			dis.printf("reached address outside of program (len=%0x)", len(dis.Program))
+			dis.printf("reached address outside of program (len=%#x)", len(dis.Program))
 			return
 		}
 
@@ -308,13 +314,13 @@ func (dis *Disassembler) SetPC(address uint16) {
 
 		for i := range di.Size {
 			if dis.Decoded[address+i].Size > 0 {
-				dis.printf("at offset %d there is an existing instruction, returning", i)
+				dis.printf("at offset %#x there is an existing instruction, returning", i)
 				return
 			}
 		}
 
 		dis.insert(di)
-		address += di.Size
+		address = address + di.Size
 		dis.stack[dis.stackIdx-1] = address
 
 		if dis.checkBranches(di) {
@@ -349,7 +355,7 @@ func (dis *Disassembler) Disassembly() *Disassembly {
 			}
 
 			if currDataSection.Raw == nil {
-				currDataSection.Address = uint16(addr)
+				currDataSection.Address = Addr(addr)
 			}
 			currDataSection.Raw = append(currDataSection.Raw, dis.Program[addr])
 			addr++
@@ -367,7 +373,7 @@ func (dis *Disassembler) Disassembly() *Disassembly {
 }
 
 func (dis *Disassembler) insert(di DisInstruction) {
-	dis.printf("insert %v at %04xh:%04xh", di.Opcode, di.Address, di.Address+di.Size-1)
+	dis.printf("insert %v at %s:%s", di.Opcode, di.Address.Hex(), (di.Address + di.Size - 1).Hex())
 	for addr := di.Address; addr != di.Address+di.Size; addr++ {
 		dis.Decoded[addr] = di
 	}
@@ -383,9 +389,9 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 		// branch taken
 		dis.printf("checking branch-taken for relative jump")
 		if e > 0 {
-			dis.SetPC(di.Address + di.Size + uint16(e))
+			dis.SetPC(di.Address + di.Size + Addr(e))
 		} else {
-			dis.SetPC(di.Address + di.Size - uint16(-e))
+			dis.SetPC(di.Address + di.Size - Addr(-e))
 		}
 
 		// branch not taken will be inspected after this
@@ -394,7 +400,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 			return true
 		}
 	case OpcodeJPnn, OpcodeJPCnn, OpcodeJPNCnn, OpcodeJPZnn, OpcodeJPNZnn, OpcodeCALLnn:
-		addr := join16(di.Raw[2], di.Raw[1])
+		addr := Addr(join16(di.Raw[2], di.Raw[1]))
 		dis.printf("checking branch-taken for absolute jump")
 		dis.SetPC(addr)
 		if di.Opcode == OpcodeJPnn || di.Opcode == OpcodeJPHL {
@@ -433,13 +439,13 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 	return false
 }
 
-func (dis *Disassembler) doRST(vec uint16) {
-	dis.printf("unconditional function call to %04x", vec)
+func (dis *Disassembler) doRST(vec Addr) {
+	dis.printf("unconditional function call to %s", vec.Hex())
 	dis.SetPC(vec)
 	dis.printf("will probably return here")
 }
 
-func (dis *Disassembler) readNewInstruction(addr uint16) (DisInstruction, error) {
+func (dis *Disassembler) readNewInstruction(addr Addr) (DisInstruction, error) {
 	di := DisInstruction{
 		Address: addr,
 	}

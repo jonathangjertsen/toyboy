@@ -9,8 +9,8 @@ import (
 type CoreDump struct {
 	Cycle           Cycle
 	Regs            RegisterFile
-	ProgramStart    uint16
-	ProgramEnd      uint16
+	ProgramStart    Addr
+	ProgramEnd      Addr
 	Program         MemDump
 	HRAM            MemDump
 	OAM             MemDump
@@ -39,8 +39,8 @@ type PPUDump struct {
 
 type MemDump []MemInfo
 
-func (md MemDump) Bytes() []uint8 {
-	out := make([]uint8, len(md))
+func (md MemDump) Bytes() []Data8 {
+	out := make([]Data8, len(md))
 	for i := range out {
 		out[i] = md[i].Value
 	}
@@ -48,19 +48,19 @@ func (md MemDump) Bytes() []uint8 {
 }
 
 func (cd *CoreDump) PrintRegs(f io.Writer) {
-	fmt.Fprintf(f, "PC = 0x%04x\n", cd.Regs.PC)
-	fmt.Fprintf(f, "SP = 0x%04x\n", cd.Regs.SP)
-	fmt.Fprintf(f, "A  =   0x%02x\n", cd.Regs.A)
-	fmt.Fprintf(f, "F  =   0x%02x\n", cd.Regs.F)
-	fmt.Fprintf(f, "B  =   0x%02x\n", cd.Regs.B)
-	fmt.Fprintf(f, "C  =   0x%02x\n", cd.Regs.C)
-	fmt.Fprintf(f, "D  =   0x%02x\n", cd.Regs.D)
-	fmt.Fprintf(f, "E  =   0x%02x\n", cd.Regs.E)
-	fmt.Fprintf(f, "H  =   0x%02x\n", cd.Regs.H)
-	fmt.Fprintf(f, "L  =   0x%02x\n", cd.Regs.L)
-	fmt.Fprintf(f, "W  =   0x%02x\n", cd.Regs.TempW)
-	fmt.Fprintf(f, "Z  =   0x%02x\n", cd.Regs.TempZ)
-	fmt.Fprintf(f, "IR =   0x%02x\n", uint8(cd.Regs.IR))
+	fmt.Fprintf(f, "PC = %s\n", cd.Regs.PC.Hex())
+	fmt.Fprintf(f, "SP = %s\n", cd.Regs.SP.Hex())
+	fmt.Fprintf(f, "A  = 0x%02x\n", cd.Regs.A)
+	fmt.Fprintf(f, "F  = 0x%02x\n", cd.Regs.F)
+	fmt.Fprintf(f, "B  = 0x%02x\n", cd.Regs.B)
+	fmt.Fprintf(f, "C  = 0x%02x\n", cd.Regs.C)
+	fmt.Fprintf(f, "D  = 0x%02x\n", cd.Regs.D)
+	fmt.Fprintf(f, "E  = 0x%02x\n", cd.Regs.E)
+	fmt.Fprintf(f, "H  = 0x%02x\n", cd.Regs.H)
+	fmt.Fprintf(f, "L  = 0x%02x\n", cd.Regs.L)
+	fmt.Fprintf(f, "W  = 0x%02x\n", cd.Regs.TempW)
+	fmt.Fprintf(f, "Z  = 0x%02x\n", cd.Regs.TempZ)
+	fmt.Fprintf(f, "IR = 0x%02x\n", uint8(cd.Regs.IR))
 	z, h, n, c := 0, 0, 0, 0
 	if cd.Regs.GetFlagZ() {
 		z = 1
@@ -83,18 +83,18 @@ func (cd *CoreDump) PrintProgram(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintHRAM(f io.Writer) {
-	memdump(f, cd.HRAM, 0xff80, 0xfffe, cd.Regs.SP)
+	memdump(f, cd.HRAM, AddrHRAMBegin, AddrHRAMEnd, cd.Regs.SP)
 }
 
 func (cd *CoreDump) PrintOAM(f io.Writer) {
-	memdump(f, cd.OAM, 0xfe00, 0xfe99, 0)
+	memdump(f, cd.OAM, AddrOAMBegin, AddrOAMEnd, 0)
 }
 
 func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
 	oam := cd.OAM.Bytes()
 	for idx := range 40 {
 		obj := DecodeSprite(oam[idx*4 : (idx+1)*4])
-		fmt.Fprintf(f, "%02d T=%03d X=%03d Y=%03d Attr=%02x\n", idx, obj.TileIndex, obj.X, obj.Y, obj.Attributes)
+		fmt.Fprintf(f, "%02d T=%03d X=%03d Y=%03d Attr=%x\n", idx, obj.TileIndex, obj.X, obj.Y, obj.Attributes.Hex())
 	}
 }
 
@@ -125,10 +125,10 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 	fmt.Fprintf(f, "BFetch.X:      %d\n", ppu.BackgroundFetcher.X)
 	fmt.Fprintf(f, "BFetch.TOffX:  %d\n", ppu.BackgroundFetcher.TileOffsetX)
 	fmt.Fprintf(f, "BFetch.TOffY:  %d\n", ppu.BackgroundFetcher.TileOffsetY)
-	fmt.Fprintf(f, "BFetch.&TIdx:  0x%04x\n", ppu.BackgroundFetcher.TileIndexAddr)
+	fmt.Fprintf(f, "BFetch.&TIdx:  %s\n", ppu.BackgroundFetcher.TileIndexAddr.Hex())
 	fmt.Fprintf(f, "BFetch.TIdx:   %d\n", ppu.BackgroundFetcher.TileIndex)
-	fmt.Fprintf(f, "BFetch.TAddr:  0x%04x\n", ppu.BackgroundFetcher.TileLSBAddr)
-	fmt.Fprintf(f, "BFetch.Tile:   0x%04x\n", join16(ppu.BackgroundFetcher.TileMSB, ppu.BackgroundFetcher.TileLSB))
+	fmt.Fprintf(f, "BFetch.TAddr:  %s\n", ppu.BackgroundFetcher.TileLSBAddr.Hex())
+	fmt.Fprintf(f, "BFetch.Tile:   %s\n", join16(ppu.BackgroundFetcher.TileMSB, ppu.BackgroundFetcher.TileLSB).Hex())
 	fmt.Fprintf(f, "BFetch.Susp:   %d\n", bool2int(ppu.BackgroundFetcher.Suspended))
 	fmt.Fprintf(f, "BFetch.WYRch:  %d\n", bool2int(ppu.BackgroundFetcher.WindowYReached))
 	fmt.Fprintf(f, "BFetch.WFetch: %d\n", bool2int(ppu.BackgroundFetcher.WindowFetching))
@@ -156,8 +156,8 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 	fmt.Fprintf(f, "SFetch.X:      %d\n", ppu.SpriteFetcher.X)
 	fmt.Fprintf(f, "SFetch.SIdx:   %d\n", ppu.SpriteFetcher.SpriteIDX)
 	fmt.Fprintf(f, "SFetch.TIdx:   %d\n", ppu.SpriteFetcher.TileIndex)
-	fmt.Fprintf(f, "SFetch.TAddr:  0x%04x\n", ppu.SpriteFetcher.TileLSBAddr)
-	fmt.Fprintf(f, "SFetch.Tile:   0x%04x\n", join16(ppu.SpriteFetcher.TileMSB, ppu.SpriteFetcher.TileLSB))
+	fmt.Fprintf(f, "SFetch.TAddr:  %s\n", ppu.SpriteFetcher.TileLSBAddr.Hex())
+	fmt.Fprintf(f, "SFetch.Tile:   %s\n", join16(ppu.SpriteFetcher.TileMSB, ppu.SpriteFetcher.TileLSB).Hex())
 	fmt.Fprintf(f, "SFetch.Susp:   %d\n", bool2int(ppu.SpriteFetcher.Suspended))
 	fmt.Fprintf(f, "Shift.Discard: %d\n", ppu.PixelShifter.Discard)
 	fmt.Fprintf(f, "Shift.X:       %d\n", ppu.PixelShifter.X)
@@ -169,7 +169,7 @@ func (cd *CoreDump) PrintAPU(f io.Writer) {
 	regdump(f, cd.APU, AddrAPUBegin, AddrAPUEnd)
 }
 
-func regdump(f io.Writer, mem []MemInfo, start, end uint16) {
+func regdump(f io.Writer, mem []MemInfo, start, end Addr) {
 	for addr := start; addr <= end; addr++ {
 		a := Addr(addr)
 		if !a.IsValid() {
@@ -179,29 +179,23 @@ func regdump(f io.Writer, mem []MemInfo, start, end uint16) {
 	}
 }
 
-func memdump(f io.Writer, mem []MemInfo, start, end, highlight uint16) {
+func memdump(f io.Writer, mem []MemInfo, start, end, highlight Addr) {
 	alignedStart := (start / 0x10) * 0x10
 	for addr := alignedStart; addr < start; addr++ {
 		if addr%0x10 == 0 {
-			fmt.Fprintf(f, "\n %04x |", addr)
+			fmt.Fprintf(f, "\n %s |", addr.Hex())
 		}
 		fmt.Fprintf(f, " .. ")
 	}
 
 	for addr := start; addr <= end; addr++ {
 		if addr%0x10 == 0 {
-			fmt.Fprintf(f, "\n%04x |", addr)
+			fmt.Fprintf(f, "\n%s |", addr.Hex())
 		}
 		if highlight == addr {
 			fmt.Fprintf(f, "[%02x]", mem[addr-start].Value)
 		} else {
-			pre := " "
-			if mem[addr-start].WriteCounter > 0 {
-				pre = "w"
-			} else if mem[addr-start].ReadCounter > 0 {
-				pre = "r"
-			}
-			fmt.Fprintf(f, "%s%02x ", pre, mem[addr-start].Value)
+			fmt.Fprintf(f, " %02x ", mem[addr-start].Value)
 		}
 	}
 
@@ -220,13 +214,13 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 
 	var cd CoreDump
 	cd.Regs = cpu.Regs
-	cd.ProgramStart = uint16(0)
+	cd.ProgramStart = 0
 	if cpu.Regs.PC > 0x40 {
 		cd.ProgramStart = cpu.Regs.PC - 0x40
 	}
 	cd.ProgramStart = (cd.ProgramStart / 0x10) * 0x10
 
-	cd.ProgramEnd = uint16(0xffff)
+	cd.ProgramEnd = 0xffff
 	if cpu.Regs.PC < 0xffff-0x40 {
 		cd.ProgramEnd = cpu.Regs.PC + 0x40
 	}
@@ -255,12 +249,12 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 }
 
 type MemInfo struct {
-	Value        uint8
+	Value        Data8
 	ReadCounter  uint64
 	WriteCounter uint64
 }
 
-func (bus *Bus) getmem(start, end uint16) []MemInfo {
+func (bus *Bus) getmem(start, end Addr) []MemInfo {
 	address := bus.Address
 	data := bus.Data
 	defer func() {
@@ -308,7 +302,7 @@ func (cd *CoreDump) PrintRewindBuffer(f io.Writer) {
 		} else if entry.BranchResult == -1 {
 			extra = "(not taken)"
 		}
-		fmt.Fprintf(f, "[PC=%04x] %s %s\n", entry.PC, entry.Opcode, extra)
+		fmt.Fprintf(f, "[PC=%s] %s %s\n", entry.PC.Hex(), entry.Opcode, extra)
 	}
 }
 

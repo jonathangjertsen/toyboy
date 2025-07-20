@@ -1,8 +1,8 @@
 package model
 
 type Bus struct {
-	Data    uint8
-	Address uint16
+	Data    Data8
+	Address Addr
 
 	inCoreDump bool
 
@@ -19,7 +19,7 @@ type Bus struct {
 	Interrupts    *Interrupts
 }
 
-func (b *Bus) WriteAddress(addr uint16) {
+func (b *Bus) WriteAddress(addr Addr) {
 	b.Address = addr
 
 	if addr <= AddrBootROMEnd {
@@ -42,36 +42,36 @@ func (b *Bus) WriteAddress(addr uint16) {
 		b.Data = b.OAM.Read(addr)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.Data = b.PPU.Read(addr)
-	} else if addr == AddrJoypad {
+	} else if addr == AddrP1 {
 		b.Data = b.Joypad.Read(addr)
-	} else if addr == uint16(AddrIF) || addr == uint16(AddrIE) {
+	} else if addr == AddrIF || addr == AddrIE {
 		b.Data = b.Interrupts.Read(addr)
 	} else if addr == AddrBootROMLock {
 		b.Data = b.BootROMLock.Read(addr)
 	} else {
 		if !b.inCoreDump {
-			panicf("Read from unmapped address 0x%04x", addr)
+			panicf("Read from unmapped address %s", addr.Hex())
 		}
 	}
 }
 
-func (b *Bus) WriteData(v uint8) {
+func (b *Bus) WriteData(v Data8) {
 	b.Data = v
 	addr := b.Address
 	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
-			panicf("Attempted write to cartridge (addr=0x%04x v=%02x)", addr, v)
+			panicf("Attempted write to cartridge (addr=%s v=%s)", addr.Hex(), v.Hex())
 		} else {
-			panicf("Attempted write to bootrom (addr=0x%04x v=%02x)", addr, v)
+			panicf("Attempted write to bootrom (addr=%s v=%s)", addr.Hex(), v.Hex())
 		}
 	} else if addr <= AddrCartridgeBank0End {
 		b.Data = b.CartridgeSlot.Read(addr)
-		panicf("Attempted write to cartridge (addr=0x%04x v=%02x)", addr, v)
+		panicf("Attempted write to cartridge (addr=%s v=%s)", addr.Hex(), v.Hex())
 	} else if addr == AddrBootROMLock {
 		b.BootROMLock.Write(addr, v)
-	} else if addr == AddrJoypad {
+	} else if addr == AddrP1 {
 		b.Joypad.Write(addr, v)
-	} else if addr == uint16(AddrIF) || addr == uint16(AddrIE) {
+	} else if addr == AddrIF || addr == AddrIE {
 		b.Interrupts.Write(addr, v)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		b.VRAM.Write(addr, v)
@@ -87,7 +87,7 @@ func (b *Bus) WriteData(v uint8) {
 		b.PPU.Write(addr, v)
 	} else {
 		if !b.inCoreDump {
-			panicf("write to unmapped address 0x%x", addr)
+			panicf("write to unmapped address %s", addr.Hex())
 		}
 	}
 }
@@ -118,7 +118,7 @@ func (b *Bus) CoreDumpEnd() {
 	b.CartridgeSlot.CountdownDisable = false
 }
 
-func (b *Bus) GetCounters(addr uint16) (uint64, uint64) {
+func (b *Bus) GetCounters(addr Addr) (uint64, uint64) {
 	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
 			return b.CartridgeSlot.GetCounters(addr)
@@ -141,11 +141,11 @@ func (b *Bus) GetCounters(addr uint16) (uint64, uint64) {
 		return b.OAM.GetCounters(addr)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		return b.PPU.GetCounters(addr)
-	} else if addr == uint16(AddrIF) || addr == uint16(AddrIE) {
+	} else if addr == AddrIF || addr == AddrIE {
 		return b.Interrupts.GetCounters(addr)
 	}
 	if !b.inCoreDump {
-		panicf("GetCounters for unmapped address 0x%04x", addr)
+		panicf("GetCounters for unmapped address %s", addr.Hex())
 	}
 	return 0, 0
 }

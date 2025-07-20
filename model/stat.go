@@ -1,17 +1,17 @@
 package model
 
 type Stat struct {
-	Reg         uint8
+	Reg         Data8
 	Interrupts  *Interrupts
 	prevStatInt bool
 }
 
-func (s *Stat) Write(v uint8) {
+func (s *Stat) Write(v Data8) {
 	s.Reg = maskedWrite(s.Reg, v, 0xf8)
 }
 
 func (s *Stat) SetMode(mode PPUMode) {
-	s.Reg = maskedWrite(s.Reg, uint8(mode), 0x7)
+	s.Reg = maskedWrite(s.Reg, Data8(mode), 0x7)
 	s.CheckInterrupt()
 }
 
@@ -19,7 +19,7 @@ func (s *Stat) SetLYCEqLY(equal bool) {
 	if equal {
 		s.Reg |= 1 << 2
 	} else {
-		s.Reg &= ^uint8(1 << 2)
+		s.Reg &= ^Data8(1 << 2)
 	}
 	s.CheckInterrupt()
 }

@@ -25,15 +25,15 @@ type GridConfig struct {
 
 	ShowAddress    bool
 	AddressFont    font.Face
-	StartAddress   uint16
-	BlockIncrement uint16
-	LineIncrement  uint16
+	StartAddress   model.Addr
+	BlockIncrement model.Addr
+	LineIncrement  model.Addr
 	DecimalAddress bool
 
 	ShowOffsets bool
 }
 
-func (gc GridConfig) WithMem(startAddr uint16, blockIncrement uint16) GridConfig {
+func (gc GridConfig) WithMem(startAddr model.Addr, blockIncrement model.Addr) GridConfig {
 	gc.StartAddress = startAddr
 	gc.BlockIncrement = blockIncrement
 	gc.ShowAddress = true
@@ -213,9 +213,9 @@ func (gui *GUI) GBGraphics(
 			if yPix-lastY >= fontHeight+margin {
 				var text string
 				if cfg.DecimalAddress {
-					text = fmt.Sprintf("%04d", address)
+					text = address.Dec()
 				} else {
-					text = fmt.Sprintf("%04Xh", address)
+					text = address.Hex()
 				}
 				drawer.Dot = fixed.Point26_6{
 					X: fixed.I(2),
@@ -225,9 +225,9 @@ func (gui *GUI) GBGraphics(
 				lastY = yPix
 			}
 			if cfg.LineIncrement > 0 {
-				address += cfg.LineIncrement * uint16(blockSize)
+				address += cfg.LineIncrement * model.Addr(blockSize)
 			} else {
-				address += cfg.BlockIncrement * uint16(w/blockSize)
+				address += cfg.BlockIncrement * model.Addr(w/blockSize)
 			}
 		}
 	}
@@ -241,7 +241,7 @@ func (gui *GUI) GBGraphics(
 		for col := 0; col < w/blockSize; col++ {
 			xPix := col*blockSize*scale + col*gridT + labelWidth
 			var text string
-			offset := uint16(col) * cfg.BlockIncrement
+			offset := model.Addr(col) * cfg.BlockIncrement
 			if cfg.DecimalAddress {
 				text = fmt.Sprintf("%02d ", offset)
 			} else {
@@ -286,7 +286,7 @@ func (gui *GUI) GBGraphics(
 	}.Layout(gtx)
 }
 
-func tiledata(vram []uint8) []model.Color {
+func tiledata(vram []model.Data8) []model.Color {
 	tileData := vram[:0x1800]
 	tiles := make([]model.Tile, len(tileData)/16)
 	for i := range tiles {
@@ -295,7 +295,7 @@ func tiledata(vram []uint8) []model.Color {
 	return placetiles(tiles, 24, 16)
 }
 
-func tilemap(vram []uint8, addr uint16, signedAddressing bool) []model.Color {
+func tilemap(vram []model.Data8, addr model.Addr, signedAddressing bool) []model.Color {
 	tileMap := vram[addr-model.AddrVRAMBegin : addr-model.AddrVRAMBegin+0x400]
 	tiles := make([]model.Tile, len(tileMap))
 	for i := range tiles {
@@ -328,7 +328,7 @@ func placetiles(tiles []model.Tile, w, h int) []model.Color {
 	return fb
 }
 
-func oambuffer(vram []uint8, buf model.OAMBuffer) []model.Color {
+func oambuffer(vram []model.Data8, buf model.OAMBuffer) []model.Color {
 	tiles := make([]model.Tile, 10)
 	for slot := range buf.Level {
 		obj := buf.Buffer[slot]
@@ -339,7 +339,7 @@ func oambuffer(vram []uint8, buf model.OAMBuffer) []model.Color {
 	return placetiles(tiles, 10, 1)
 }
 
-func oam(vram []uint8, oam []uint8) []model.Color {
+func oam(vram []model.Data8, oam []model.Data8) []model.Color {
 	tiles := make([]model.Tile, 40)
 	for i := 0; i < 40; i++ {
 		obj := model.DecodeSprite(oam[i*4 : (i+1)*4])

@@ -74,18 +74,18 @@ func (gb *Gameboy) init() {
 
 	bootROMLock := NewBootROMLock(clk)
 	bootROM := NewBootROM(clk, gb.Config.Model)
-	disassembler.SetProgram(bootROM.Data)
+	disassembler.SetProgram(ByteSlice(bootROM.Data))
 	disassembler.SetPC(0)
 	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
 	hram := NewMemoryRegion(clk, AddrHRAMBegin, SizeHRAM)
-	wram := NewMemoryRegion(clk, AddrWRAMBegin, AddrWRAMEnd)
+	wram := NewMemoryRegion(clk, AddrWRAMBegin, SizeWRAM)
 	apu := NewAPU(clk)
 	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
-	cartridgeSlot := NewMemoryRegion(clk, AddrCartridgeBank0Begin, AddrCartridgeBank0Size)
+	cartridgeSlot := NewMemoryRegion(clk, AddrZero, SizeCartridgeBank0)
 	joypad := NewJoypad(clk, interrupts)
 
 	bootROMLock.OnUnlock = func() {
-		disassembler.SetProgram(cartridgeSlot.Data)
+		disassembler.SetProgram(ByteSlice(cartridgeSlot.Data))
 		disassembler.SetPC(0x100)
 	}
 

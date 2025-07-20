@@ -7,7 +7,7 @@ import (
 
 type BootROMLock struct {
 	MemoryRegion
-	RegBootROMLock uint8
+	RegBootROMLock Data8
 
 	BootOff  bool
 	OnUnlock func()
@@ -15,21 +15,21 @@ type BootROMLock struct {
 
 func NewBootROMLock(clock *ClockRT) *BootROMLock {
 	return &BootROMLock{
-		MemoryRegion: NewMemoryRegion(clock, 0xff50, 0x0001),
+		MemoryRegion: NewMemoryRegion(clock, AddrBootROMLock, 0x0001),
 	}
 }
 
-func (brl *BootROMLock) Read(addr uint16) uint8 {
+func (brl *BootROMLock) Read(addr Addr) Data8 {
 	_ = brl.MemoryRegion.Read(addr)
 
-	if addr == 0xff50 {
+	if addr == AddrBootROMLock {
 		return brl.RegBootROMLock
 	}
 	panicv(addr)
 	return 0
 }
 
-func (brl *BootROMLock) Write(addr uint16, v uint8) {
+func (brl *BootROMLock) Write(addr Addr, v Data8) {
 	if brl.BootOff {
 		return
 	}
@@ -46,7 +46,7 @@ func (brl *BootROMLock) Write(addr uint16, v uint8) {
 }
 
 func NewBootROM(clk *ClockRT, model Model) MemoryRegion {
-	bootrom := NewMemoryRegion(clk, 0x0000, 0x0100)
+	bootrom := NewMemoryRegion(clk, AddrZero, SizeBootROM)
 	switch model {
 	case DMG:
 		// todo: static fs
@@ -56,7 +56,7 @@ func NewBootROM(clk *ClockRT, model Model) MemoryRegion {
 		} else if len(f) != 256 {
 			panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
 		}
-		copy(bootrom.Data, f)
+		bootrom.Data = Data8Slice(f)
 	}
 	return bootrom
 }

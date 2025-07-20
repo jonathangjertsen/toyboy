@@ -2,7 +2,7 @@ package model
 
 type TileLine [8]Pixel
 
-func DecodeTileLine(msb, lsb uint8) TileLine {
+func DecodeTileLine(msb, lsb Data8) TileLine {
 	var pixels TileLine
 	for i := range 8 {
 		lsbMask := lsb & (1 << (7 - i))
@@ -17,7 +17,7 @@ func DecodeTileLine(msb, lsb uint8) TileLine {
 
 type Tile [8]TileLine
 
-func DecodeTile(b []byte) Tile {
+func DecodeTile(b []Data8) Tile {
 	var tile Tile
 	for i := range 8 {
 		tile[i] = DecodeTileLine(b[2*i], b[2*i+1])

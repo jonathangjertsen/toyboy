@@ -1,9 +1,9 @@
 package model
 
 type PixelShifter struct {
-	Discard     uint8
+	Discard     Data8
 	Suspended   bool
-	X           uint8
+	X           Data8
 	LastShifted Color
 
 	PPU *PPU

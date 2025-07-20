@@ -31,7 +31,7 @@ var audioDebugEvents = []string{
 
 type APU struct {
 	MemoryRegion
-	MasterCtl uint8
+	MasterCtl Data8
 
 	Pulse1 PulseChannelWithSweep
 	Pulse2 PulseChannel
@@ -44,18 +44,18 @@ type APU struct {
 }
 
 type Mixer struct {
-	RegChannelPan         uint8
-	RegMasterVolumeVINPan uint8
+	RegChannelPan         Data8
+	RegMasterVolumeVINPan Data8
 
 	leftVIN        bool
 	rightVIN       bool
-	leftVol        uint8
-	rightVol       uint8
+	leftVol        Data8
+	rightVol       Data8
 	leftEnChannel  [4]bool
 	rightEnChannel [4]bool
 }
 
-func (mixer *Mixer) SetChannelPan(v uint8) {
+func (mixer *Mixer) SetChannelPan(v Data8) {
 	mixer.RegChannelPan = v
 	mixer.leftEnChannel[0] = v&(1<<0) != 0
 	mixer.leftEnChannel[1] = v&(1<<1) != 0
@@ -67,7 +67,7 @@ func (mixer *Mixer) SetChannelPan(v uint8) {
 	mixer.rightEnChannel[3] = v&(1<<7) != 0
 }
 
-func (mixer *Mixer) SetMasterVolumeVINPan(v uint8) {
+func (mixer *Mixer) SetMasterVolumeVINPan(v Data8) {
 	mixer.RegMasterVolumeVINPan = v
 	mixer.rightVol = v & 0x7
 	mixer.rightVIN = (v>>3)&0x1 != 0
@@ -76,29 +76,29 @@ func (mixer *Mixer) SetMasterVolumeVINPan(v uint8) {
 }
 
 type PulseChannel struct {
-	RegLengthDuty     uint8
-	RegVolumeEnvelope uint8
-	RegPeriodLow      uint8
-	RegPeriodHighCtl  uint8
+	RegLengthDuty     Data8
+	RegVolumeEnvelope Data8
+	RegPeriodLow      Data8
+	RegPeriodHighCtl  Data8
 
 	period uint16
 
 	lengthEnable bool
-	waveDuty     uint8
-	lengthTimer  uint8
-	initVolume   uint8
-	envDir       uint8
-	envSweepPace uint8
+	waveDuty     Data8
+	lengthTimer  Data8
+	initVolume   Data8
+	envDir       Data8
+	envSweepPace Data8
 }
 
-func (pc *PulseChannel) SetLengthDuty(v uint8) {
+func (pc *PulseChannel) SetLengthDuty(v Data8) {
 	pc.RegLengthDuty = v
 
 	pc.lengthTimer = v & 0x3f
 	pc.waveDuty = (v >> 5) & 0x3
 }
 
-func (pc *PulseChannel) SetVolumeEnvelope(v uint8) {
+func (pc *PulseChannel) SetVolumeEnvelope(v Data8) {
 	pc.RegVolumeEnvelope = v
 
 	pc.envSweepPace = v & 0x7
@@ -108,7 +108,7 @@ func (pc *PulseChannel) SetVolumeEnvelope(v uint8) {
 	// TODO "Setting bits 3-7 of this register all to 0 (initial volume = 0, envelope = decreasing) turns the DAC off (and thus, the channel as well), which may cause an apu pop."
 }
 
-func (pc *PulseChannel) SetPeriodLow(v uint8) {
+func (pc *PulseChannel) SetPeriodLow(v Data8) {
 	pc.RegPeriodLow = v
 
 	// keep upper 3 bits, overwrite lower 8
@@ -116,7 +116,7 @@ func (pc *PulseChannel) SetPeriodLow(v uint8) {
 	pc.period |= uint16(v)
 }
 
-func (pc *PulseChannel) SetPeriodHighCtl(v uint8) {
+func (pc *PulseChannel) SetPeriodHighCtl(v Data8) {
 	pc.RegPeriodHighCtl = v
 
 	// keep lower 8 bits, overwrite upper 3
@@ -135,76 +135,76 @@ func (pc *PulseChannel) trigger() {
 
 type PulseChannelWithSweep struct {
 	PulseChannel
-	RegSweep uint8
+	RegSweep Data8
 }
 
-func (pc *PulseChannelWithSweep) SetSweep(v uint8) {
+func (pc *PulseChannelWithSweep) SetSweep(v Data8) {
 	pc.RegSweep = v
 }
 
 type WaveChannel struct {
-	RegDACEn         uint8
-	RegLengthTimer   uint8
-	RegOutputLevel   uint8
-	RegPeriodLow     uint8
-	RegPeriodHighCtl uint8
+	RegDACEn         Data8
+	RegLengthTimer   Data8
+	RegOutputLevel   Data8
+	RegPeriodLow     Data8
+	RegPeriodHighCtl Data8
 }
 
-func (wc *WaveChannel) SetDACEn(v uint8) {
+func (wc *WaveChannel) SetDACEn(v Data8) {
 	wc.RegDACEn = v
 	fmt.Printf("not implemented: SetDACEn\n")
 }
 
-func (wc *WaveChannel) SetLengthTimer(v uint8) {
+func (wc *WaveChannel) SetLengthTimer(v Data8) {
 	wc.RegLengthTimer = v
 	fmt.Printf("not implemented: SetLengthTimer\n")
 }
 
-func (wc *WaveChannel) SetOutputLevel(v uint8) {
+func (wc *WaveChannel) SetOutputLevel(v Data8) {
 	wc.RegOutputLevel = v
 	fmt.Printf("not implemented: SetOutputLevel\n")
 }
 
-func (wc *WaveChannel) SetPeriodLow(v uint8) {
+func (wc *WaveChannel) SetPeriodLow(v Data8) {
 	wc.RegPeriodLow = v
 	fmt.Printf("not implemented: SetPeriodLow\n")
 }
 
-func (wc *WaveChannel) SetPeriodHighCtl(v uint8) {
+func (wc *WaveChannel) SetPeriodHighCtl(v Data8) {
 	wc.RegPeriodHighCtl = v
 	fmt.Printf("not implemented: SetPeriodHighCtl\n")
 }
 
 type NoiseChannel struct {
-	RegLengthTimer    uint8
-	RegVolumeEnvelope uint8
-	RegRNG            uint8
-	RegCtl            uint8
+	RegLengthTimer    Data8
+	RegVolumeEnvelope Data8
+	RegRNG            Data8
+	RegCtl            Data8
 }
 
-func (nc *NoiseChannel) SetLengthTimer(v uint8) {
+func (nc *NoiseChannel) SetLengthTimer(v Data8) {
 	nc.RegLengthTimer = v
 	fmt.Printf("not implemented: SetLengthTimer\n")
 }
 
-func (nc *NoiseChannel) SetVolumeEnvelope(v uint8) {
+func (nc *NoiseChannel) SetVolumeEnvelope(v Data8) {
 	nc.RegVolumeEnvelope = v
 	fmt.Printf("not implemented: SetVolumeEnvelope\n")
 }
 
-func (nc *NoiseChannel) SetRNG(v uint8) {
+func (nc *NoiseChannel) SetRNG(v Data8) {
 	nc.RegRNG = v
 	fmt.Printf("not implemented: SetRNG\n")
 }
 
-func (nc *NoiseChannel) SetCtl(v uint8) {
+func (nc *NoiseChannel) SetCtl(v Data8) {
 	nc.RegCtl = v
 	fmt.Printf("not implemented: SetCtl\n")
 }
 
 func NewAPU(clock *ClockRT) *APU {
 	return &APU{
-		MemoryRegion:                   NewMemoryRegion(clock, AddrAPUBegin, AddrAPUEnd),
+		MemoryRegion:                   NewMemoryRegion(clock, AddrAPUBegin, SizeAPU),
 		canWriteLengthTimersWithAPUOff: true, // on monochrome models
 	}
 }
@@ -221,7 +221,7 @@ func (apu *APU) Enabled() bool {
 	return apu.MasterCtl&0x80 != 0
 }
 
-func (apu *APU) Read(addr uint16) uint8 {
+func (apu *APU) Read(addr Addr) Data8 {
 	_ = apu.MemoryRegion.Read(addr)
 
 	switch Addr(addr) {
@@ -276,7 +276,7 @@ func (apu *APU) Read(addr uint16) uint8 {
 	return 0
 }
 
-func (apu *APU) Write(addr uint16, v uint8) {
+func (apu *APU) Write(addr Addr, v Data8) {
 	apu.MemoryRegion.Write(addr, v)
 
 	switch Addr(addr) {
@@ -329,7 +329,7 @@ func (apu *APU) Write(addr uint16, v uint8) {
 	}
 }
 
-func (apu *APU) SetPulse1Sweep(v uint8) {
+func (apu *APU) SetPulse1Sweep(v Data8) {
 	apu.Debug("SetPulse1Sweep", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -337,7 +337,7 @@ func (apu *APU) SetPulse1Sweep(v uint8) {
 	apu.Pulse1.SetSweep(v)
 }
 
-func (apu *APU) SetPulse1LengthDuty(v uint8) {
+func (apu *APU) SetPulse1LengthDuty(v Data8) {
 	apu.Debug("SetPulse1LengthDuty", "0x%02x\n", v)
 	if !apu.canWriteLengthTimersWithAPUOff && !apu.Enabled() {
 		return
@@ -345,7 +345,7 @@ func (apu *APU) SetPulse1LengthDuty(v uint8) {
 	apu.Pulse1.SetLengthDuty(v)
 }
 
-func (apu *APU) SetPulse1VolumeEnvelope(v uint8) {
+func (apu *APU) SetPulse1VolumeEnvelope(v Data8) {
 	apu.Debug("SetPulse1VolumeEnvelope", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -353,7 +353,7 @@ func (apu *APU) SetPulse1VolumeEnvelope(v uint8) {
 	apu.Pulse1.SetVolumeEnvelope(v)
 }
 
-func (apu *APU) SetPulse1PeriodLow(v uint8) {
+func (apu *APU) SetPulse1PeriodLow(v Data8) {
 	apu.Debug("SetPulse1PeriodLow", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -361,7 +361,7 @@ func (apu *APU) SetPulse1PeriodLow(v uint8) {
 	apu.Pulse1.SetPeriodLow(v)
 }
 
-func (apu *APU) SetPulse1PeriodHighCtl(v uint8) {
+func (apu *APU) SetPulse1PeriodHighCtl(v Data8) {
 	apu.Debug("SetPulse1PeriodHighCtl", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -369,7 +369,7 @@ func (apu *APU) SetPulse1PeriodHighCtl(v uint8) {
 	apu.Pulse1.SetPeriodHighCtl(v)
 }
 
-func (apu *APU) SetPulse2LengthDuty(v uint8) {
+func (apu *APU) SetPulse2LengthDuty(v Data8) {
 	apu.Debug("SetPulse2LengthDuty", "0x%02x\n", v)
 	if !apu.canWriteLengthTimersWithAPUOff && !apu.Enabled() {
 		return
@@ -377,7 +377,7 @@ func (apu *APU) SetPulse2LengthDuty(v uint8) {
 	apu.Pulse2.SetLengthDuty(v)
 }
 
-func (apu *APU) SetPulse2VolumeEnvelope(v uint8) {
+func (apu *APU) SetPulse2VolumeEnvelope(v Data8) {
 	apu.Debug("SetPulse2VolumeEnvelope", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -385,7 +385,7 @@ func (apu *APU) SetPulse2VolumeEnvelope(v uint8) {
 	apu.Pulse2.SetVolumeEnvelope(v)
 }
 
-func (apu *APU) SetPulse2PeriodLow(v uint8) {
+func (apu *APU) SetPulse2PeriodLow(v Data8) {
 	apu.Debug("SetPulse2PeriodLow", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -393,7 +393,7 @@ func (apu *APU) SetPulse2PeriodLow(v uint8) {
 	apu.Pulse2.SetPeriodLow(v)
 }
 
-func (apu *APU) SetPulse2PeriodHighCtl(v uint8) {
+func (apu *APU) SetPulse2PeriodHighCtl(v Data8) {
 	apu.Debug("SetPulse2PeriodHighCtl", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -401,7 +401,7 @@ func (apu *APU) SetPulse2PeriodHighCtl(v uint8) {
 	apu.Pulse2.SetPeriodHighCtl(v)
 }
 
-func (apu *APU) SetWaveDACEn(v uint8) {
+func (apu *APU) SetWaveDACEn(v Data8) {
 	apu.Debug("SetWaveDACEn", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -409,7 +409,7 @@ func (apu *APU) SetWaveDACEn(v uint8) {
 	apu.Wave.SetDACEn(v)
 }
 
-func (apu *APU) SetWaveLengthTimer(v uint8) {
+func (apu *APU) SetWaveLengthTimer(v Data8) {
 	apu.Debug("SetWaveLengthTimer", "0x%02x\n", v)
 	if !apu.canWriteLengthTimersWithAPUOff && !apu.Enabled() {
 		return
@@ -417,7 +417,7 @@ func (apu *APU) SetWaveLengthTimer(v uint8) {
 	apu.Wave.SetLengthTimer(v)
 }
 
-func (apu *APU) SetWaveOutputLevel(v uint8) {
+func (apu *APU) SetWaveOutputLevel(v Data8) {
 	apu.Debug("SetWaveOutputLevel", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -425,7 +425,7 @@ func (apu *APU) SetWaveOutputLevel(v uint8) {
 	apu.Wave.SetOutputLevel(v)
 }
 
-func (apu *APU) SetWavePeriodLow(v uint8) {
+func (apu *APU) SetWavePeriodLow(v Data8) {
 	apu.Debug("SetWavePeriodLow", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -433,7 +433,7 @@ func (apu *APU) SetWavePeriodLow(v uint8) {
 	apu.Wave.SetPeriodLow(v)
 }
 
-func (apu *APU) SetWavePeriodHighCtl(v uint8) {
+func (apu *APU) SetWavePeriodHighCtl(v Data8) {
 	apu.Debug("SetWavePeriodHighCtl", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -441,7 +441,7 @@ func (apu *APU) SetWavePeriodHighCtl(v uint8) {
 	apu.Wave.SetPeriodHighCtl(v)
 }
 
-func (apu *APU) SetNoiseLengthTimer(v uint8) {
+func (apu *APU) SetNoiseLengthTimer(v Data8) {
 	apu.Debug("SetNoiseLengthTimer", "0x%02x\n", v)
 	if !apu.canWriteLengthTimersWithAPUOff && !apu.Enabled() {
 		return
@@ -449,7 +449,7 @@ func (apu *APU) SetNoiseLengthTimer(v uint8) {
 	apu.Noise.SetLengthTimer(v)
 }
 
-func (apu *APU) SetNoiseVolumeEnvelope(v uint8) {
+func (apu *APU) SetNoiseVolumeEnvelope(v Data8) {
 	apu.Debug("SetNoiseVolumeEnvelope", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -457,7 +457,7 @@ func (apu *APU) SetNoiseVolumeEnvelope(v uint8) {
 	apu.Noise.SetVolumeEnvelope(v)
 }
 
-func (apu *APU) SetNoiseRNG(v uint8) {
+func (apu *APU) SetNoiseRNG(v Data8) {
 	apu.Debug("SetNoiseRNG", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -465,7 +465,7 @@ func (apu *APU) SetNoiseRNG(v uint8) {
 	apu.Noise.SetRNG(v)
 }
 
-func (apu *APU) SetNoiseCtl(v uint8) {
+func (apu *APU) SetNoiseCtl(v Data8) {
 	apu.Debug("SetNoiseCtl", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -473,7 +473,7 @@ func (apu *APU) SetNoiseCtl(v uint8) {
 	apu.Noise.SetCtl(v)
 }
 
-func (apu *APU) SetMasterVolumePan(v uint8) {
+func (apu *APU) SetMasterVolumePan(v Data8) {
 	apu.Debug("SetMasterVolumePan", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -481,7 +481,7 @@ func (apu *APU) SetMasterVolumePan(v uint8) {
 	apu.Mixer.SetMasterVolumeVINPan(v)
 }
 
-func (apu *APU) SetChannelPan(v uint8) {
+func (apu *APU) SetChannelPan(v Data8) {
 	apu.Debug("SetChannelPan", "0x%02x\n", v)
 	if !apu.Enabled() {
 		return
@@ -489,7 +489,7 @@ func (apu *APU) SetChannelPan(v uint8) {
 	apu.Mixer.SetChannelPan(v)
 }
 
-func (apu *APU) SetMasterCtl(v uint8) {
+func (apu *APU) SetMasterCtl(v Data8) {
 	apu.Debug("SetMasterCtl", "0x%02x\n", v)
 
 	// only bit 7 is R/W
@@ -521,6 +521,6 @@ func (apu *APU) SetMasterCtl(v uint8) {
 	}
 }
 
-func maskedWrite(prev, v, mask uint8) uint8 {
+func maskedWrite(prev, v, mask Data8) Data8 {
 	return (prev & (^mask)) | (v & mask)
 }

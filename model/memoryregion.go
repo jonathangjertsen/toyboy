@@ -6,19 +6,19 @@ const (
 )
 
 type MemoryRegion struct {
-	Offset uint16
-	Data   []uint8
+	Offset Addr
+	Data   []Data8
 
 	WriteCountdowns  []uint64
 	ReadCountdowns   []uint64
 	CountdownDisable bool
 }
 
-func (mr *MemoryRegion) GetCounters(addr uint16) (uint64, uint64) {
+func (mr *MemoryRegion) GetCounters(addr Addr) (uint64, uint64) {
 	return mr.ReadCountdowns[addr-mr.Offset], mr.WriteCountdowns[addr-mr.Offset]
 }
 
-func (mr *MemoryRegion) Read(addr uint16) uint8 {
+func (mr *MemoryRegion) Read(addr Addr) Data8 {
 	idx := addr - mr.Offset
 	if !mr.CountdownDisable { // todo move out of fast path
 		mr.ReadCountdowns[idx] = ReadCountdown
@@ -26,7 +26,7 @@ func (mr *MemoryRegion) Read(addr uint16) uint8 {
 	return mr.Data[idx]
 }
 
-func (mr *MemoryRegion) Write(addr uint16, v uint8) {
+func (mr *MemoryRegion) Write(addr Addr, v Data8) {
 	idx := addr - mr.Offset
 	if !mr.CountdownDisable { // todo move out of fast path
 		mr.WriteCountdowns[idx] = WriteCountdown
@@ -47,9 +47,9 @@ func (mr *MemoryRegion) DecrementCounters() {
 	}
 }
 
-func NewMemoryRegion(clock *ClockRT, start, size uint16) MemoryRegion {
+func NewMemoryRegion(clock *ClockRT, start Addr, size Size16) MemoryRegion {
 	mr := MemoryRegion{
-		Data:            make([]uint8, size),
+		Data:            make([]Data8, size),
 		WriteCountdowns: make([]uint64, size),
 		ReadCountdowns:  make([]uint64, size),
 		Offset:          start,

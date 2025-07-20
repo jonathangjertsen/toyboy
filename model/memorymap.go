@@ -1,58 +1,27 @@
 package model
 
-const (
-	AddrBootROMBegin = 0x0000
-	AddrBootROMSize  = 0x0100
-	AddrBootROMEnd   = AddrBootROMBegin + AddrBootROMSize - 1
+import "fmt"
 
-	AddrCartridgeBank0Begin = 0x0000
-	AddrCartridgeBank0Size  = 0x4000
-	AddrCartridgeBank0End   = AddrCartridgeBank0Begin + AddrCartridgeBank0Size - 1
-
-	AddrVRAMBegin = 0x8000
-	SizeVRAM      = 0x2000
-	AddrVRAMEnd   = AddrVRAMBegin + SizeVRAM - 1
-
-	AddrTileData    = 0x8000
-	SizeTileData    = 0x0400
-	AddrTileDataEnd = AddrTileData + SizeTileData - 1
-
-	AddrCartridgeRAMBegin = 0xa000
-	SizeCartridgeRAM      = 0x2000
-	AddrCartridgeRAMEnd   = AddrCartridgeRAMBegin + SizeCartridgeRAM - 1
-
-	AddrWRAMBegin = 0xc000
-	SizeWRAM      = 0x2000
-	AddrWRAMEnd   = AddrWRAMBegin + SizeWRAM - 1
-
-	AddrEchoRAMBegin = 0xe000
-	SizeEchoRAM      = 0x1f00
-	AddrEchoRAMEnd   = AddrEchoRAMBegin + SizeEchoRAM - 1
-
-	AddrJoypad = 0xff00
-
-	AddrAPUBegin = 0xff10
-	SizeAPU      = 0x0017
-	AddrAPUEnd   = AddrAPUBegin + SizeAPU - 1
-
-	AddrPPUBegin = 0xff40
-	SizePPU      = 0x000c
-	AddrPPUEnd   = AddrPPUBegin + SizePPU - 1
-
-	AddrBootROMLock = 0xff50
-
-	AddrHRAMBegin = 0xff80
-	SizeHRAM      = 0x007f
-	AddrHRAMEnd   = AddrHRAMBegin + SizeHRAM - 1
-
-	AddrOAMBegin = 0xfe00
-	SizeOAM      = 0x00a0
-	AddrOAMEnd   = AddrOAMBegin + SizeOAM - 1
-)
-
-//go:generate go-enum --marshal --flag --values --nocomments
+//go:generate go-enum --marshal --flag --nocomments
 
 // ENUM(
+// Zero              = 0x0000
+// BootROMEnd        = 0x00ff
+// CartridgeBank0End = 0x3fff
+// TileDataBegin     = 0x8000
+// TileDataEnd       = 0x97ff
+// TileMap0Begin     = 0x9800
+// TileMap0End       = 0x9bff
+// TileMap1Begin     = 0x9c00
+// TileMap1End       = 0x9fff
+// RAMBegin          = 0xa000
+// RAMEnd            = 0xbfff
+// WRAMBegin         = 0xc000
+// WRAMEnd           = 0xdfff
+// EchoRAMBegin      = 0xe000
+// EchoRAMEnd        = 0xfdff
+// OAMBegin          = 0xfe00
+// OAMEnd = 0xfe9f
 // P1   = 0xff00
 // SB   = 0xff01
 // SC   = 0xff02
@@ -94,6 +63,133 @@ const (
 // NR50 = 0xff24
 // NR51 = 0xff25
 // NR52 = 0xff26
+// BootROMLock = 0xff50
+// HRAMBegin = 0xff80
+// HRAMEnd = 0xfffe
 // IE   = 0xffff
 // )
 type Addr uint16
+
+const (
+	AddrVRAMBegin = AddrTileDataBegin
+	AddrVRAMEnd   = AddrTileMap1End
+	AddrAPUBegin  = AddrNR10
+	AddrAPUEnd    = AddrNR52
+	AddrPPUBegin  = AddrLCDC
+	AddrPPUEnd    = AddrWX
+)
+
+func ByteSlice(in []Data8) []byte {
+	out := make([]byte, len(in))
+	for i := range in {
+		out[i] = byte(in[i])
+	}
+	return out
+}
+
+func Data8Slice(in []byte) []Data8 {
+	out := make([]Data8, len(in))
+	for i := range in {
+		out[i] = Data8(in[i])
+	}
+	return out
+}
+
+func (a Addr) Hex() string {
+	return Data16(a).Hex()
+}
+
+func (a Addr) Dec() string {
+	return Data16(a).Dec()
+}
+
+func (a Addr) MSB() Data8 {
+	return Data16(a).MSB()
+}
+
+func (a Addr) LSB() Data8 {
+	return Data16(a).LSB()
+}
+
+func (a Addr) Split() (Data8, Data8) {
+	return Data16(a).Split()
+}
+
+type Data16 uint16
+
+func (a Data16) MSB() Data8 {
+	return Data8(a >> 8)
+}
+
+func (a Data16) LSB() Data8 {
+	return Data8(a)
+}
+
+func (a Data16) Hex() string {
+	return Hex16(uint16(a))
+}
+
+func (a Data16) Dec() string {
+	return fmt.Sprintf("%dd", a)
+}
+
+func (a Data16) Split() (Data8, Data8) {
+	return a.MSB(), a.LSB()
+}
+
+type Data8 uint8
+
+func (a Data8) Bit(i int) bool {
+	if i < 0 || i > 8 {
+		panic(i)
+	}
+	return a&(1<<i) != 0
+}
+
+func (a Data8) SignBit() bool {
+	return a.Bit(7)
+}
+
+func (a Data8) SignedOffset() Offset8 {
+	return Offset8(int8(uint8(a)))
+}
+func (a Data8) SignedAbs() Data8 {
+	if a.SignBit() {
+		return Data8(-int8(a))
+	}
+	return a
+}
+
+func (a Data8) Hex() string {
+	return Hex8(uint8(a))
+}
+
+func (a Data8) Dec() string {
+	return fmt.Sprintf("%dd", a)
+}
+
+func Hex16(x uint16) string {
+	return fmt.Sprintf("%04xh", x)
+}
+
+func Hex8(x uint8) string {
+	return fmt.Sprintf("%02xh", x)
+}
+
+type Size16 uint16
+
+const (
+	SizeBootROM        Size16 = 0x0100
+	SizeCartridgeBank0 Size16 = 0x4000
+	SizeVRAM           Size16 = 0x2000
+	SizeTileData       Size16 = 0x0400
+	SizeCartridgeRAM   Size16 = 0x2000
+	SizeWRAM           Size16 = 0x2000
+	SizeEchoRAM        Size16 = 0x1f00
+	SizeAPU            Size16 = 0x0017
+	SizePPU            Size16 = 0x000c
+	SizeHRAM           Size16 = 0x007f
+	SizeOAM            Size16 = 0x00a0
+)
+
+type Offset8 int8

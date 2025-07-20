@@ -60,23 +60,23 @@ func (c Color) RGBA() color.RGBA {
 }
 
 // ENUM(FetchTileNo, FetchTileLSB, FetchTileMSB, PushFIFO)
-type PixelFetcherState uint8
+type PixelFetcherState Data8
 
 type Pixel struct {
 	Color              Color
-	Palette            uint8
+	Palette            Data8
 	SpritePriority     bool // CGB only
 	BackgroundPriority bool
 }
 
 type Sprite struct {
-	X          uint8
-	Y          uint8
-	TileIndex  uint8
-	Attributes uint8
+	X          Data8
+	Y          Data8
+	TileIndex  Data8
+	Attributes Data8
 }
 
-func DecodeSprite(data []uint8) Sprite {
+func DecodeSprite(data []Data8) Sprite {
 	return Sprite{
 		Y:          data[0],
 		X:          data[1],
@@ -91,17 +91,17 @@ type PPU struct {
 	Interrupts *Interrupts
 	Debugger   *Debugger
 
-	RegLCDC uint8
+	RegLCDC Data8
 	Stat    Stat
-	RegSCY  uint8
-	RegSCX  uint8
-	RegWY   uint8
-	RegWX   uint8
-	RegLY   uint8
-	RegLYC  uint8
-	RegBGP  uint8
-	RegOBP0 uint8
-	RegOBP1 uint8
+	RegSCY  Data8
+	RegSCX  Data8
+	RegWY   Data8
+	RegWX   Data8
+	RegLY   Data8
+	RegLYC  Data8
+	RegBGP  Data8
+	RegOBP0 Data8
+	RegOBP1 Data8
 
 	Bus  *Bus
 	Mode PPUMode
@@ -143,90 +143,90 @@ func (ppu *PPU) Debug(event string, f string, v ...any) {
 }
 
 func (ppu *PPU) Enabled() bool {
-	return ppu.RegLCDC&0x80 != 0
+	return ppu.RegLCDC.Bit(7)
 }
 
-func (ppu *PPU) WindowTilemapArea() uint16 {
-	if ppu.RegLCDC&0x40 != 0 {
-		return 0x9800
+func (ppu *PPU) WindowTilemapArea() Addr {
+	if ppu.RegLCDC.Bit(6) {
+		return AddrTileMap1Begin
 	}
-	return 0x9c00
+	return AddrTileMap0Begin
 }
 
 func (ppu *PPU) WindowEnable() bool {
-	if ppu.RegLCDC&0x01 == 0 {
+	if ppu.RegLCDC.Bit(0) {
 		return false // DMG only
 	}
-	return ppu.RegLCDC&0x20 != 0
+	return ppu.RegLCDC.Bit(5)
 }
 
-func (ppu *PPU) BGTilemapArea() uint16 {
-	if ppu.RegLCDC&0x08 != 0 {
-		return 0x9c00
+func (ppu *PPU) BGTilemapArea() Addr {
+	if ppu.RegLCDC.Bit(3) {
+		return AddrTileMap1Begin
 	}
-	return 0x9800
+	return AddrTileMap0Begin
 }
 
-func (ppu *PPU) ObjHeight() uint8 {
-	if ppu.RegLCDC&0x04 != 0 {
+func (ppu *PPU) ObjHeight() Data8 {
+	if ppu.RegLCDC.Bit(2) {
 		return 16
 	}
 	return 8
 }
 
 func (ppu *PPU) OBJEnable() uint8 {
-	bitSet := ppu.RegLCDC&0x02 != 0
+	bitSet := ppu.RegLCDC.Bit(1)
 	_ = bitSet
 	panic("not implemented")
 }
 
 func (ppu *PPU) BGWindowEnablePriority() uint8 {
-	bitSet := ppu.RegLCDC&0x01 != 0
+	bitSet := ppu.RegLCDC.Bit(0)
 	_ = bitSet
 	panic("not implemented")
 }
 
-func (ppu *PPU) SetLCDC(v uint8) {
-	ppu.Debug("SetLCDC", "%02x", v)
+func (ppu *PPU) SetLCDC(v Data8) {
+	ppu.Debug("SetLCDC", "%s", v.Hex())
 	ppu.RegLCDC = v
 }
 
-func (ppu *PPU) SetSCY(v uint8) {
-	ppu.Debug("SetSCY", "%02x", v)
+func (ppu *PPU) SetSCY(v Data8) {
+	ppu.Debug("SetSCY", "%s", v.Hex())
 	ppu.RegSCY = v
 }
 
-func (ppu *PPU) SetSCX(v uint8) {
-	ppu.Debug("SetSCX", "%02x", v)
+func (ppu *PPU) SetSCX(v Data8) {
+	ppu.Debug("SetSCX", "%s", v.Hex())
 	ppu.RegSCX = v
 }
 
-func (ppu *PPU) SetWY(v uint8) {
-	ppu.Debug("SetWY", "%02x", v)
+func (ppu *PPU) SetWY(v Data8) {
+	ppu.Debug("SetWY", "%s", v.Hex())
 	ppu.RegWY = v
 	panic("not implemented: SetWY")
 }
 
-func (ppu *PPU) SetWX(v uint8) {
-	ppu.Debug("SetWX", "%02x", v)
+func (ppu *PPU) SetWX(v Data8) {
+	ppu.Debug("SetWX", "%s", v.Hex())
 	ppu.RegWX = v
 	panic("not implemented: SetWX")
 }
 
-func (ppu *PPU) SetLY(v uint8) {
-	ppu.Debug("SetLY", "%02x", v)
+func (ppu *PPU) SetLY(v Data8) {
+	ppu.Debug("SetLY", "%s", v.Hex())
 	ppu.RegLY = v
 	panic("not implemented: SetLY")
 }
 
-func (ppu *PPU) SetLYC(v uint8) {
-	ppu.Debug("SetLYC", "%02x", v)
+func (ppu *PPU) SetLYC(v Data8) {
+	ppu.Debug("SetLYC", "%s", v.Hex())
 	ppu.RegLYC = v
 	panic("not implemented: SetLYC")
 }
 
-func (ppu *PPU) SetBGP(v uint8) {
-	ppu.Debug("SetBGP", "%02x", v)
+func (ppu *PPU) SetBGP(v Data8) {
+	ppu.Debug("SetBGP", "%s", v.Hex())
 	ppu.RegBGP = v
 
 	ppu.BGPalette[0] = Color((v >> 0) & 0x3)
@@ -235,8 +235,8 @@ func (ppu *PPU) SetBGP(v uint8) {
 	ppu.BGPalette[3] = Color((v >> 6) & 0x3)
 }
 
-func (ppu *PPU) SetOBP0(v uint8) {
-	ppu.Debug("SetOBP0", "v=%02x", v)
+func (ppu *PPU) SetOBP0(v Data8) {
+	ppu.Debug("SetOBP0", "%s", v.Hex())
 	ppu.RegOBP0 = v
 
 	ppu.OBJPalette0[0] = Color((v >> 0) & 0x3)
@@ -245,8 +245,8 @@ func (ppu *PPU) SetOBP0(v uint8) {
 	ppu.OBJPalette0[3] = Color((v >> 6) & 0x3)
 }
 
-func (ppu *PPU) SetOBP1(v uint8) {
-	ppu.Debug("SetOBP1", "v=%02x", v)
+func (ppu *PPU) SetOBP1(v Data8) {
+	ppu.Debug("SetOBP1", "%s", v.Hex())
 	ppu.RegOBP1 = v
 
 	ppu.OBJPalette1[0] = Color((v >> 0) & 0x3)
@@ -257,7 +257,7 @@ func (ppu *PPU) SetOBP1(v uint8) {
 
 func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, debugger *Debugger) *PPU {
 	ppu := &PPU{
-		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, AddrPPUEnd),
+		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, SizePPU),
 		Bus:          bus,
 		Debugger:     debugger,
 		Interrupts:   interrupts,
@@ -371,11 +371,11 @@ func (ppu *PPU) fsmOAMScan() {
 	if cycle&1 == 0 {
 		return
 	}
-	index := uint16((cycle - 1) / 2)
+	index := Addr((cycle - 1) / 2)
 
 	// Read sprite out of OAM
-	spriteData := make([]uint8, 4)
-	for offs := uint16(0); offs < 4; offs++ {
+	spriteData := make([]Data8, 4)
+	for offs := Addr(0); offs < 4; offs++ {
 		spriteData[offs] = ppu.Bus.OAM.Read(AddrOAMBegin + index*4 + offs)
 	}
 	sprite := DecodeSprite(spriteData)
@@ -480,7 +480,7 @@ func (ppu *PPU) IncRegLY() {
 	ppu.Debugger.SetY(ppu.RegLY)
 }
 
-func (ppu *PPU) Read(addr uint16) uint8 {
+func (ppu *PPU) Read(addr Addr) Data8 {
 	switch Addr(addr) {
 	case AddrLCDC:
 		return ppu.RegLCDC
@@ -508,7 +508,7 @@ func (ppu *PPU) Read(addr uint16) uint8 {
 	return 0
 }
 
-func (ppu *PPU) Write(addr uint16, v uint8) {
+func (ppu *PPU) Write(addr Addr, v Data8) {
 	switch Addr(addr) {
 	case AddrLCDC:
 		ppu.SetLCDC(v)

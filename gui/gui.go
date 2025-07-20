@@ -91,13 +91,13 @@ func New(config model.HWConfig) *GUI {
 
 func (gui *GUI) initGameboy() {
 	gb := model.NewGameboy(gui.Config)
-	f, err := os.ReadFile("assets/cartridges/tetris.gb")
+	f, err := os.ReadFile("assets/cartridges/unbricked.gb")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load cartridge: %v", err))
 	} else if len(f) != 0x8000 {
 		panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
 	}
-	copy(gb.CartridgeSlot.Data, f)
+	gb.CartridgeSlot.Data = model.Data8Slice(f)
 	gb.Disassembler.SetPC(0x0100)
 
 	cm := plugin.NewClockMeasurement()
@@ -416,7 +416,7 @@ func (gui *GUI) Render(gtx C) {
 								gtx,
 								256,
 								256,
-								tilemap(vramBytes, 0x9800, cd.PPU.Registers[0].Value&uint8(1<<4) == 0),
+								tilemap(vramBytes, 0x9800, cd.PPU.Registers[0].Value&model.Data8(1<<4) == 0),
 								2,
 								DefaultGridConfig.WithMem(0x9800, 1),
 								nil,
@@ -433,7 +433,7 @@ func (gui *GUI) Render(gtx C) {
 								gtx,
 								256,
 								256,
-								tilemap(vramBytes, 0x9c00, cd.PPU.Registers[0].Value&uint8(1<<4) == 0),
+								tilemap(vramBytes, 0x9c00, cd.PPU.Registers[0].Value&model.Data8(1<<4) == 0),
 								2,
 								DefaultGridConfig.WithMem(0x9c00, 1),
 								nil,

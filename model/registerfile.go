@@ -1,23 +1,23 @@
 package model
 
 type RegisterFile struct {
-	A  uint8
-	F  uint8
-	B  uint8
-	C  uint8
-	D  uint8
-	E  uint8
-	H  uint8
-	L  uint8
-	PC uint16
-	SP uint16
+	A  Data8
+	F  Data8
+	B  Data8
+	C  Data8
+	D  Data8
+	E  Data8
+	H  Data8
+	L  Data8
+	PC Addr
+	SP Addr
 	IR Opcode
 
-	TempZ uint8
-	TempW uint8
+	TempZ Data8
+	TempW Data8
 }
 
-func (regs *RegisterFile) setFlag(mask uint8, v bool) {
+func (regs *RegisterFile) setFlag(mask Data8, v bool) {
 	if v {
 		regs.F |= mask
 	} else {
@@ -25,7 +25,7 @@ func (regs *RegisterFile) setFlag(mask uint8, v bool) {
 	}
 }
 
-func (regs *RegisterFile) getFlag(mask uint8) bool {
+func (regs *RegisterFile) getFlag(mask Data8) bool {
 	return (regs.F & mask) == mask
 }
 
@@ -74,12 +74,11 @@ func (regs *RegisterFile) SetFlagC(v bool) {
 	regs.setFlag(0x10, v)
 }
 
-func (regs *RegisterFile) SetWZ(v uint16) {
-	regs.TempW = uint8(v >> 8)
-	regs.TempZ = uint8(v)
+func (regs *RegisterFile) SetWZ(v Data16) {
+	regs.TempW = v.MSB()
+	regs.TempZ = v.LSB()
 }
 
-func (regs *RegisterFile) GetWZ() uint16 {
-	wz := (uint16(regs.TempW) << 8) | uint16(regs.TempZ)
-	return wz
+func (regs *RegisterFile) GetWZ() Data16 {
+	return join16(regs.TempW, regs.TempZ)
 }

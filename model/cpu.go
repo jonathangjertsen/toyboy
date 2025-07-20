@@ -46,36 +46,33 @@ func (cpu *CPU) Reset() {
 }
 
 type ExecLogEntry struct {
-	PC           uint16
+	PC           Addr
 	Opcode       Opcode
 	BranchResult int
 }
 
-func (cpu *CPU) SetHL(v uint16) {
+func (cpu *CPU) SetHL(v Data16) {
 	if cpu.clockCycle.Falling {
 		panic("SetHL must be called on rising edge")
 	}
-	cpu.Regs.H = uint8(v >> 8)
-	cpu.Regs.L = uint8(v)
+	cpu.Regs.H, cpu.Regs.L = v.Split()
 }
 
-func (cpu *CPU) SetBC(v uint16) {
+func (cpu *CPU) SetBC(v Data16) {
 	if cpu.clockCycle.Falling {
 		panic("SetBC must be called on rising edge")
 	}
-	cpu.Regs.B = uint8(v >> 8)
-	cpu.Regs.C = uint8(v)
+	cpu.Regs.B, cpu.Regs.C = v.Split()
 }
 
-func (cpu *CPU) SetDE(v uint16) {
+func (cpu *CPU) SetDE(v Data16) {
 	if cpu.clockCycle.Falling {
 		panic("SetDE must be called on rising edge")
 	}
-	cpu.Regs.D = uint8(v >> 8)
-	cpu.Regs.E = uint8(v)
+	cpu.Regs.D, cpu.Regs.E = v.Split()
 }
 
-func (cpu *CPU) SetSP(v uint16) {
+func (cpu *CPU) SetSP(v Addr) {
 	if cpu.clockCycle.Falling {
 		panic("SetSP must be called on rising edge")
 	}
@@ -85,58 +82,23 @@ func (cpu *CPU) SetSP(v uint16) {
 	cpu.Regs.SP = v
 }
 
-func (cpu *CPU) GetA() uint8 {
-	v := cpu.Regs.A
-	return v
-}
-
-func (cpu *CPU) GetB() uint8 {
-	v := cpu.Regs.B
-	return v
-}
-
-func (cpu *CPU) GetC() uint8 {
-	v := cpu.Regs.C
-	return v
-}
-
-func (cpu *CPU) GetD() uint8 {
-	v := cpu.Regs.D
-	return v
-}
-
-func (cpu *CPU) GetE() uint8 {
-	v := cpu.Regs.E
-	return v
-}
-
-func (cpu *CPU) GetH() uint8 {
-	v := cpu.Regs.H
-	return v
-}
-
-func (cpu *CPU) GetL() uint8 {
-	v := cpu.Regs.L
-	return v
-}
-
-func (cpu *CPU) GetBC() uint16 {
+func (cpu *CPU) GetBC() Data16 {
 	v := join16(cpu.Regs.B, cpu.Regs.C)
 	return v
 }
 
-func (cpu *CPU) GetDE() uint16 {
+func (cpu *CPU) GetDE() Data16 {
 	v := join16(cpu.Regs.D, cpu.Regs.E)
 	return v
 }
 
-func (cpu *CPU) GetHL() uint16 {
+func (cpu *CPU) GetHL() Data16 {
 	v := join16(cpu.Regs.H, cpu.Regs.L)
 	return v
 }
 
-func join16(msb, lsb uint8) uint16 {
-	return (uint16(msb) << 8) | uint16(lsb)
+func join16(msb, lsb Data8) Data16 {
+	return (Data16(msb) << 8) | Data16(lsb)
 }
 
 func msb(w uint16) uint8 {
@@ -147,7 +109,7 @@ func lsb(w uint16) uint8 {
 	return uint8(w & 0xff)
 }
 
-func (cpu *CPU) SetPC(pc uint16) {
+func (cpu *CPU) SetPC(pc Addr) {
 	if cpu.clockCycle.Falling {
 		panic("SetPC must be called on rising edge")
 	}
@@ -224,16 +186,12 @@ func (cpu *CPU) fsm(c Cycle) {
 
 	if fetch {
 		if !c.Falling {
-			//cpu.Debug("PreFetch", "PC=%04x", cpu.Regs.PC)
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
 		} else {
-			//cpu.Debug("ExecDone", "")
 			cpu.Regs.SetWZ(0)
 			cpu.machineCycle = 1
 			cpu.Regs.IR = Opcode(cpu.Bus.Data)
-			//cpu.Debug("ExecBegin", "%s", cpu.Regs.IR)
-			//cpu.Debug(fmt.Sprintf("ExecBegin%s", cpu.Regs.IR), "")
 			prevIdx := cpu.rewindBufferIdx
 			if prevIdx > 0 {
 				prevIdx--
@@ -257,7 +215,7 @@ func (cpu *CPU) fsm(c Cycle) {
 	}
 }
 
-func (cpu *CPU) writeAddressBus(addr uint16) {
+func (cpu *CPU) writeAddressBus(addr Addr) {
 	if !cpu.Bus.inCoreDump {
 		if cpu.clockCycle.Falling {
 			panic("writeAddressBus must be called on rising edge")
