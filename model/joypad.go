@@ -32,7 +32,7 @@ func NewJoypad(clock *ClockRT, ints *Interrupts) *Joypad {
 }
 
 func (jp *Joypad) Write(addr Addr, v Data8) {
-	// TODO: can this trigger an interrupt?
+	// TODO: this can trigger an interrupt
 	jp.Written.Write(addr, v)
 }
 

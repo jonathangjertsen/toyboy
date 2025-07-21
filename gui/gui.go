@@ -29,8 +29,10 @@ type GUI struct {
 	GB          *model.Gameboy
 	JoypadState model.JoypadState
 
-	ClockMeasurement *plugin.ClockMeasurement
-	Theme            material.Theme
+	ClockMeasurement  *plugin.ClockMeasurement
+	GBFPSMeasurement  *plugin.ClockMeasurement
+	GUIFPSMeasurement *plugin.ClockMeasurement
+	Theme             material.Theme
 
 	KeyboardControl *KeyboardControl
 
@@ -58,9 +60,12 @@ type GUI struct {
 	APUScroll          widget.List
 	TimingScroll       widget.List
 
-	TargetPercent float64
-	LastFrameCPS  float64
-	StepCycles    uint64
+	TargetPercent   float64
+	LastFrameCPS    float64
+	LastFrameGBFPS  float64
+	LastFrameGUIFPS float64
+	LastFrameT      time.Time
+	StepCycles      uint64
 }
 
 func New(config model.HWConfig) *GUI {
@@ -91,24 +96,30 @@ func New(config model.HWConfig) *GUI {
 
 func (gui *GUI) initGameboy() {
 	gb := model.NewGameboy(gui.Config)
-	f, err := os.ReadFile("assets/cartridges/unbricked.gb")
+	f, err := os.ReadFile("assets/cartridges/tetris.gb")
 	if err != nil {
 		panic(fmt.Sprintf("failed to load cartridge: %v", err))
-	} else if len(f) != 0x8000 {
-		panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
 	}
-	gb.CartridgeSlot.Data = model.Data8Slice(f)
+	gb.Cartridge.LoadROM(f)
 	gb.Disassembler.SetPC(0x0100)
 
-	cm := plugin.NewClockMeasurement()
+	gui.GB = gb
+
+	// Measure clock freq
+	gui.ClockMeasurement = plugin.NewClockMeasurement()
 	gb.PHI.AttachDevice(func(c model.Cycle) {
 		if c.Falling {
-			cm.Clocked()
+			gui.ClockMeasurement.Clocked()
 		}
 	})
 
-	gui.GB = gb
-	gui.ClockMeasurement = cm
+	// Measure gameboy FPS
+	gui.GBFPSMeasurement = plugin.NewClockMeasurement()
+	gb.PPU.FrameClock.AttachDevice(func(c model.Cycle) {
+		if c.Falling {
+			gui.GBFPSMeasurement.Clocked()
+		}
+	})
 }
 
 func (gui *GUI) Run() {
@@ -170,10 +181,25 @@ func run(window *app.Window, gui *GUI) error {
 }
 
 func (gui *GUI) Interactions(gtx C) {
+	// TODO: avg over more frames
+	t := time.Now()
+	frameElapsed := t.Sub(gui.LastFrameT)
+	gui.LastFrameT = t
+	gui.LastFrameGUIFPS = float64(time.Second / frameElapsed)
+
+	// TODO: avg over more frames
+	frames, duration := gui.GBFPSMeasurement.Stop()
+	defer gui.GBFPSMeasurement.Start()
+	if duration > 0 {
+		gui.LastFrameGBFPS = float64((time.Duration(frames) * time.Second) / duration)
+	} else {
+		gui.LastFrameGBFPS = 0
+	}
+
+	// TODO: avg over more frames
 	cycles, duration := gui.ClockMeasurement.Stop()
 	defer gui.ClockMeasurement.Start()
 	us := uint64(duration / time.Microsecond)
-
 	if us > 0 {
 		gui.LastFrameCPS = float64(cycles) * 1_000_000 / float64(us)
 	} else {
@@ -293,6 +319,8 @@ func (gui *GUI) Render(gtx C) {
 								fmt.Fprintf(w, "CPU clock:              %.0f\n", gui.LastFrameCPS)
 								fmt.Fprintf(w, "Target emulation speed: %.2f%%\n", gui.TargetPercent)
 								fmt.Fprintf(w, "Actual emulation speed: %.2f%%\n", (100*4*gui.LastFrameCPS)/4194304)
+								fmt.Fprintf(w, "Gameboy FPS:            %.0f\n", gui.LastFrameGBFPS)
+								fmt.Fprintf(w, "GUI FPS:                %.0f\n", gui.LastFrameGUIFPS)
 							}, &gui.TimingScroll, unit.Dp(100), unit.Dp(400)),
 						),
 						Rigid(gui.label("Registers")),

@@ -79,6 +79,10 @@ func (cd *CoreDump) PrintRegs(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintProgram(f io.Writer) {
+	if cd.ProgramEnd >= 0x8000 {
+		fmt.Printf("out of bounds\n")
+		return
+	}
 	memdump(f, cd.Program[cd.ProgramStart:cd.ProgramEnd+1], cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
 }
 

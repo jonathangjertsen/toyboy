@@ -155,29 +155,11 @@ func (cpu *CPU) fsm(c Cycle) {
 
 	var fetch bool
 	if c.C > 0 {
-		opcode := cpu.Regs.IR
-
-		// Detect runaway code
-		nopCheck := opcode == OpcodeNop
-		if cpu.Regs.PC < 0x100 {
-			// In unmapped bootrom, allow NOPs here because soft reset puts PC at 0
-			nopCheck = false
-		}
-		if nopCheck {
-			cpu.nopCount++
-			if cpu.nopCount > cpu.nopCountMax {
-				panic("max nop count exceeded")
-			}
+		cpu.detectRunawayCode()
+		if cpu.Interrupts.PendingInterrupt != 0 {
+			fetch = cpu.execTransferToISR()
 		} else {
-			cpu.nopCount = 0
-		}
-
-		if handler := cpu.handlers[opcode]; handler != nil {
-			e := edge{cpu.machineCycle, c.Falling}
-			//cpu.Debug("Handler", "e=%v", e)
-			fetch = handler(e)
-		} else {
-			panicf("not implemented opcode %v", opcode)
+			fetch = cpu.execCurrentInstruction()
 		}
 	} else {
 		// initial instruction
@@ -188,31 +170,96 @@ func (cpu *CPU) fsm(c Cycle) {
 		if !c.Falling {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		} else {
-			cpu.Regs.SetWZ(0)
-			cpu.machineCycle = 1
-			cpu.Regs.IR = Opcode(cpu.Bus.Data)
-			prevIdx := cpu.rewindBufferIdx
-			if prevIdx > 0 {
-				prevIdx--
-			} else {
-				prevIdx = len(cpu.rewindBuffer) - 1
-			}
-			cpu.rewindBuffer[prevIdx].BranchResult = cpu.lastBranchResult
-			cpu.rewindBuffer[cpu.rewindBufferIdx] = ExecLogEntry{
-				PC:     cpu.Regs.PC - 1,
-				Opcode: cpu.Regs.IR,
-			}
-			cpu.lastBranchResult = 0
-			cpu.rewindBufferIdx++
-			if cpu.rewindBufferIdx >= len(cpu.rewindBuffer) {
-				cpu.rewindBufferIdx = 0
-			}
-			cpu.Disassembler.SetPC(cpu.Regs.PC - 1)
+		} else if cpu.Interrupts.PendingInterrupt == 0 {
+			cpu.instructionFetch()
 		}
 	} else if c.Falling {
 		cpu.machineCycle++
 	}
+}
+
+func (cpu *CPU) detectRunawayCode() {
+	// Detect runaway code
+	nopCheck := cpu.Regs.IR == OpcodeNop
+	if cpu.Regs.PC < 0x100 {
+		// In unmapped bootrom, allow NOPs here because soft reset puts PC at 0
+		nopCheck = false
+	}
+	if nopCheck {
+		cpu.nopCount++
+		if cpu.nopCount > cpu.nopCountMax {
+			panic("max nop count exceeded")
+		}
+	} else {
+		cpu.nopCount = 0
+	}
+}
+
+func (cpu *CPU) instructionFetch() {
+	// Reset inter-instruction state
+	cpu.Regs.SetWZ(0)
+	cpu.machineCycle = 1
+
+	// Read next instruction opcode
+	cpu.Regs.IR = Opcode(cpu.Bus.Data)
+
+	// Update rewind buffer
+	prevIdx := cpu.rewindBufferIdx
+	if prevIdx > 0 {
+		prevIdx--
+	} else {
+		prevIdx = len(cpu.rewindBuffer) - 1
+	}
+	cpu.rewindBuffer[prevIdx].BranchResult = cpu.lastBranchResult
+	cpu.rewindBuffer[cpu.rewindBufferIdx] = ExecLogEntry{
+		PC:     cpu.Regs.PC - 1,
+		Opcode: cpu.Regs.IR,
+	}
+	cpu.lastBranchResult = 0
+	cpu.rewindBufferIdx++
+	if cpu.rewindBufferIdx >= len(cpu.rewindBuffer) {
+		cpu.rewindBufferIdx = 0
+	}
+
+	// Set PC
+	cpu.Disassembler.SetPC(cpu.Regs.PC - 1)
+}
+
+func (cpu *CPU) execCurrentInstruction() bool {
+	opcode := cpu.Regs.IR
+	if handler := cpu.handlers[opcode]; handler != nil {
+		e := edge{cpu.machineCycle, cpu.clockCycle.Falling}
+		return handler(e)
+	}
+	panicf("not implemented opcode %v", opcode)
+	return false
+}
+
+func (cpu *CPU) execTransferToISR() bool {
+	e := edge{cpu.machineCycle, cpu.clockCycle.Falling}
+	switch e {
+	// wait states
+	case edge{1, false}, edge{1, true}, edge{2, false}, edge{2, true}:
+	// push MSB of PC to stack
+	case edge{3, false}:
+		cpu.SetSP(cpu.Regs.SP - 1)
+	case edge{3, true}:
+		cpu.Bus.WriteData(cpu.Regs.PC.MSB())
+		// push LSB of PC to stack
+	case edge{4, false}:
+		cpu.SetSP(cpu.Regs.SP - 1)
+	case edge{4, true}:
+		cpu.Bus.WriteData(cpu.Regs.PC.LSB())
+	case edge{5, false}:
+		cpu.SetPC(cpu.Interrupts.PendingInterrupt.ISR())
+		return true
+	case edge{5, true}:
+		cpu.Interrupts.PendingInterrupt = 0
+		return true
+	default:
+		panicv(e)
+	}
+	return false
 }
 
 func (cpu *CPU) writeAddressBus(addr Addr) {

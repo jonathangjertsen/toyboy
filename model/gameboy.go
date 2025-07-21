@@ -3,14 +3,14 @@ package model
 type Gameboy struct {
 	Config HWConfig
 
-	CLK           *ClockRT
-	Debugger      *Debugger
-	Disassembler  *Disassembler
-	PHI           *Clock
-	CPU           *CPU
-	PPU           *PPU
-	CartridgeSlot *MemoryRegion
-	Joypad        *Joypad
+	CLK          *ClockRT
+	Debugger     *Debugger
+	Disassembler *Disassembler
+	PHI          *Clock
+	CPU          *CPU
+	PPU          *PPU
+	Cartridge    *Cartridge
+	Joypad       *Joypad
 }
 
 func (gb *Gameboy) Start() {
@@ -35,6 +35,7 @@ func (gb *Gameboy) SoftReset() {
 			gb.CLK.divided[i].cycle = 0
 		}
 		gb.CPU.Reset()
+		gb.PPU.Reset()
 	})
 }
 
@@ -81,11 +82,13 @@ func (gb *Gameboy) init() {
 	wram := NewMemoryRegion(clk, AddrWRAMBegin, SizeWRAM)
 	apu := NewAPU(clk)
 	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
-	cartridgeSlot := NewMemoryRegion(clk, AddrZero, SizeCartridgeBank0)
+	cartridge := NewCartridge(clk)
 	joypad := NewJoypad(clk, interrupts)
+	serial := NewSerial(clk)
+	prohibited := NewProhibited(clk)
 
 	bootROMLock.OnUnlock = func() {
-		disassembler.SetProgram(ByteSlice(cartridgeSlot.Data))
+		disassembler.SetProgram(ByteSlice(cartridge.Bank0.Data))
 		disassembler.SetPC(0x100)
 	}
 
@@ -105,15 +108,17 @@ func (gb *Gameboy) init() {
 	bus.APU = apu
 	bus.OAM = &oam
 	bus.PPU = ppu
-	bus.CartridgeSlot = &cartridgeSlot
+	bus.Cartridge = cartridge
 	bus.Joypad = joypad
 	bus.Interrupts = interrupts
+	bus.Serial = serial
+	bus.Prohibited = prohibited
 
 	gb.CLK = clk
 	gb.Disassembler = disassembler
 	gb.PHI = cpuClock
 	gb.CPU = cpu
-	gb.CartridgeSlot = &cartridgeSlot
+	gb.Cartridge = cartridge
 	gb.PPU = ppu
 	gb.Debugger = debugger
 	gb.Joypad = joypad

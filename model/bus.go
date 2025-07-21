@@ -6,17 +6,19 @@ type Bus struct {
 
 	inCoreDump bool
 
-	BootROMLock   *BootROMLock
-	BootROM       *MemoryRegion
-	VRAM          *MemoryRegion
-	HRAM          *MemoryRegion
-	WRAM          *MemoryRegion
-	APU           *APU
-	OAM           *MemoryRegion
-	PPU           *PPU
-	CartridgeSlot *MemoryRegion
-	Joypad        *Joypad
-	Interrupts    *Interrupts
+	BootROMLock *BootROMLock
+	BootROM     *MemoryRegion
+	VRAM        *MemoryRegion
+	HRAM        *MemoryRegion
+	WRAM        *MemoryRegion
+	APU         *APU
+	OAM         *MemoryRegion
+	PPU         *PPU
+	Cartridge   *Cartridge
+	Joypad      *Joypad
+	Interrupts  *Interrupts
+	Serial      *Serial
+	Prohibited  *Prohibited
 }
 
 func (b *Bus) WriteAddress(addr Addr) {
@@ -24,12 +26,12 @@ func (b *Bus) WriteAddress(addr Addr) {
 
 	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
-			b.Data = b.CartridgeSlot.Read(addr)
+			b.Data = b.Cartridge.Read(addr)
 		} else {
 			b.Data = b.BootROM.Read(addr)
 		}
-	} else if addr <= AddrCartridgeBank0End {
-		b.Data = b.CartridgeSlot.Read(addr)
+	} else if addr <= AddrCartridgeBankNEnd {
+		b.Data = b.Cartridge.Read(addr)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		b.Data = b.VRAM.Read(addr)
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
@@ -42,12 +44,18 @@ func (b *Bus) WriteAddress(addr Addr) {
 		b.Data = b.OAM.Read(addr)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.Data = b.PPU.Read(addr)
+	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
+		b.Data = b.Prohibited.Read(addr)
+	} else if addr >= 0xff71 && addr <= 0xff7f {
+		b.Data = b.Prohibited.Read(addr)
 	} else if addr == AddrP1 {
 		b.Data = b.Joypad.Read(addr)
 	} else if addr == AddrIF || addr == AddrIE {
 		b.Data = b.Interrupts.Read(addr)
 	} else if addr == AddrBootROMLock {
 		b.Data = b.BootROMLock.Read(addr)
+	} else if addr == AddrSB || addr == AddrSC {
+		b.Data = b.Serial.Read(addr)
 	} else {
 		if !b.inCoreDump {
 			panicf("Read from unmapped address %s", addr.Hex())
@@ -64,9 +72,8 @@ func (b *Bus) WriteData(v Data8) {
 		} else {
 			panicf("Attempted write to bootrom (addr=%s v=%s)", addr.Hex(), v.Hex())
 		}
-	} else if addr <= AddrCartridgeBank0End {
-		b.Data = b.CartridgeSlot.Read(addr)
-		panicf("Attempted write to cartridge (addr=%s v=%s)", addr.Hex(), v.Hex())
+	} else if addr <= AddrCartridgeBankNEnd {
+		b.Cartridge.Write(addr, v)
 	} else if addr == AddrBootROMLock {
 		b.BootROMLock.Write(addr, v)
 	} else if addr == AddrP1 {
@@ -85,6 +92,12 @@ func (b *Bus) WriteData(v Data8) {
 		b.OAM.Write(addr, v)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.PPU.Write(addr, v)
+	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
+		b.Prohibited.Write(addr, v)
+	} else if addr >= 0xff71 && addr <= 0xff7f {
+		b.Prohibited.Write(addr, v)
+	} else if addr == AddrSB || addr == AddrSC {
+		b.Serial.Write(addr, v)
 	} else {
 		if !b.inCoreDump {
 			panicf("write to unmapped address %s", addr.Hex())
@@ -102,7 +115,8 @@ func (b *Bus) CoreDumpBegin() {
 	b.APU.CountdownDisable = true
 	b.OAM.CountdownDisable = true
 	b.PPU.CountdownDisable = true
-	b.CartridgeSlot.CountdownDisable = true
+	b.Prohibited.FEA0toFEFF.CountdownDisable = true
+	b.Cartridge.Bank0.CountdownDisable = true
 }
 
 func (b *Bus) CoreDumpEnd() {
@@ -115,18 +129,19 @@ func (b *Bus) CoreDumpEnd() {
 	b.APU.CountdownDisable = false
 	b.OAM.CountdownDisable = false
 	b.PPU.CountdownDisable = false
-	b.CartridgeSlot.CountdownDisable = false
+	b.Prohibited.FEA0toFEFF.CountdownDisable = false
+	b.Cartridge.Bank0.CountdownDisable = false
 }
 
 func (b *Bus) GetCounters(addr Addr) (uint64, uint64) {
 	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
-			return b.CartridgeSlot.GetCounters(addr)
+			return b.Cartridge.GetCounters(addr)
 		} else {
 			return b.BootROM.GetCounters(addr)
 		}
-	} else if addr <= AddrCartridgeBank0End {
-		return b.CartridgeSlot.GetCounters(addr)
+	} else if addr <= AddrCartridgeBankNEnd {
+		return b.Cartridge.GetCounters(addr)
 	} else if addr == AddrBootROMLock {
 		return b.BootROMLock.GetCounters(addr)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
@@ -141,8 +156,14 @@ func (b *Bus) GetCounters(addr Addr) (uint64, uint64) {
 		return b.OAM.GetCounters(addr)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		return b.PPU.GetCounters(addr)
+	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
+		return b.Prohibited.GetCounters(addr)
+	} else if addr >= 0xff71 && addr <= 0xff7f {
+		return b.Prohibited.GetCounters(addr)
 	} else if addr == AddrIF || addr == AddrIE {
 		return b.Interrupts.GetCounters(addr)
+	} else if addr == AddrSB || addr == AddrSC {
+		return b.Serial.GetCounters(addr)
 	}
 	if !b.inCoreDump {
 		panicf("GetCounters for unmapped address %s", addr.Hex())

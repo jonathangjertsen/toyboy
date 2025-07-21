@@ -91,6 +91,9 @@ type PPU struct {
 	Interrupts *Interrupts
 	Debugger   *Debugger
 
+	FrameClock *Clock
+	FrameCount uint64
+
 	RegLCDC Data8
 	Stat    Stat
 	RegSCY  Data8
@@ -131,6 +134,10 @@ type PPU struct {
 	FBWindow     FrameBuffer
 	FBViewport   ViewPort
 	LastFrame    ViewPort
+}
+
+func (ppu *PPU) Reset() {
+	ppu.FrameCount = 0
 }
 
 func (ppu *PPU) Debug(event string, f string, v ...any) {
@@ -262,6 +269,7 @@ func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, de
 		Debugger:     debugger,
 		Interrupts:   interrupts,
 		Stat:         Stat{Interrupts: interrupts},
+		FrameClock:   NewClock(),
 	}
 	ppu.BackgroundFetcher.PPU = ppu
 	ppu.SpriteFetcher.PPU = ppu
@@ -358,6 +366,8 @@ func (ppu *PPU) beginVBlank() {
 
 	// TODO: do we ever clear the VBlank interrupt?
 	ppu.Interrupts.IRQSet(0x01)
+
+	ppu.FrameClock.Cycle(ppu.FrameCount)
 }
 
 func (ppu *PPU) fsmOAMScan() {
