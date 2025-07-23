@@ -43,7 +43,7 @@ func (s *Stat) CheckInterrupt() {
 		statInt = true
 	}
 	if !s.prevStatInt && statInt {
-		s.Interrupts.IRQSet(0x2)
+		s.Interrupts.IRQSet(IntSourceLCD)
 	}
 	s.prevStatInt = statInt
 }

@@ -75,12 +75,14 @@ import "fmt"
 type Addr uint16
 
 const (
-	AddrVRAMBegin = AddrTileDataBegin
-	AddrVRAMEnd   = AddrTileMap1End
-	AddrAPUBegin  = AddrNR10
-	AddrAPUEnd    = AddrNR52
-	AddrPPUBegin  = AddrLCDC
-	AddrPPUEnd    = AddrWX
+	AddrVRAMBegin  = AddrTileDataBegin
+	AddrVRAMEnd    = AddrTileMap1End
+	AddrAPUBegin   = AddrNR10
+	AddrAPUEnd     = AddrNR52
+	AddrPPUBegin   = AddrLCDC
+	AddrPPUEnd     = AddrWX
+	AddrTimerBegin = AddrDIV
+	AddrTimerEnd   = AddrTAC
 )
 
 func ByteSlice(in []Data8) []byte {
@@ -121,6 +123,13 @@ func (a Addr) Split() (Data8, Data8) {
 
 type Data16 uint16
 
+func (a Data16) Bit(i int) bool {
+	if i < 0 || i > 15 {
+		panic(i)
+	}
+	return a&(1<<i) != 0
+}
+
 func (a Data16) MSB() Data8 {
 	return Data8(a >> 8)
 }
@@ -144,7 +153,7 @@ func (a Data16) Split() (Data8, Data8) {
 type Data8 uint8
 
 func (a Data8) Bit(i int) bool {
-	if i < 0 || i > 8 {
+	if i < 0 || i > 7 {
 		panic(i)
 	}
 	return a&(1<<i) != 0
@@ -195,6 +204,7 @@ const (
 	SizeHRAM          Size16 = 0x007f
 	SizeOAM           Size16 = 0x00a0
 	SizeProhibited    Size16 = 0x0060
+	SizeTimer         Size16 = 0x0004
 )
 
 type Offset8 int8

@@ -1,8 +1,13 @@
 package model
 
-type PixelFetcher struct {
+//go:generate go-enum --marshal --flag --values --nocomments
+
+// ENUM(FetchTileNo, FetchTileLSB, FetchTileMSB, PushFIFO)
+type FetcherState Data8
+
+type Fetcher struct {
 	Cycle       uint64
-	State       PixelFetcherState
+	State       FetcherState
 	X           Data8
 	TileIndex   Data8
 	TileLSBAddr Addr
@@ -14,7 +19,7 @@ type PixelFetcher struct {
 }
 
 type BackgroundFetcher struct {
-	PixelFetcher
+	Fetcher
 	TileIndexAddr Addr
 
 	TileOffsetX Addr
@@ -34,30 +39,30 @@ func (bgf *BackgroundFetcher) fsm() {
 	bgf.Cycle++
 
 	switch bgf.State {
-	case PixelFetcherStateFetchTileNo:
+	case FetcherStateFetchTileNo:
 		// Takes 2 cycles
 		if bgfCycle&1 == 0 {
 			return
 		}
 		bgf.fetchTileNo()
-		bgf.State = PixelFetcherStateFetchTileLSB
-	case PixelFetcherStateFetchTileLSB:
+		bgf.State = FetcherStateFetchTileLSB
+	case FetcherStateFetchTileLSB:
 		// Takes 2 cycles
 		if bgfCycle&1 == 0 {
 			return
 		}
 		bgf.fetchTileLSB()
-		bgf.State = PixelFetcherStateFetchTileMSB
-	case PixelFetcherStateFetchTileMSB:
+		bgf.State = FetcherStateFetchTileMSB
+	case FetcherStateFetchTileMSB:
 		// Takes 2 cycles
 		if bgfCycle&1 == 0 {
 			return
 		}
 		bgf.fetchTileMSB()
-		bgf.State = PixelFetcherStatePushFIFO
-	case PixelFetcherStatePushFIFO:
+		bgf.State = FetcherStatePushFIFO
+	case FetcherStatePushFIFO:
 		if bgf.pushFIFO() {
-			bgf.State = PixelFetcherStateFetchTileNo
+			bgf.State = FetcherStateFetchTileNo
 			bgf.X++
 		}
 	}
@@ -155,7 +160,7 @@ func (bgf *BackgroundFetcher) pushFIFO() bool {
 }
 
 type SpriteFetcher struct {
-	PixelFetcher
+	Fetcher
 	SpriteIDX int
 	DoneX     Data8
 }
@@ -168,32 +173,32 @@ func (sf *SpriteFetcher) fsm() {
 		return
 	}
 	switch sf.State {
-	case PixelFetcherStateFetchTileNo:
+	case FetcherStateFetchTileNo:
 		// Takes 2 cycles
 		if sfCycle&1 == 0 {
 			return
 		}
 		sf.fetchTileNo()
-		sf.State = PixelFetcherStateFetchTileLSB
-	case PixelFetcherStateFetchTileLSB:
+		sf.State = FetcherStateFetchTileLSB
+	case FetcherStateFetchTileLSB:
 		// Takes 2 cycles
 		if sfCycle&1 == 0 {
 			return
 		}
 		sf.fetchTileLSB()
-		sf.State = PixelFetcherStateFetchTileMSB
-	case PixelFetcherStateFetchTileMSB:
+		sf.State = FetcherStateFetchTileMSB
+	case FetcherStateFetchTileMSB:
 		// Takes 2 cycles
 		if sfCycle&1 == 0 {
 			return
 		}
 		sf.fetchTileMSB()
-		sf.State = PixelFetcherStatePushFIFO
-	case PixelFetcherStatePushFIFO:
+		sf.State = FetcherStatePushFIFO
+	case FetcherStatePushFIFO:
 		if sf.pushFIFO() {
-			sf.State = PixelFetcherStateFetchTileNo
+			sf.State = FetcherStateFetchTileNo
 			sf.Suspended = true
-			sf.DoneX = sf.PPU.PixelShifter.X
+			sf.DoneX = sf.PPU.Shifter.X
 		}
 	}
 }
@@ -217,7 +222,7 @@ func (sf *SpriteFetcher) fetchTileMSB() {
 func (sf *SpriteFetcher) pushFIFO() bool {
 	line := DecodeTileLine(sf.TileMSB, sf.TileLSB)
 	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
-	offsetInSprite := sf.PPU.PixelShifter.X + 8 - obj.X
+	offsetInSprite := sf.PPU.Shifter.X + 8 - obj.X
 	pixelsToPush := 8 - offsetInSprite
 	pos := sf.PPU.SpriteFIFO.ShiftPos
 	for i := range int(pixelsToPush) {

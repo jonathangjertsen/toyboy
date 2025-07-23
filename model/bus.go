@@ -19,6 +19,7 @@ type Bus struct {
 	Interrupts  *Interrupts
 	Serial      *Serial
 	Prohibited  *Prohibited
+	Timer       *Timer
 }
 
 func (b *Bus) WriteAddress(addr Addr) {
@@ -48,6 +49,8 @@ func (b *Bus) WriteAddress(addr Addr) {
 		b.Data = b.Prohibited.Read(addr)
 	} else if addr >= 0xff71 && addr <= 0xff7f {
 		b.Data = b.Prohibited.Read(addr)
+	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
+		b.Data = b.Timer.Read(addr)
 	} else if addr == AddrP1 {
 		b.Data = b.Joypad.Read(addr)
 	} else if addr == AddrIF || addr == AddrIE {
@@ -94,6 +97,8 @@ func (b *Bus) WriteData(v Data8) {
 		b.PPU.Write(addr, v)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
 		b.Prohibited.Write(addr, v)
+	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
+		b.Timer.Write(addr, v)
 	} else if addr >= 0xff71 && addr <= 0xff7f {
 		b.Prohibited.Write(addr, v)
 	} else if addr == AddrSB || addr == AddrSC {
@@ -114,9 +119,10 @@ func (b *Bus) CoreDumpBegin() {
 	b.WRAM.CountdownDisable = true
 	b.APU.CountdownDisable = true
 	b.OAM.CountdownDisable = true
-	b.PPU.CountdownDisable = true
+	b.PPU.MemoryRegion.CountdownDisable = true
 	b.Prohibited.FEA0toFEFF.CountdownDisable = true
 	b.Cartridge.Bank0.CountdownDisable = true
+	b.Timer.Mem.CountdownDisable = true
 }
 
 func (b *Bus) CoreDumpEnd() {
@@ -128,9 +134,10 @@ func (b *Bus) CoreDumpEnd() {
 	b.WRAM.CountdownDisable = false
 	b.APU.CountdownDisable = false
 	b.OAM.CountdownDisable = false
-	b.PPU.CountdownDisable = false
+	b.PPU.MemoryRegion.CountdownDisable = false
 	b.Prohibited.FEA0toFEFF.CountdownDisable = false
 	b.Cartridge.Bank0.CountdownDisable = false
+	b.Timer.Mem.CountdownDisable = false
 }
 
 func (b *Bus) GetCounters(addr Addr) (uint64, uint64) {
@@ -155,9 +162,11 @@ func (b *Bus) GetCounters(addr Addr) (uint64, uint64) {
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
 		return b.OAM.GetCounters(addr)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		return b.PPU.GetCounters(addr)
+		return b.PPU.MemoryRegion.GetCounters(addr)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
 		return b.Prohibited.GetCounters(addr)
+	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
+		return b.Timer.GetCounters(addr)
 	} else if addr >= 0xff71 && addr <= 0xff7f {
 		return b.Prohibited.GetCounters(addr)
 	} else if addr == AddrIF || addr == AddrIE {

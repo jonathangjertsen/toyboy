@@ -7,15 +7,14 @@ import (
 )
 
 func main() {
-	rom := "assets/cartridges/tetris.gb"
+	rom := "assets/cartridges/01-special.gb"
 	bytes, err := os.ReadFile(rom)
 	if err != nil {
 		panic(err)
 	}
-	dis := model.NewDisassembler()
-	dis.Trace = true
+	dis := model.NewDisassembler(&model.DefaultConfig.Debug.Disassembler)
 	dis.SetProgram(bytes)
-	dis.SetPC(0x0100)
+	dis.ExploreFrom(0x0100)
 	out := dis.Disassembly()
 	out.Print(os.Stdout)
 }

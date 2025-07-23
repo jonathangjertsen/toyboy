@@ -1,4 +1,4 @@
-package gui
+package main
 
 import (
 	"fmt"
@@ -342,7 +342,7 @@ func oambuffer(vram []model.Data8, buf model.OAMBuffer) []model.Color {
 func oam(vram []model.Data8, oam []model.Data8) []model.Color {
 	tiles := make([]model.Tile, 40)
 	for i := 0; i < 40; i++ {
-		obj := model.DecodeSprite(oam[i*4 : (i+1)*4])
+		obj := model.DecodeObject(oam[i*4 : (i+1)*4])
 		tileIndex := int(obj.TileIndex)
 		tile := model.DecodeTile(vram[16*tileIndex : 16*(tileIndex+1)])
 		tiles[i] = tile

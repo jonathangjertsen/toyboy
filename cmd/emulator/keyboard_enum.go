@@ -4,7 +4,7 @@
 // Build Date: 2025-06-17T15:19:50Z
 // Built By: goreleaser
 
-package gui
+package main
 
 import (
 	"errors"

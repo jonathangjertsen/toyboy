@@ -90,11 +90,32 @@ func RL(a Data8, carry bool) ALUResult {
 	if carry {
 		mask = 0x01
 	}
-	return ALUResult{Value: a<<1 | mask, C: a&0x80 != 0}
+	return ALUResult{Value: a<<1 | mask, C: a.Bit(7)}
+}
+
+func SLA(a Data8) ALUResult {
+	return ALUResult{Value: a << 1, C: a.Bit(7)}
+}
+
+func SRA(a Data8) ALUResult {
+	var mask Data8
+	if a.Bit(7) {
+		mask = 0x80
+	}
+	return ALUResult{Value: a>>1 | mask, C: a.Bit(0)}
+}
+
+func RLC(a Data8) ALUResult {
+	b7 := a.Bit(7)
+	var mask Data8
+	if b7 {
+		mask = 0x01
+	}
+	return ALUResult{Value: a<<1 | mask, C: b7}
 }
 
 func SRL(a Data8) ALUResult {
-	return ALUResult{Value: a >> 1, C: a&0x01 != 0}
+	return ALUResult{Value: a >> 1, C: a.Bit(0)}
 }
 
 func RLA(a Data8, carry bool) ALUResult {
@@ -109,6 +130,15 @@ func RR(a Data8, carry bool) ALUResult {
 		mask = 0x80
 	}
 	return ALUResult{Value: a>>1 | mask, C: a&1 != 0}
+}
+
+func RRC(a Data8) ALUResult {
+	b0 := a.Bit(0)
+	var mask Data8
+	if b0 {
+		mask = 0x80
+	}
+	return ALUResult{Value: a>>1 | mask, C: b0}
 }
 
 func RRA(a Data8, carry bool) ALUResult {
@@ -138,21 +168,25 @@ func SWAP(a Data8) ALUResult {
 }
 
 func DAA(a Data8, c, n, h bool) ALUResult {
-	if n {
-		if c {
-			a -= 0x60
+	va := int(a)
+	if !n {
+		if h || ((va & 0xf) > 9) {
+			va += 0x06
 		}
-		if h {
-			a -= 0x6
+		if c || (va > 0x9f) {
+			va += 0x60
 		}
 	} else {
-		if c || a > 0x90 {
-			a += 0x60
-			c = true
+		if h {
+			va = (va - 6) & 0xff
 		}
-		if h || ((a & 0x0f) > 0x09) {
-			a += 0x6
+		if c {
+			va -= 0x60
 		}
 	}
-	return ALUResult{Value: a, C: c, N: n}
+	if va&0x100 == 0x100 {
+		c = true
+	}
+	return ALUResult{Value: Data8(va & 0xff), C: c}
+
 }

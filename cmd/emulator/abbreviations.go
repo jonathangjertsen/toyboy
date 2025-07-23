@@ -1,4 +1,4 @@
-package gui
+package main
 
 import (
 	"gioui.org/layout"
@@ -8,21 +8,22 @@ import (
 type C = layout.Context
 type D = layout.Dimensions
 type F = layout.Flex
+type FC = layout.FlexChild
 
-var Rigid = layout.Rigid
+var R = layout.Rigid
 
-func Spacer(h, w int) layout.FlexChild {
-	return Rigid(layout.Spacer{Height: unit.Dp(h), Width: unit.Dp(w)}.Layout)
+func Spacer(h, w int) FC {
+	return R(layout.Spacer{Height: unit.Dp(h), Width: unit.Dp(w)}.Layout)
 }
 
-func Column(gtx layout.Context, children ...layout.FlexChild) D {
+func Column(gtx layout.Context, children ...FC) D {
 	return layout.Flex{
 		Axis:    layout.Vertical,
 		Spacing: layout.SpaceEnd,
 	}.Layout(gtx, children...)
 }
 
-func Row(gtx layout.Context, children ...layout.FlexChild) D {
+func Row(gtx layout.Context, children ...FC) D {
 	return layout.Flex{
 		Axis:    layout.Horizontal,
 		Spacing: layout.SpaceAround,

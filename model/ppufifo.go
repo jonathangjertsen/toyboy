@@ -1,20 +1,20 @@
 package model
 
-type PixelFIFO struct {
+type FIFO struct {
 	Slots    [8]Pixel
 	Level    int
 	ShiftPos int
 	PushPos  int
 }
 
-func (fifo *PixelFIFO) Clear() {
+func (fifo *FIFO) Clear() {
 	clear(fifo.Slots[:])
 	fifo.Level = 0
 	fifo.ShiftPos = 0
 	fifo.PushPos = 0
 }
 
-func (fifo *PixelFIFO) ShiftOut() (Pixel, bool) {
+func (fifo *FIFO) ShiftOut() (Pixel, bool) {
 	var p Pixel
 	if fifo.Level == 0 {
 		return p, false
@@ -28,7 +28,7 @@ func (fifo *PixelFIFO) ShiftOut() (Pixel, bool) {
 	return p, true
 }
 
-func (fifo *PixelFIFO) Write8(pixels [8]Pixel) {
+func (fifo *FIFO) Write8(pixels [8]Pixel) {
 	pos := fifo.ShiftPos
 	for i := range 8 {
 		fifo.Slots[pos] = pixels[i]
@@ -45,7 +45,7 @@ type PixelFIFODump struct {
 	Level int
 }
 
-func (fifo *PixelFIFO) Dump() PixelFIFODump {
+func (fifo *FIFO) Dump() PixelFIFODump {
 	var dump PixelFIFODump
 	dump.Level = fifo.Level
 	pos := fifo.ShiftPos

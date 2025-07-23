@@ -1,10 +1,12 @@
 package model
 
+import "fmt"
+
 type CPU struct {
-	PHI          *Clock
-	Bus          *Bus
-	Debugger     *Debugger
-	Disassembler *Disassembler
+	Config *Config
+	PHI    *Clock
+	Bus    *Bus
+	Debug  *Debug
 
 	Regs       RegisterFile
 	Interrupts *Interrupts
@@ -18,11 +20,11 @@ type CPU struct {
 
 	handlers [256]InstructionHandling
 
-	rewindBuffer    []ExecLogEntry
-	rewindBufferIdx int
+	rewindBuffer     []ExecLogEntry
+	rewindBufferIdx  int
+	rewindBufferFull bool
 
-	nopCount    int
-	nopCountMax int
+	nopCount int
 
 	lastBranchResult int
 }
@@ -43,11 +45,24 @@ func (cpu *CPU) Reset() {
 	clear(cpu.rewindBuffer)
 	cpu.rewindBufferIdx = 0
 	cpu.nopCount = 0
+
+	if cpu.Config.BootROM.Skip {
+		cpu.Bus.BootROMLock.Lock()
+		cpu.Regs.A = 0x01
+		cpu.Regs.F = 0xB0
+		cpu.Regs.B = 0x00
+		cpu.Regs.C = 0x13
+		cpu.Regs.D = 0x00
+		cpu.Regs.E = 0xD8
+		cpu.Regs.H = 0x01
+		cpu.Regs.L = 0x4D
+		cpu.Regs.PC = 0x00ff
+		cpu.Regs.SP = 0xFFFE
+	}
 }
 
 type ExecLogEntry struct {
-	PC           Addr
-	Opcode       Opcode
+	Instruction  DisInstruction
 	BranchResult int
 }
 
@@ -114,7 +129,7 @@ func (cpu *CPU) SetPC(pc Addr) {
 		panic("SetPC must be called on rising edge")
 	}
 	cpu.Regs.PC = pc
-	cpu.Debugger.SetPC(pc)
+	cpu.Debug.SetPC(pc)
 }
 
 func (cpu *CPU) IncPC() {
@@ -124,23 +139,22 @@ func (cpu *CPU) IncPC() {
 	cpu.SetPC(cpu.Regs.PC + 1)
 }
 
+// Must call Reset before starting
 func NewCPU(
 	phi *Clock,
 	interrupts *Interrupts,
 	bus *Bus,
-	debugger *Debugger,
-	disassembler *Disassembler,
+	config *Config,
+	debug *Debug,
 ) *CPU {
 	cpu := &CPU{
+		Config:       config,
 		PHI:          phi,
 		Bus:          bus,
-		Debugger:     debugger,
-		Disassembler: disassembler,
+		Debug:        debug,
 		Interrupts:   interrupts,
-		nopCountMax:  4,
-		rewindBuffer: make([]ExecLogEntry, 16),
+		rewindBuffer: make([]ExecLogEntry, 8192),
 	}
-	cpu.Reset()
 	cpu.handlers = handlers(cpu)
 	phi.AttachDevice(cpu.fsm)
 	return cpu
@@ -176,6 +190,45 @@ func (cpu *CPU) fsm(c Cycle) {
 	} else if c.Falling {
 		cpu.machineCycle++
 	}
+
+	if cpu.Config.Debug.GBD.Enable && !c.Falling && fetch && cpu.machineCycle == 1 {
+		cpu.doGBDLog()
+	}
+}
+
+func (cpu *CPU) doGBDLog() {
+	cpu.Bus.inCoreDump = true
+	defer func() {
+		cpu.Bus.inCoreDump = false
+	}()
+
+	pc := cpu.Regs.PC - 1
+
+	origAddr := cpu.Bus.Address
+	var pcmem [4]Data8
+	for i := range Addr(4) {
+		cpu.writeAddressBus(pc + i)
+		pcmem[i] = cpu.Bus.Data
+	}
+	cpu.writeAddressBus(origAddr)
+
+	cpu.Config.Debug.GBD.GBDLog(fmt.Sprintf(
+		"A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
+		uint(cpu.Regs.A),
+		uint(cpu.Regs.F),
+		uint(cpu.Regs.B),
+		uint(cpu.Regs.C),
+		uint(cpu.Regs.D),
+		uint(cpu.Regs.E),
+		uint(cpu.Regs.H),
+		uint(cpu.Regs.L),
+		uint(cpu.Regs.SP),
+		uint(pc),
+		uint(pcmem[0]),
+		uint(pcmem[1]),
+		uint(pcmem[2]),
+		uint(pcmem[3]),
+	))
 }
 
 func (cpu *CPU) detectRunawayCode() {
@@ -185,9 +238,9 @@ func (cpu *CPU) detectRunawayCode() {
 		// In unmapped bootrom, allow NOPs here because soft reset puts PC at 0
 		nopCheck = false
 	}
-	if nopCheck {
+	if nopCheck && !cpu.clockCycle.Falling {
 		cpu.nopCount++
-		if cpu.nopCount > cpu.nopCountMax {
+		if cpu.nopCount > cpu.Config.Debug.MaxNOPCount {
 			panic("max nop count exceeded")
 		}
 	} else {
@@ -202,6 +255,7 @@ func (cpu *CPU) instructionFetch() {
 
 	// Read next instruction opcode
 	cpu.Regs.IR = Opcode(cpu.Bus.Data)
+	cpu.Debug.SetIR(cpu.Regs.IR)
 
 	// Update rewind buffer
 	prevIdx := cpu.rewindBufferIdx
@@ -212,17 +266,20 @@ func (cpu *CPU) instructionFetch() {
 	}
 	cpu.rewindBuffer[prevIdx].BranchResult = cpu.lastBranchResult
 	cpu.rewindBuffer[cpu.rewindBufferIdx] = ExecLogEntry{
-		PC:     cpu.Regs.PC - 1,
-		Opcode: cpu.Regs.IR,
+		Instruction: DisInstruction{
+			Address: cpu.Regs.PC - 1,
+			Opcode:  cpu.Regs.IR,
+		},
 	}
 	cpu.lastBranchResult = 0
 	cpu.rewindBufferIdx++
 	if cpu.rewindBufferIdx >= len(cpu.rewindBuffer) {
 		cpu.rewindBufferIdx = 0
+		cpu.rewindBufferFull = true
 	}
 
 	// Set PC
-	cpu.Disassembler.SetPC(cpu.Regs.PC - 1)
+	cpu.Debug.SetPC(cpu.Regs.PC - 1)
 }
 
 func (cpu *CPU) execCurrentInstruction() bool {

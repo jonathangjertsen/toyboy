@@ -1,16 +1,17 @@
 package model
 
-type Gameboy struct {
-	Config HWConfig
+import "os"
 
-	CLK          *ClockRT
-	Debugger     *Debugger
-	Disassembler *Disassembler
-	PHI          *Clock
-	CPU          *CPU
-	PPU          *PPU
-	Cartridge    *Cartridge
-	Joypad       *Joypad
+type Gameboy struct {
+	Config *Config
+
+	CLK       *ClockRT
+	Debug     *Debug
+	PHI       *Clock
+	CPU       *CPU
+	PPU       *PPU
+	Cartridge *Cartridge
+	Joypad    *Joypad
 }
 
 func (gb *Gameboy) Start() {
@@ -57,7 +58,7 @@ func (gb *Gameboy) GetViewport() ViewPort {
 }
 
 func NewGameboy(
-	config HWConfig,
+	config *Config,
 ) *Gameboy {
 	gameboy := &Gameboy{
 		Config: config,
@@ -67,38 +68,40 @@ func NewGameboy(
 }
 
 func (gb *Gameboy) init() {
-	clk := NewRealtimeClock(gb.Config.SystemClock)
-	debugger := NewDebugger(clk)
-	disassembler := NewDisassembler()
+	clk := NewRealtimeClock(gb.Config.Clock)
+
+	debug := NewDebug(clk, &gb.Config.Debug)
 
 	interrupts := NewInterrupts(clk)
 
 	bootROMLock := NewBootROMLock(clk)
-	bootROM := NewBootROM(clk, gb.Config.Model)
-	disassembler.SetProgram(ByteSlice(bootROM.Data))
-	disassembler.SetPC(0)
+	bootROM := NewBootROM(clk, gb.Config.BootROM)
+	debug.SetProgram(ByteSlice(bootROM.Data))
+	debug.SetPC(0)
+
 	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
 	hram := NewMemoryRegion(clk, AddrHRAMBegin, SizeHRAM)
 	wram := NewMemoryRegion(clk, AddrWRAMBegin, SizeWRAM)
-	apu := NewAPU(clk)
+	apu := NewAPU(clk, gb.Config)
 	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
 	cartridge := NewCartridge(clk)
 	joypad := NewJoypad(clk, interrupts)
 	serial := NewSerial(clk)
 	prohibited := NewProhibited(clk)
+	timer := NewTimer(clk, interrupts)
 
-	bootROMLock.OnUnlock = func() {
-		disassembler.SetProgram(ByteSlice(cartridge.Bank0.Data))
-		disassembler.SetPC(0x100)
+	bootROMLock.OnLock = func() {
+		debug.SetProgram(ByteSlice(cartridge.Bank0.Data))
+		debug.SetPC(0x100)
 	}
 
 	bus := &Bus{}
 
 	cpuClock := clk.Divide(4)
-	cpu := NewCPU(cpuClock, interrupts, bus, debugger, disassembler)
+	cpu := NewCPU(cpuClock, interrupts, bus, gb.Config, debug)
 
 	ppuClock := clk.Divide(2)
-	ppu := NewPPU(clk, ppuClock, interrupts, bus, debugger)
+	ppu := NewPPU(clk, ppuClock, interrupts, bus, gb.Config, debug)
 
 	bus.BootROMLock = bootROMLock
 	bus.BootROM = &bootROM
@@ -113,15 +116,27 @@ func (gb *Gameboy) init() {
 	bus.Interrupts = interrupts
 	bus.Serial = serial
 	bus.Prohibited = prohibited
+	bus.Timer = timer
+
+	debug.HRAM.Source = hram.Data
+	debug.WRAM.Source = wram.Data
 
 	gb.CLK = clk
-	gb.Disassembler = disassembler
 	gb.PHI = cpuClock
 	gb.CPU = cpu
 	gb.Cartridge = cartridge
 	gb.PPU = ppu
-	gb.Debugger = debugger
+	gb.Debug = debug
 	gb.Joypad = joypad
 
+	gb.CPU.Reset()
+
 	clk.Onpanic = gb.CPU.Dump
+
+	romData, err := os.ReadFile(gb.Config.ROM.Location)
+	if err != nil {
+		gb.Debug.SetWarning("LoadROM", "Couldn't open ROM file")
+	} else {
+		gb.Cartridge.LoadROM(romData)
+	}
 }

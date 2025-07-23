@@ -7,19 +7,20 @@ import (
 )
 
 type CoreDump struct {
-	Cycle           Cycle
-	Regs            RegisterFile
-	ProgramStart    Addr
-	ProgramEnd      Addr
-	Program         MemDump
-	HRAM            MemDump
-	OAM             MemDump
-	VRAM            MemDump
-	APU             MemDump
-	PPU             PPUDump
-	RewindBuffer    []ExecLogEntry
-	RewindBufferIdx int
-	Disassembly     *Disassembly
+	Cycle            Cycle
+	Regs             RegisterFile
+	ProgramStart     Addr
+	ProgramEnd       Addr
+	Program          MemDump
+	HRAM             MemDump
+	OAM              MemDump
+	VRAM             MemDump
+	APU              MemDump
+	PPU              PPUDump
+	RewindBuffer     []ExecLogEntry
+	RewindBufferIdx  int
+	RewindBufferFull bool
+	Disassembly      *Disassembly
 }
 
 type PPUDump struct {
@@ -31,7 +32,7 @@ type PPUDump struct {
 	PixelDrawCycle            uint64
 	HBlankRemainingCycles     uint64
 	VBlankLineRemainingCycles uint64
-	PixelShifter              PixelShifter
+	PixelShifter              Shifter
 	BackgroundFetcher         BackgroundFetcher
 	SpriteFetcher             SpriteFetcher
 	OAMBuffer                 OAMBuffer
@@ -80,7 +81,6 @@ func (cd *CoreDump) PrintRegs(f io.Writer) {
 
 func (cd *CoreDump) PrintProgram(f io.Writer) {
 	if cd.ProgramEnd >= 0x8000 {
-		fmt.Printf("out of bounds\n")
 		return
 	}
 	memdump(f, cd.Program[cd.ProgramStart:cd.ProgramEnd+1], cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
@@ -97,7 +97,7 @@ func (cd *CoreDump) PrintOAM(f io.Writer) {
 func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
 	oam := cd.OAM.Bytes()
 	for idx := range 40 {
-		obj := DecodeSprite(oam[idx*4 : (idx+1)*4])
+		obj := DecodeObject(oam[idx*4 : (idx+1)*4])
 		fmt.Fprintf(f, "%02d T=%03d X=%03d Y=%03d Attr=%x\n", idx, obj.TileIndex, obj.X, obj.Y, obj.Attributes.Hex())
 	}
 }
@@ -107,7 +107,7 @@ func (cd *CoreDump) PrintVRAM(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintWRAM(f io.Writer) {
-	memdump(f, cd.VRAM, AddrWRAMBegin, AddrWRAMEnd, 0)
+	memdump(f, cd.VRAM, AddrWRAMBegin, AddrWRAMEnd, cd.Regs.SP)
 }
 
 func bool2int(b bool) int {
@@ -230,7 +230,7 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
 	cd.Program = cpu.Bus.getmem(0x0000, AddrCartridgeBank0End)
-	cd.Disassembly = cpu.Disassembler.Disassembly()
+	cd.Disassembly = cpu.Debug.Disassembly()
 	cd.HRAM = cpu.Bus.getmem(AddrHRAMBegin, AddrHRAMEnd)
 	cd.OAM = cpu.Bus.getmem(AddrOAMBegin, AddrOAMEnd)
 	cd.VRAM = cpu.Bus.getmem(AddrVRAMBegin, AddrVRAMEnd)
@@ -238,17 +238,18 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	cd.PPU.Registers = cpu.Bus.getmem(AddrPPUBegin, AddrPPUEnd)
 	cd.PPU.BGFIFO = cpu.Bus.PPU.BackgroundFIFO.Dump()
 	cd.PPU.SpriteFIFO = cpu.Bus.PPU.SpriteFIFO.Dump()
-	cd.PPU.LastShifted = cpu.Bus.PPU.PixelShifter.LastShifted
+	cd.PPU.LastShifted = cpu.Bus.PPU.Shifter.LastShifted
 	cd.PPU.OAMScanCycle = cpu.Bus.PPU.OAMScanCycle
 	cd.PPU.PixelDrawCycle = cpu.Bus.PPU.PixelDrawCycle
 	cd.PPU.HBlankRemainingCycles = cpu.Bus.PPU.HBlankRemainingCycles
 	cd.PPU.VBlankLineRemainingCycles = cpu.Bus.PPU.VBlankLineRemainingCycles
-	cd.PPU.PixelShifter = cpu.Bus.PPU.PixelShifter
+	cd.PPU.PixelShifter = cpu.Bus.PPU.Shifter
 	cd.PPU.BackgroundFetcher = cpu.Bus.PPU.BackgroundFetcher
 	cd.PPU.SpriteFetcher = cpu.Bus.PPU.SpriteFetcher
 	cd.PPU.OAMBuffer = cpu.Bus.PPU.OAMBuffer
 	cd.RewindBuffer = cpu.rewindBuffer
 	cd.RewindBufferIdx = cpu.rewindBufferIdx
+	cd.RewindBufferFull = cpu.rewindBufferFull
 	return cd
 }
 
@@ -298,7 +299,11 @@ func (cpu *CPU) Dump() {
 }
 
 func (cd *CoreDump) PrintRewindBuffer(f io.Writer) {
-	for i := (cd.RewindBufferIdx + 1) % len(cd.RewindBuffer); i != cd.RewindBufferIdx; i = (i + 1) % len(cd.RewindBuffer) {
+	var start int
+	if cd.RewindBufferFull {
+		start = (cd.RewindBufferIdx + 1) % len(cd.RewindBuffer)
+	}
+	for i := start; i != cd.RewindBufferIdx; i = (i + 1) % len(cd.RewindBuffer) {
 		entry := cd.RewindBuffer[i]
 		extra := ""
 		if entry.BranchResult == +1 {
@@ -306,7 +311,7 @@ func (cd *CoreDump) PrintRewindBuffer(f io.Writer) {
 		} else if entry.BranchResult == -1 {
 			extra = "(not taken)"
 		}
-		fmt.Fprintf(f, "[PC=%s] %s %s\n", entry.PC.Hex(), entry.Opcode, extra)
+		fmt.Fprintf(f, "[PC=%s] %s %s\n", entry.Instruction.Address.Hex(), entry.Instruction.Asm(), extra)
 	}
 }
 

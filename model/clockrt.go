@@ -32,13 +32,13 @@ func (r *ClockRT) Sync(f func()) {
 	<-done
 }
 
-func (r *ClockRT) SetFrequency(f float64) {
+func (r *ClockRT) SetSpeedPercent(pct float64) {
 	r.Sync(func() {
-		r.setFreq(f)
+		r.setSpeedPercent(pct)
 	})
 }
 
-func NewRealtimeClock(config ClockConfig) *ClockRT {
+func NewRealtimeClock(config ConfigClock) *ClockRT {
 	clockRT := ClockRT{
 		resume:  make(chan struct{}),
 		pause:   make(chan struct{}),
@@ -46,7 +46,7 @@ func NewRealtimeClock(config ClockConfig) *ClockRT {
 		jobs:    make(chan func()),
 		Onpanic: func() {},
 	}
-	go clockRT.run(config.Frequency)
+	go clockRT.run(config.SpeedPercent)
 	return &clockRT
 }
 
@@ -86,7 +86,8 @@ func (clockRT *ClockRT) wait() {
 	clockRT.Running.Store(true)
 }
 
-func (clockRT *ClockRT) setFreq(f float64) {
+func (clockRT *ClockRT) setSpeedPercent(pct float64) {
+	f := 4194304.0 * pct / 100
 	cycleInterval := time.Duration(float64(time.Second) / f)
 	clockRT.tickInterval = time.Millisecond * 2
 	if clockRT.tickInterval < cycleInterval {
@@ -98,14 +99,14 @@ func (clockRT *ClockRT) setFreq(f float64) {
 	}
 }
 
-func (clockRT *ClockRT) run(initFreq float64) {
+func (clockRT *ClockRT) run(initSpeedPercent float64) {
 	defer func() {
 		if e := recover(); e != nil {
 			clockRT.Onpanic()
 			panic(e)
 		}
 	}()
-	clockRT.setFreq(initFreq)
+	clockRT.setSpeedPercent(initSpeedPercent)
 
 	clockRT.wait()
 	clockRT.ticker = time.NewTicker(clockRT.tickInterval)

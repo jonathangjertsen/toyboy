@@ -1,8 +1,11 @@
 vendor/
 bin/
 
+config.json
+
 // ethically sources ROMs only
-assets/cartridges/*.gb
+assets/cartridges/**/*.gb
+assets/cartridges/**/*.sym
 !assets/cartridges/empty.gb
 !assets/cartridges/hello-world.gb
 !assets/cartridges/unbricked.gb

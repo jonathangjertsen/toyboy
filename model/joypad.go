@@ -93,7 +93,7 @@ func (jp *Joypad) SetState(jps JoypadState) {
 		jp.Direction = newDirection
 
 		if doJoypadInterrupt {
-			jp.Interrupts.IRQSet(0x10)
+			jp.Interrupts.IRQSet(IntSourceJoypad)
 		}
 	})
 }

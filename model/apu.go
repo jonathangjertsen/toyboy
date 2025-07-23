@@ -202,11 +202,19 @@ func (nc *NoiseChannel) SetCtl(v Data8) {
 	fmt.Printf("not implemented: SetCtl\n")
 }
 
-func NewAPU(clock *ClockRT) *APU {
-	return &APU{
+func NewAPU(clock *ClockRT, config *Config) *APU {
+	apu := &APU{
 		MemoryRegion:                   NewMemoryRegion(clock, AddrAPUBegin, SizeAPU),
 		canWriteLengthTimersWithAPUOff: true, // on monochrome models
 	}
+	if config.BootROM.Skip {
+		apu.SetMasterCtl(0x80)
+		apu.Pulse1.SetLengthDuty(0x80)
+		apu.Pulse1.SetVolumeEnvelope(0xf3)
+		apu.SetChannelPan(0xf3)
+		apu.SetMasterVolumePan(0x77)
+	}
+	return apu
 }
 
 func (apu *APU) Debug(event string, f string, v ...any) {

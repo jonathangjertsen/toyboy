@@ -7,10 +7,9 @@ import (
 
 type BootROMLock struct {
 	MemoryRegion
-	RegBootROMLock Data8
 
-	BootOff  bool
-	OnUnlock func()
+	BootOff bool
+	OnLock  func()
 }
 
 func NewBootROMLock(clock *ClockRT) *BootROMLock {
@@ -20,43 +19,35 @@ func NewBootROMLock(clock *ClockRT) *BootROMLock {
 }
 
 func (brl *BootROMLock) Read(addr Addr) Data8 {
-	_ = brl.MemoryRegion.Read(addr)
-
-	if addr == AddrBootROMLock {
-		return brl.RegBootROMLock
-	}
-	panicv(addr)
-	return 0
+	return brl.MemoryRegion.Read(addr)
 }
 
 func (brl *BootROMLock) Write(addr Addr, v Data8) {
 	if brl.BootOff {
 		return
 	}
-
 	brl.MemoryRegion.Write(addr, v)
-
 	if v&1 == 1 {
-		brl.RegBootROMLock = 0x01
-		brl.BootOff = true
-		if brl.OnUnlock != nil {
-			brl.OnUnlock()
-		}
+		brl.Lock()
 	}
 }
 
-func NewBootROM(clk *ClockRT, model Model) MemoryRegion {
-	bootrom := NewMemoryRegion(clk, AddrZero, SizeBootROM)
-	switch model {
-	case DMG:
-		// todo: static fs
-		f, err := os.ReadFile("assets/bootrom/dmg_boot.bin")
-		if err != nil {
-			panic(fmt.Sprintf("failed to load boot rom: %v", err))
-		} else if len(f) != 256 {
-			panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
-		}
-		bootrom.Data = Data8Slice(f)
+func (brl *BootROMLock) Lock() {
+	brl.BootOff = true
+	if brl.OnLock != nil {
+		brl.OnLock()
 	}
+}
+
+func NewBootROM(clk *ClockRT, config ConfigBootROM) MemoryRegion {
+	bootrom := NewMemoryRegion(clk, AddrZero, SizeBootROM)
+	// todo: static fs
+	f, err := os.ReadFile(config.Location)
+	if err != nil {
+		panic(fmt.Sprintf("failed to load boot rom: %v", err))
+	} else if len(f) != 256 {
+		panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
+	}
+	bootrom.Data = Data8Slice(f)
 	return bootrom
 }

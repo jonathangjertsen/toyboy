@@ -1,99 +1,16 @@
 package model
 
-import (
-	"fmt"
-	"image/color"
-	"slices"
-)
-
 //go:generate go-enum --marshal --flag --values --nocomments
 
-var ppuDebugEvents = []string{
-	"SetLCDC",
-	"SetSTAT",
-	//"SetSCY",
-	"SetSCX",
-	"SetWY",
-	"SetWX",
-	"SetLY",
-	"SetLYC",
-	"SetBGP",
-	"SetOBP0",
-	"SetOBP1",
-
-	// "BeginHBlank",
-	// "BeginVBlank",
-}
+import (
+	"fmt"
+)
 
 // ENUM(HBlank, VBlank, OAMScan, PixelDraw)
 type PPUMode uint8
 
-// ENUM(WhiteOrTransparent, LightGray, DarkGray, Black)
-type Color uint8
-
-func (c Color) Grayscale() uint8 {
-	switch c {
-	case ColorWhiteOrTransparent:
-		return 0xf0
-	case ColorLightGray:
-		return 0xa0
-	case ColorDarkGray:
-		return 0x70
-	case ColorBlack:
-		return 0x30
-	}
-	return 0x00
-}
-
-func (c Color) RGBA() color.RGBA {
-	switch c {
-	case ColorWhiteOrTransparent:
-		return color.RGBA{R: 0xf0, G: 0xf0, B: 0xf0, A: 0xff}
-	case ColorLightGray:
-		return color.RGBA{R: 0xa0, G: 0xa0, B: 0xa0, A: 0xff}
-	case ColorDarkGray:
-		return color.RGBA{R: 0x70, G: 0x70, B: 0x70, A: 0xff}
-	case ColorBlack:
-		return color.RGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}
-	}
-	return color.RGBA{}
-}
-
-// ENUM(FetchTileNo, FetchTileLSB, FetchTileMSB, PushFIFO)
-type PixelFetcherState Data8
-
-type Pixel struct {
-	Color              Color
-	Palette            Data8
-	SpritePriority     bool // CGB only
-	BackgroundPriority bool
-}
-
-type Sprite struct {
-	X          Data8
-	Y          Data8
-	TileIndex  Data8
-	Attributes Data8
-}
-
-func DecodeSprite(data []Data8) Sprite {
-	return Sprite{
-		Y:          data[0],
-		X:          data[1],
-		TileIndex:  data[2],
-		Attributes: data[3],
-	}
-}
-
 type PPU struct {
-	MemoryRegion
-
-	Interrupts *Interrupts
-	Debugger   *Debugger
-
-	FrameClock *Clock
-	FrameCount uint64
-
+	// Registers and subsystems
 	RegLCDC Data8
 	Stat    Stat
 	RegSCY  Data8
@@ -105,48 +22,81 @@ type PPU struct {
 	RegBGP  Data8
 	RegOBP0 Data8
 	RegOBP1 Data8
+	DMA     DMA
 
-	Bus  *Bus
+	// Memory access
+	Bus *Bus
+
+	// For setting the VBlank interrupt
+	// ppu.Stat deals with STAT interrupt
+	Interrupts *Interrupts
+
+	// For other systems to hook in
+	MemoryRegion MemoryRegion
+	Debug        *Debug
+	FrameClock   *Clock
+	FrameCount   uint64
+	Config       *Config
+
+	// PPU overall state
 	Mode PPUMode
-
-	OAMBuffer OAMBuffer
 
 	// OAM scan state
 	OAMScanCycle uint64
+	OAMBuffer    OAMBuffer
 
 	// Pixel draw state
 	PixelDrawCycle    uint64
 	BackgroundFetcher BackgroundFetcher
 	SpriteFetcher     SpriteFetcher
-	PixelShifter      PixelShifter
+	Shifter           Shifter
+	BackgroundFIFO    FIFO
+	SpriteFIFO        FIFO
+	BGPalette         [4]Color
+	OBJPalette0       [4]Color
+	OBJPalette1       [4]Color
 
+	// HBlank/VBlank state
 	HBlankRemainingCycles     uint64
 	VBlankLineRemainingCycles uint64
 
-	BackgroundFIFO PixelFIFO
-	SpriteFIFO     PixelFIFO
-
-	BGPalette   [4]Color
-	OBJPalette0 [4]Color
-	OBJPalette1 [4]Color
-
+	// Outputs
 	FBBackground FrameBuffer
 	FBWindow     FrameBuffer
 	FBViewport   ViewPort
 	LastFrame    ViewPort
 }
 
-func (ppu *PPU) Reset() {
-	ppu.FrameCount = 0
+func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, config *Config, debug *Debug) *PPU {
+	ppu := &PPU{
+		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, SizePPU),
+		Bus:          bus,
+		Debug:        debug,
+		Interrupts:   interrupts,
+		Stat:         Stat{Interrupts: interrupts},
+		FrameClock:   NewClock(),
+		DMA:          DMA{Bus: bus},
+		Config:       config,
+	}
+	ppu.BackgroundFetcher.PPU = ppu
+	ppu.SpriteFetcher.PPU = ppu
+	ppu.SpriteFetcher.Suspended = true
+	ppu.SpriteFetcher.DoneX = 0xff
+	ppu.Shifter.PPU = ppu
+
+	if config.BootROM.Skip {
+		ppu.RegBGP = 0xfc
+		ppu.RegSCY = 100
+		ppu.RegLCDC = 0x91
+	}
+
+	ppu.beginFrame()
+	clock.AttachDevice(ppu.fsm)
+	return ppu
 }
 
-func (ppu *PPU) Debug(event string, f string, v ...any) {
-	if !slices.Contains(ppuDebugEvents, event) {
-		return
-	}
-	fmt.Printf("PPU | %s | ", event)
-	fmt.Printf(f, v...)
-	fmt.Printf("\n")
+func (ppu *PPU) Reset() {
+	ppu.FrameCount = 0
 }
 
 func (ppu *PPU) Enabled() bool {
@@ -194,46 +144,36 @@ func (ppu *PPU) BGWindowEnablePriority() uint8 {
 }
 
 func (ppu *PPU) SetLCDC(v Data8) {
-	ppu.Debug("SetLCDC", "%s", v.Hex())
 	ppu.RegLCDC = v
 }
 
 func (ppu *PPU) SetSCY(v Data8) {
-	ppu.Debug("SetSCY", "%s", v.Hex())
 	ppu.RegSCY = v
 }
 
 func (ppu *PPU) SetSCX(v Data8) {
-	ppu.Debug("SetSCX", "%s", v.Hex())
 	ppu.RegSCX = v
 }
 
 func (ppu *PPU) SetWY(v Data8) {
-	ppu.Debug("SetWY", "%s", v.Hex())
 	ppu.RegWY = v
-	panic("not implemented: SetWY")
 }
 
 func (ppu *PPU) SetWX(v Data8) {
-	ppu.Debug("SetWX", "%s", v.Hex())
 	ppu.RegWX = v
-	panic("not implemented: SetWX")
 }
 
 func (ppu *PPU) SetLY(v Data8) {
-	ppu.Debug("SetLY", "%s", v.Hex())
 	ppu.RegLY = v
 	panic("not implemented: SetLY")
 }
 
 func (ppu *PPU) SetLYC(v Data8) {
-	ppu.Debug("SetLYC", "%s", v.Hex())
 	ppu.RegLYC = v
 	panic("not implemented: SetLYC")
 }
 
 func (ppu *PPU) SetBGP(v Data8) {
-	ppu.Debug("SetBGP", "%s", v.Hex())
 	ppu.RegBGP = v
 
 	ppu.BGPalette[0] = Color((v >> 0) & 0x3)
@@ -243,7 +183,6 @@ func (ppu *PPU) SetBGP(v Data8) {
 }
 
 func (ppu *PPU) SetOBP0(v Data8) {
-	ppu.Debug("SetOBP0", "%s", v.Hex())
 	ppu.RegOBP0 = v
 
 	ppu.OBJPalette0[0] = Color((v >> 0) & 0x3)
@@ -253,32 +192,12 @@ func (ppu *PPU) SetOBP0(v Data8) {
 }
 
 func (ppu *PPU) SetOBP1(v Data8) {
-	ppu.Debug("SetOBP1", "%s", v.Hex())
 	ppu.RegOBP1 = v
 
 	ppu.OBJPalette1[0] = Color((v >> 0) & 0x3)
 	ppu.OBJPalette1[1] = Color((v >> 2) & 0x3)
 	ppu.OBJPalette1[2] = Color((v >> 4) & 0x3)
 	ppu.OBJPalette1[3] = Color((v >> 6) & 0x3)
-}
-
-func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, debugger *Debugger) *PPU {
-	ppu := &PPU{
-		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, SizePPU),
-		Bus:          bus,
-		Debugger:     debugger,
-		Interrupts:   interrupts,
-		Stat:         Stat{Interrupts: interrupts},
-		FrameClock:   NewClock(),
-	}
-	ppu.BackgroundFetcher.PPU = ppu
-	ppu.SpriteFetcher.PPU = ppu
-	ppu.SpriteFetcher.Suspended = true
-	ppu.SpriteFetcher.DoneX = 0xff
-	ppu.PixelShifter.PPU = ppu
-	ppu.beginFrame()
-	clock.AttachDevice(ppu.fsm)
-	return ppu
 }
 
 func (ppu *PPU) Dump() {
@@ -293,6 +212,7 @@ func (ppu *PPU) fsm(c Cycle) {
 	if !ppu.Enabled() {
 		return
 	}
+	ppu.DMA.fsm(c)
 	switch ppu.Mode {
 	case PPUModeVBlank:
 		ppu.fsmVBlank()
@@ -326,11 +246,11 @@ func (ppu *PPU) beginOAMScan() {
 func (ppu *PPU) beginPixelDraw() {
 	ppu.setMode(PPUModePixelDraw)
 	ppu.BackgroundFetcher.Cycle = 0
-	ppu.BackgroundFetcher.State = PixelFetcherStateFetchTileNo
+	ppu.BackgroundFetcher.State = FetcherStateFetchTileNo
 	ppu.BackgroundFetcher.WindowFetching = false
 	ppu.BackgroundFetcher.X = 0
 	ppu.SpriteFetcher.Cycle = 0
-	ppu.SpriteFetcher.State = PixelFetcherStateFetchTileNo
+	ppu.SpriteFetcher.State = FetcherStateFetchTileNo
 	ppu.SpriteFetcher.DoneX = 0xff
 	ppu.SpriteFetcher.X = 0
 	ppu.BackgroundFIFO.Clear()
@@ -342,11 +262,10 @@ func (ppu *PPU) beginPixelDraw() {
 	// the remaining scrolling is actually done at the start of a scanline while shifting pixels out of the background FIFO.
 	// SCX mod 8 pixels are discarded at the start of each scanline rather than being pushed to the LCD,
 	// which is also the cause of PPU Mode 3 being extended by SCX mod 8 cycles.
-	ppu.PixelShifter.Discard = ppu.RegSCX % 8
+	ppu.Shifter.Discard = ppu.RegSCX % 8
 }
 
 func (ppu *PPU) beginHBlank() {
-	ppu.Debug("BeginHBlank", "pixelCycle=%v", ppu.PixelDrawCycle)
 
 	ppu.setMode(PPUModeHBlank)
 
@@ -358,14 +277,13 @@ func (ppu *PPU) beginHBlank() {
 }
 
 func (ppu *PPU) beginVBlank() {
-	ppu.Debug("BeginVBlank", "")
 
 	ppu.setMode(PPUModeVBlank)
 
 	ppu.VBlankLineRemainingCycles = 456
 
 	// TODO: do we ever clear the VBlank interrupt?
-	ppu.Interrupts.IRQSet(0x01)
+	ppu.Interrupts.IRQSet(IntSourceVBlank)
 
 	ppu.FrameClock.Cycle(ppu.FrameCount)
 }
@@ -388,7 +306,7 @@ func (ppu *PPU) fsmOAMScan() {
 	for offs := Addr(0); offs < 4; offs++ {
 		spriteData[offs] = ppu.Bus.OAM.Read(AddrOAMBegin + index*4 + offs)
 	}
-	sprite := DecodeSprite(spriteData)
+	sprite := DecodeObject(spriteData)
 
 	// Check if sprite should be added to buffer
 	if !(sprite.X > 0) {
@@ -408,14 +326,14 @@ func (ppu *PPU) fsmOAMScan() {
 }
 
 func (ppu *PPU) fsmPixelDraw() {
-	if ppu.SpriteFetcher.Suspended && ppu.SpriteFetcher.DoneX != ppu.PixelShifter.X {
+	if ppu.SpriteFetcher.Suspended && ppu.SpriteFetcher.DoneX != ppu.Shifter.X {
 		for idx := range ppu.OAMBuffer.Level {
 			obj := ppu.OAMBuffer.Buffer[idx]
-			if obj.X <= ppu.PixelShifter.X+8 && obj.X > ppu.PixelShifter.X {
+			if obj.X <= ppu.Shifter.X+8 && obj.X > ppu.Shifter.X {
 				// Initiate sprite fetch
-				ppu.SpriteFetcher.State = PixelFetcherStateFetchTileNo
+				ppu.SpriteFetcher.State = FetcherStateFetchTileNo
 				ppu.SpriteFetcher.SpriteIDX = idx
-				ppu.PixelShifter.Suspended = true
+				ppu.Shifter.Suspended = true
 				ppu.SpriteFetcher.Suspended = false
 				ppu.SpriteFetcher.DoneX = 0xff
 				break
@@ -424,13 +342,13 @@ func (ppu *PPU) fsmPixelDraw() {
 	} else {
 		if ppu.SpriteFetcher.DoneX != 0xff {
 			ppu.BackgroundFetcher.Suspended = false
-			ppu.PixelShifter.Suspended = false
+			ppu.Shifter.Suspended = false
 		}
 	}
 
 	ppu.SpriteFetcher.fsm()
 	ppu.BackgroundFetcher.fsm()
-	ppu.PixelShifter.fsm()
+	ppu.Shifter.fsm()
 
 	// GBEDG: After each pixel shifted out, the PPU checks if it has reached the window
 	if !ppu.BackgroundFetcher.WindowFetching && ppu.BackgroundFetcher.windowReached() {
@@ -439,9 +357,9 @@ func (ppu *PPU) fsmPixelDraw() {
 		ppu.BackgroundFetcher.X = 0
 	}
 
-	if ppu.PixelShifter.X >= 160 {
+	if ppu.Shifter.X >= 160 {
 		ppu.beginHBlank()
-		ppu.PixelShifter.X = 0
+		ppu.Shifter.X = 0
 	}
 
 	ppu.PixelDrawCycle++
@@ -487,7 +405,7 @@ func (ppu *PPU) IncRegLY() {
 		ppu.RegLY = 0
 	}
 	ppu.Stat.SetLYCEqLY(ppu.RegLY == ppu.RegLYC)
-	ppu.Debugger.SetY(ppu.RegLY)
+	ppu.Debug.SetY(ppu.RegLY)
 }
 
 func (ppu *PPU) Read(addr Addr) Data8 {
@@ -501,6 +419,9 @@ func (ppu *PPU) Read(addr Addr) Data8 {
 	case AddrSCX:
 		return ppu.RegSCX
 	case AddrLY:
+		if ppu.Config.Debug.GBD.Enable {
+			return 0x90
+		}
 		return ppu.RegLY
 	case AddrLYC:
 		return ppu.RegLYC
@@ -514,6 +435,8 @@ func (ppu *PPU) Read(addr Addr) Data8 {
 		return ppu.RegWY
 	case AddrWX:
 		return ppu.RegWX
+	case AddrDMA:
+		return ppu.DMA.Reg
 	}
 	return 0
 }
@@ -542,6 +465,8 @@ func (ppu *PPU) Write(addr Addr, v Data8) {
 		ppu.SetWY(v)
 	case AddrWX:
 		ppu.SetWX(v)
+	case AddrDMA:
+		ppu.DMA.Write(v)
 	default:
 		panicf("Write to unknown LCD register %#v", addr)
 	}

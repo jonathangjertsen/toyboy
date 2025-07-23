@@ -1,6 +1,6 @@
 package model
 
-type PixelShifter struct {
+type Shifter struct {
 	Discard     Data8
 	Suspended   bool
 	X           Data8
@@ -9,7 +9,7 @@ type PixelShifter struct {
 	PPU *PPU
 }
 
-func (ps *PixelShifter) fsm() {
+func (ps *Shifter) fsm() {
 	if ps.Suspended {
 		return
 	}
@@ -30,10 +30,10 @@ func (ps *PixelShifter) fsm() {
 	ps.LastShifted = pixel.Color
 	ps.X++
 
-	ps.PPU.Debugger.SetX(ps.X)
+	ps.PPU.Debug.SetX(ps.X)
 }
 
-func (ps *PixelShifter) getPixel() (Pixel, bool) {
+func (ps *Shifter) getPixel() (Pixel, bool) {
 	spritePixel, haveSpritePixel := ps.PPU.SpriteFIFO.ShiftOut()
 	bgPixel, haveBGPixel := ps.PPU.BackgroundFIFO.ShiftOut()
 	if haveSpritePixel && haveBGPixel {

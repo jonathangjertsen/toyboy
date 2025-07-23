@@ -6,21 +6,34 @@ import (
 )
 
 type Disassembler struct {
-	Program []Data8
-	Decoded []DisInstruction
-	Trace   bool
-	PC      Addr
+	Config *ConfigDisassembler
+
+	Program Block
+	HRAM    Block
+	WRAM    Block
+
+	PC Addr
 
 	stack             []Addr
 	stackIdx          int
 	cachedDisassembly *Disassembly
 }
 
+type Block struct {
+	CanExplore bool
+	Begin      Addr
+	Source     []Data8
+	Decoded    []DisInstruction
+}
+
 type DisInstruction struct {
 	Raw     [3]Data8
-	Size    Addr
 	Address Addr
 	Opcode  Opcode
+}
+
+func (di *DisInstruction) Size() Size16 {
+	return instSize[di.Opcode]
 }
 
 func (di *DisInstruction) Asm() string {
@@ -56,7 +69,7 @@ func (di *DisInstruction) Asm() string {
 		return fmt.Sprintf("LD (%s), A", str[ln-3:ln-1])
 	case OpcodeLDHLn:
 		return fmt.Sprintf("LD (HL), $%s", di.Raw[1].Hex())
-	case OpcodeRET, OpcodeNop, OpcodeRLA, OpcodeRLCA, OpcodeRRA, OpcodeRRCA, OpcodeDAA, OpcodeDI, OpcodeEI, OpcodeSTOP, OpcodeCCF, OpcodeRETI:
+	case OpcodeRET, OpcodeNop, OpcodeRLA, OpcodeRLCA, OpcodeRRA, OpcodeRRCA, OpcodeDAA, OpcodeDI, OpcodeEI, OpcodeSTOP, OpcodeCCF, OpcodeRETI, OpcodeHALT:
 		return str
 	case OpcodeRETZ, OpcodeRETC:
 		return fmt.Sprintf("RET %s", str[ln-1:])
@@ -260,19 +273,25 @@ func splitSections(sections []DataSection) []DataSection {
 	return result
 }
 
-func NewDisassembler() *Disassembler {
-	return &Disassembler{}
+func NewDisassembler(config *ConfigDisassembler) Disassembler {
+	dis := Disassembler{
+		Config:  config,
+		Program: Block{Begin: 0},
+		HRAM:    Block{Begin: AddrHRAMBegin, Decoded: make([]DisInstruction, SizeHRAM)},
+		WRAM:    Block{Begin: AddrWRAMBegin, Decoded: make([]DisInstruction, SizeWRAM)},
+	}
+	return dis
 }
 
 func (dis *Disassembler) SetProgram(program []byte) {
-	dis.Program = Data8Slice(program)
-	dis.Decoded = make([]DisInstruction, len(program))
+	dis.Program.CanExplore = true
+	dis.Program.Source = Data8Slice(program)
+	dis.Program.Decoded = make([]DisInstruction, len(program))
 	dis.cachedDisassembly = nil
-	dis.printf("setProgram with len=%d", len(program))
 }
 
 func (dis *Disassembler) printf(format string, args ...any) {
-	if !dis.Trace {
+	if !dis.Config.Trace {
 		return
 	}
 	for range dis.stackIdx {
@@ -286,7 +305,17 @@ func (dis *Disassembler) printf(format string, args ...any) {
 }
 
 func (dis *Disassembler) SetPC(address Addr) {
-	dis.printf("SetPC %s", address.Hex())
+	if address >= AddrHRAMBegin && address <= AddrHRAMEnd {
+		dis.HRAM.CanExplore = true
+	}
+	if address >= AddrWRAMBegin && address <= AddrWRAMEnd {
+		dis.WRAM.CanExplore = true
+	}
+	dis.ExploreFrom(address)
+}
+
+func (dis *Disassembler) ExploreFrom(address Addr) {
+	//dis.printf("SetPC %s", address.Hex())
 	dis.stack = append(dis.stack, address)
 	dis.stackIdx++
 	defer func() {
@@ -296,92 +325,132 @@ func (dis *Disassembler) SetPC(address Addr) {
 	}()
 
 	for {
-		if int(address) >= len(dis.Program) {
-			dis.printf("reached address outside of program (len=%#x)", len(dis.Program))
+		var block *Block
+		if int(address) < len(dis.Program.Source) {
+			block = &dis.Program
+		} else if address >= AddrHRAMBegin && address <= AddrHRAMEnd {
+			if !dis.HRAM.CanExplore {
+				dis.printf("reached HRAM address before setting HRAM")
+				return
+			}
+			block = &dis.HRAM
+		} else if address >= AddrWRAMBegin && address <= AddrWRAMEnd {
+			if !dis.WRAM.CanExplore {
+				dis.printf("reached WRAM address before setting WRAM")
+				return
+			}
+			block = &dis.WRAM
+		} else {
+			dis.printf("reached address outside of program, WRAM and HRAM")
 			return
 		}
 
-		if dis.Decoded[address].Size > 0 {
-			dis.printf("already seen this address")
+		if block.Decoded[address-block.Begin].Size() > 0 {
+			//dis.printf("already seen this address")
 			return
 		}
 
-		di, err := dis.readNewInstruction(address)
+		maxConsecutiveNops := Addr(10)
+		for i := range maxConsecutiveNops {
+			next := address - block.Begin + i
+			if next < block.Begin || int(next) >= len(block.Source) {
+				break
+			}
+			if block.Source[next] == 0x00 {
+				if i == maxConsecutiveNops-1 {
+					dis.printf("too many nops ahead, probably not code")
+					return
+				}
+			} else {
+				break
+			}
+		}
+
+		di, err := dis.readNewInstruction(address, block)
 		if err != nil {
-			panicf("failed decoding at %x: %v", address, err)
+			panicf("failed decoding at %v: %v", address.Hex(), err)
 			return
 		}
 
-		for i := range di.Size {
-			if dis.Decoded[address+i].Size > 0 {
-				dis.printf("at offset %#x there is an existing instruction, returning", i)
+		for i := range Addr(di.Size()) {
+			if block.Decoded[address+i-block.Begin].Size() > 0 {
+				dis.printf("at offset %s there is an existing instruction, returning", i.Dec())
 				return
 			}
 		}
 
-		dis.insert(di)
-		address = address + di.Size
+		dis.insert(di, block)
+		address += Addr(di.Size())
 		dis.stack[dis.stackIdx-1] = address
 
-		if dis.checkBranches(di) {
+		if dis.checkBranches(di, block) {
 			return
 		}
 	}
 }
 
 func (dis *Disassembler) Disassembly() *Disassembly {
-	if dis.cachedDisassembly != nil {
-		dis.cachedDisassembly.PC = dis.PC
+	if dis.cachedDisassembly != nil && len(dis.cachedDisassembly.Code) > 0 {
 		return dis.cachedDisassembly
 	}
 
 	var out Disassembly
-	currCodeSection := CodeSection{}
-	currDataSection := DataSection{}
-	for addr := 0; addr < len(dis.Decoded); {
-		di := dis.Decoded[addr]
-		if di.Size > 0 {
-			if currDataSection.Raw != nil {
-				out.Data = append(out.Data, currDataSection)
-			}
+	fmt.Printf("prog=%d progdec=%d\n", len(dis.Program.Source), len(dis.Program.Decoded))
+	for _, block := range []*Block{&dis.Program, &dis.HRAM, &dis.WRAM} {
+		if block.Source == nil {
+			continue
+		}
+		currCodeSection := CodeSection{}
+		currDataSection := DataSection{}
+		for offs := 0; offs < len(block.Decoded); {
+			di := block.Decoded[offs]
+			if di.Size() > 0 {
+				if currDataSection.Raw != nil {
+					out.Data = append(out.Data, currDataSection)
+				}
 
-			currCodeSection.Instructions = append(currCodeSection.Instructions, di)
-			addr += int(di.Size)
+				currCodeSection.Instructions = append(currCodeSection.Instructions, di)
+				offs += int(di.Size())
 
-			currDataSection.Raw = nil
-		} else {
-			if currCodeSection.Instructions != nil {
-				out.Code = append(out.Code, currCodeSection)
-			}
+				currDataSection.Raw = nil
+			} else {
+				if currCodeSection.Instructions != nil {
+					out.Code = append(out.Code, currCodeSection)
+				}
 
-			if currDataSection.Raw == nil {
-				currDataSection.Address = Addr(addr)
+				if currDataSection.Raw == nil {
+					currDataSection.Address = Addr(offs) + block.Begin
+				}
+				currDataSection.Raw = append(currDataSection.Raw, block.Source[offs])
+				offs++
+				currCodeSection.Instructions = nil
 			}
-			currDataSection.Raw = append(currDataSection.Raw, dis.Program[addr])
-			addr++
-			currCodeSection.Instructions = nil
+		}
+		if currCodeSection.Instructions != nil {
+			out.Code = append(out.Code, currCodeSection)
+		}
+		if currDataSection.Raw != nil {
+			out.Data = append(out.Data, currDataSection)
 		}
 	}
-	if currCodeSection.Instructions != nil {
-		out.Code = append(out.Code, currCodeSection)
-	}
-	if currDataSection.Raw != nil {
-		out.Data = append(out.Data, currDataSection)
-	}
+
+	fmt.Printf("len=%d\n", len(out.Code))
+
+	out.PC = dis.PC
 	dis.cachedDisassembly = &out
 	return &out
 }
 
-func (dis *Disassembler) insert(di DisInstruction) {
-	dis.printf("insert %v at %s:%s", di.Opcode, di.Address.Hex(), (di.Address + di.Size - 1).Hex())
-	for addr := di.Address; addr != di.Address+di.Size; addr++ {
-		dis.Decoded[addr] = di
+func (dis *Disassembler) insert(di DisInstruction, block *Block) {
+	dis.printf("insert %v at %s:%s", di.Opcode, di.Address.Hex(), (di.Address + Addr(di.Size()) - 1).Hex())
+	for addr := di.Address; addr != di.Address+Addr(di.Size()); addr++ {
+		block.Decoded[addr-block.Begin] = di
 	}
 	dis.cachedDisassembly = nil
 }
 
 // returns true if unconditional branch, i.e. can never fall through
-func (dis *Disassembler) checkBranches(di DisInstruction) bool {
+func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 	switch di.Opcode {
 	case OpcodeJRNZe, OpcodeJRZe, OpcodeJRe:
 		e := int8(di.Raw[1])
@@ -389,9 +458,9 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 		// branch taken
 		dis.printf("checking branch-taken for relative jump")
 		if e > 0 {
-			dis.SetPC(di.Address + di.Size + Addr(e))
+			dis.ExploreFrom(di.Address + Addr(di.Size()) + Addr(e))
 		} else {
-			dis.SetPC(di.Address + di.Size - Addr(-e))
+			dis.ExploreFrom(di.Address + Addr(di.Size()) - Addr(-e))
 		}
 
 		// branch not taken will be inspected after this
@@ -402,7 +471,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 	case OpcodeJPnn, OpcodeJPCnn, OpcodeJPNCnn, OpcodeJPZnn, OpcodeJPNZnn, OpcodeCALLnn:
 		addr := Addr(join16(di.Raw[2], di.Raw[1]))
 		dis.printf("checking branch-taken for absolute jump")
-		dis.SetPC(addr)
+		dis.ExploreFrom(addr)
 		if di.Opcode == OpcodeJPnn || di.Opcode == OpcodeJPHL {
 			dis.printf("unconditional branch, can never fall through")
 			return true
@@ -430,7 +499,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 		dis.doRST(0x38)
 	case OpcodeUndefD3, OpcodeUndefDB, OpcodeUndefDD, OpcodeUndefE3, OpcodeUndefE4, OpcodeUndefEB, OpcodeUndefEC, OpcodeUndefED, OpcodeUndefF4, OpcodeUndefFC, OpcodeUndefFD:
 		dis.printf("dropping undefined instruction %02x", di.Opcode)
-		dis.Decoded[di.Address] = DisInstruction{}
+		block.Decoded[di.Address-block.Begin] = DisInstruction{}
 		return true
 	case OpcodeRET, OpcodeRETI, OpcodeJPHL:
 		return true
@@ -441,28 +510,27 @@ func (dis *Disassembler) checkBranches(di DisInstruction) bool {
 
 func (dis *Disassembler) doRST(vec Addr) {
 	dis.printf("unconditional function call to %s", vec.Hex())
-	dis.SetPC(vec)
+	dis.ExploreFrom(vec)
 	dis.printf("will probably return here")
 }
 
-func (dis *Disassembler) readNewInstruction(addr Addr) (DisInstruction, error) {
+func (dis *Disassembler) readNewInstruction(addr Addr, block *Block) (DisInstruction, error) {
 	di := DisInstruction{
 		Address: addr,
 	}
-	if int(addr) >= len(dis.Program) {
+	if int(addr-block.Begin) >= len(block.Source) {
 		return di, fmt.Errorf("address out of bounds")
 	}
-	di.Opcode = Opcode(dis.Program[addr])
+	di.Opcode = Opcode(block.Source[addr-block.Begin])
 	ok := di.Opcode.IsValid()
 	if !ok {
 		return di, fmt.Errorf("invalid opcode %v", di.Opcode)
 	}
-	di.Size = instSize[di.Opcode]
-	if di.Size == 0 {
+	if di.Size() == 0 {
 		return di, fmt.Errorf("no size set for opcode %v (0x%x)", di.Opcode, int(di.Opcode))
 	}
-	for i := range di.Size {
-		di.Raw[i] = dis.Program[di.Address+i]
+	for i := range Addr(di.Size()) {
+		di.Raw[i] = block.Source[di.Address+i-block.Begin]
 	}
 	return di, nil
 }

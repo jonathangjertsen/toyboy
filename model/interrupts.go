@@ -99,11 +99,11 @@ func (ints *Interrupts) PendInterrupt(in IntSource) {
 	ints.PendingInterrupt = in
 }
 
-func (ints *Interrupts) IRQSet(in Data8) {
-	if ints.MemIF.Data[0]&in != 0 {
+func (ints *Interrupts) IRQSet(in IntSource) {
+	if ints.MemIF.Data[0]&in.Mask() != 0 {
 		return
 	}
-	ints.MemIF.Data[0] |= in
+	ints.MemIF.Data[0] |= in.Mask()
 	ints.IRQCheck()
 }
 
