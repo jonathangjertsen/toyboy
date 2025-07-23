@@ -319,7 +319,7 @@ func placetiles(tiles []model.Tile, w, h int) []model.Color {
 			tile := tiles[tileRow*w+tileCol]
 			for rowInTile := range 8 {
 				for colInTile := range 8 {
-					col := tile[rowInTile][colInTile].Color
+					col := tile[rowInTile][colInTile].Color()
 					fb[(tileRow*8+rowInTile)*(8*w)+tileCol*8+colInTile] = col
 				}
 			}

@@ -110,7 +110,7 @@ func (ppu *PPU) WindowTilemapArea() Addr {
 }
 
 func (ppu *PPU) WindowEnable() bool {
-	if ppu.RegLCDC.Bit(0) {
+	if !ppu.RegLCDC.Bit(0) {
 		return false // DMG only
 	}
 	return ppu.RegLCDC.Bit(5)
@@ -130,16 +130,12 @@ func (ppu *PPU) ObjHeight() Data8 {
 	return 8
 }
 
-func (ppu *PPU) OBJEnable() uint8 {
-	bitSet := ppu.RegLCDC.Bit(1)
-	_ = bitSet
-	panic("not implemented")
+func (ppu *PPU) OBJEnable() bool {
+	return ppu.RegLCDC.Bit(1)
 }
 
-func (ppu *PPU) BGWindowEnablePriority() uint8 {
-	bitSet := ppu.RegLCDC.Bit(0)
-	_ = bitSet
-	panic("not implemented")
+func (ppu *PPU) BGWindowEnable() bool {
+	return ppu.RegLCDC.Bit(0)
 }
 
 func (ppu *PPU) SetLCDC(v Data8) {
@@ -156,6 +152,7 @@ func (ppu *PPU) SetSCX(v Data8) {
 
 func (ppu *PPU) SetWY(v Data8) {
 	ppu.RegWY = v
+	fmt.Printf("SetWY %s\n", v.Dec())
 }
 
 func (ppu *PPU) SetWX(v Data8) {
@@ -169,7 +166,7 @@ func (ppu *PPU) SetLY(v Data8) {
 
 func (ppu *PPU) SetLYC(v Data8) {
 	ppu.RegLYC = v
-	panic("not implemented: SetLYC")
+	ppu.Interrupts.IRQCheck()
 }
 
 func (ppu *PPU) SetBGP(v Data8) {
@@ -233,6 +230,7 @@ func (ppu *PPU) setMode(mode PPUMode) {
 
 func (ppu *PPU) beginFrame() {
 	ppu.beginOAMScan()
+	ppu.BackgroundFetcher.WindowYReached = false
 }
 
 func (ppu *PPU) beginOAMScan() {
@@ -241,12 +239,13 @@ func (ppu *PPU) beginOAMScan() {
 	ppu.OAMBuffer.Level = 0
 }
 
-// start of scanline after OAM scan
+// start of scanline after 7OAM scan
 func (ppu *PPU) beginPixelDraw() {
 	ppu.setMode(PPUModePixelDraw)
 	ppu.BackgroundFetcher.Cycle = 0
 	ppu.BackgroundFetcher.State = FetcherStateFetchTileNo
 	ppu.BackgroundFetcher.WindowFetching = false
+	ppu.BackgroundFetcher.WindowPixelRenderedThisScanline = false
 	ppu.BackgroundFetcher.X = 0
 	ppu.SpriteFetcher.Cycle = 0
 	ppu.SpriteFetcher.State = FetcherStateFetchTileNo
@@ -265,17 +264,27 @@ func (ppu *PPU) beginPixelDraw() {
 }
 
 func (ppu *PPU) beginHBlank() {
-
 	ppu.setMode(PPUModeHBlank)
-
 	if ppu.PixelDrawCycle > 376 {
-		panicv(ppu.PixelDrawCycle)
-		ppu.HBlankRemainingCycles = 0
+		ppu.HBlankRemainingCycles = 1
+	} else {
+		ppu.HBlankRemainingCycles = 376 - ppu.PixelDrawCycle
 	}
-	ppu.HBlankRemainingCycles = 376 - ppu.PixelDrawCycle
+}
+
+func (ppu *PPU) ObjPalette(attribs Data8) [4]Color {
+	var palette [4]Color
+	if attribs.Bit(4) {
+		palette = ppu.OBJPalette1
+	} else {
+		palette = ppu.OBJPalette0
+	}
+	palette[0] = ColorWhiteOrTransparent
+	return palette
 }
 
 func (ppu *PPU) beginVBlank() {
+	ppu.BackgroundFetcher.WindowLineCounter = 0
 
 	ppu.setMode(PPUModeVBlank)
 
@@ -385,7 +394,7 @@ func (ppu *PPU) fsmHBlank() {
 	}
 
 	ppu.IncRegLY()
-	if ppu.BackgroundFetcher.WindowFetching {
+	if ppu.BackgroundFetcher.WindowPixelRenderedThisScanline {
 		ppu.BackgroundFetcher.WindowLineCounter++
 	}
 

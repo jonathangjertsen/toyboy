@@ -211,6 +211,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 			}
 			cpu.Interrupts.setIMENextCycle = true
 		}),
+		OpcodeHALT:     cpu.halt,
 		OpcodeJRe:      cpu.jre,
 		OpcodeJPnn:     cpu.jpnn,
 		OpcodeJPHL:     cpu.jphl,
@@ -326,6 +327,19 @@ func (cpu *CPU) jphl(e edge) bool {
 	switch e {
 	case edge{1, false}:
 		cpu.SetPC(Addr(cpu.GetHL()))
+		return true
+	case edge{1, true}:
+		return true
+	default:
+		panicv(e)
+	}
+	return false
+}
+
+func (cpu *CPU) halt(e edge) bool {
+	switch e {
+	case edge{1, false}:
+		cpu.halted = true
 		return true
 	case edge{1, true}:
 		return true
@@ -1353,6 +1367,7 @@ func (cpu *CPU) ldsphl(e edge) bool {
 	}
 	return false
 }
+
 func (cpu *CPU) ldhlspe(e edge) bool {
 	switch e {
 	case edge{1, false}:

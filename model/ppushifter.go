@@ -26,8 +26,8 @@ func (ps *Shifter) fsm() {
 	}
 
 	// Write pixel to LCD
-	ps.PPU.FBViewport[ps.PPU.RegLY][ps.X] = pixel.Color
-	ps.LastShifted = pixel.Color
+	ps.PPU.FBViewport[ps.PPU.RegLY][ps.X] = pixel.Color()
+	ps.LastShifted = pixel.Color()
 	ps.X++
 
 	ps.PPU.Debug.SetX(ps.X)
@@ -37,9 +37,9 @@ func (ps *Shifter) getPixel() (Pixel, bool) {
 	spritePixel, haveSpritePixel := ps.PPU.SpriteFIFO.ShiftOut()
 	bgPixel, haveBGPixel := ps.PPU.BackgroundFIFO.ShiftOut()
 	if haveSpritePixel && haveBGPixel {
-		if spritePixel.Color == ColorWhiteOrTransparent {
+		if spritePixel.ColorIDX == 0 {
 			return bgPixel, true
-		} else if spritePixel.BackgroundPriority && bgPixel.Color != ColorWhiteOrTransparent {
+		} else if spritePixel.BackgroundPriority && bgPixel.ColorIDX != 0 {
 			return bgPixel, true
 		} else {
 			return spritePixel, true

@@ -13,6 +13,8 @@ type CPU struct {
 
 	CBOp CBOp
 
+	halted bool
+
 	machineCycle int
 
 	clockCycle                 Cycle
@@ -128,14 +130,6 @@ func join16(msb, lsb Data8) Data16 {
 	return (Data16(msb) << 8) | Data16(lsb)
 }
 
-func msb(w uint16) uint8 {
-	return uint8((w >> 8) & 0xff)
-}
-
-func lsb(w uint16) uint8 {
-	return uint8(w & 0xff)
-}
-
 func (cpu *CPU) SetPC(pc Addr) {
 	if cpu.clockCycle.Falling {
 		panic("SetPC must be called on rising edge")
@@ -174,10 +168,18 @@ func NewCPU(
 
 func (cpu *CPU) fsm(c Cycle) {
 	cpu.wroteToAddressBusThisCycle = false
-
 	cpu.clockCycle = c
-
 	cpu.applyPendingIME()
+
+	if cpu.halted {
+		if cpu.Interrupts == nil {
+			panic("can't be HALTed without interrupts")
+		}
+		if cpu.Interrupts.PendingInterrupt == 0 {
+			return
+		}
+		cpu.halted = false
+	}
 
 	var fetch bool
 	if c.C > 0 {
@@ -267,8 +269,25 @@ func (cpu *CPU) instructionFetch() {
 	cpu.machineCycle = 1
 
 	// Read next instruction opcode
-	cpu.Regs.IR = Opcode(cpu.Bus.GetData())
+	rawOp := cpu.Bus.GetData()
+	cpu.Regs.IR = Opcode(rawOp)
 	cpu.Debug.SetIR(cpu.Regs.IR)
+
+	di := DisInstruction{
+		Address: cpu.Regs.PC - 1,
+		Opcode:  cpu.Regs.IR,
+		Raw:     [3]Data8{rawOp, 0, 0},
+	}
+	size := instSize[cpu.Regs.IR]
+	if size == 0 {
+		panicf("no size set for %v", cpu.Regs.IR)
+	}
+	pop := cpu.Bus.PushState()
+	for i := Size16(1); i < size; i++ {
+		cpu.Bus.WriteAddress(cpu.Regs.PC - 1 + Addr(i))
+		di.Raw[i] = cpu.Bus.GetData()
+	}
+	pop()
 
 	// Update rewind buffer
 	prevIdx := cpu.rewindBufferIdx
@@ -278,12 +297,8 @@ func (cpu *CPU) instructionFetch() {
 		prevIdx = len(cpu.rewindBuffer) - 1
 	}
 	cpu.rewindBuffer[prevIdx].BranchResult = cpu.lastBranchResult
-	cpu.rewindBuffer[cpu.rewindBufferIdx] = ExecLogEntry{
-		Instruction: DisInstruction{
-			Address: cpu.Regs.PC - 1,
-			Opcode:  cpu.Regs.IR,
-		},
-	}
+	cpu.rewindBuffer[cpu.rewindBufferIdx] = ExecLogEntry{Instruction: di}
+
 	cpu.lastBranchResult = 0
 	cpu.rewindBufferIdx++
 	if cpu.rewindBufferIdx >= len(cpu.rewindBuffer) {
@@ -313,11 +328,13 @@ func (cpu *CPU) execTransferToISR() bool {
 	// push MSB of PC to stack
 	case edge{3, false}:
 		cpu.SetSP(cpu.Regs.SP - 1)
+		cpu.writeAddressBus(cpu.Regs.SP)
 	case edge{3, true}:
 		cpu.Bus.WriteData(cpu.Regs.PC.MSB())
 		// push LSB of PC to stack
 	case edge{4, false}:
 		cpu.SetSP(cpu.Regs.SP - 1)
+		cpu.writeAddressBus(cpu.Regs.SP)
 	case edge{4, true}:
 		cpu.Bus.WriteData(cpu.Regs.PC.LSB())
 	case edge{5, false}:

@@ -80,7 +80,7 @@ func (cd *CoreDump) PrintRegs(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintProgram(f io.Writer) {
-	if cd.ProgramEnd >= 0x8000 {
+	if cd.ProgramEnd >= min(Addr(len(cd.Program)), 0x8000) {
 		return
 	}
 	memdump(f, cd.Program[cd.ProgramStart:cd.ProgramEnd+1], cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
@@ -140,7 +140,7 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 	fmt.Fprintf(f, "\n")
 	fmt.Fprintf(f, "BGFIFO: /[")
 	for i := range ppu.BGFIFO.Level {
-		fmt.Fprintf(f, "%d", ppu.BGFIFO.Slots[i].Color)
+		fmt.Fprintf(f, "%d", ppu.BGFIFO.Slots[i].ColorIDX)
 	}
 	for range 8 - ppu.BGFIFO.Level {
 		fmt.Fprintf(f, " ")
@@ -149,7 +149,7 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 	fmt.Fprintf(f, "       [%d]\n", ppu.LastShifted)
 	fmt.Fprintf(f, " SFIFO: \\[")
 	for i := range ppu.SpriteFIFO.Level {
-		fmt.Fprintf(f, "%d", ppu.SpriteFIFO.Slots[i].Color)
+		fmt.Fprintf(f, "%d", ppu.SpriteFIFO.Slots[i].ColorIDX)
 	}
 	for range 8 - ppu.SpriteFIFO.Level {
 		fmt.Fprintf(f, " ")

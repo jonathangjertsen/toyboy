@@ -30,9 +30,13 @@ type DisInstruction struct {
 	Raw     [3]Data8
 	Address Addr
 	Opcode  Opcode
+	Visited bool
 }
 
 func (di *DisInstruction) Size() Size16 {
+	if !di.Visited {
+		return 0
+	}
 	return instSize[di.Opcode]
 }
 
@@ -57,6 +61,10 @@ func (di *DisInstruction) Asm() string {
 		return "LD A, (HL+)"
 	case OpcodeLDAHLDec:
 		return "LD A, (HL-)"
+	case OpcodeLDSPHL:
+		return "LD SP, HL"
+	case OpcodeADDSPe:
+		return fmt.Sprintf("ADD SP, PC$%s", fmtSignedOffset(di.Raw[1]))
 	case OpcodeDECHLInd:
 		return "DEC (HL)"
 	case OpcodeINCHLInd:
@@ -69,7 +77,8 @@ func (di *DisInstruction) Asm() string {
 		return fmt.Sprintf("LD (%s), A", str[ln-3:ln-1])
 	case OpcodeLDHLn:
 		return fmt.Sprintf("LD (HL), $%s", di.Raw[1].Hex())
-	case OpcodeRET, OpcodeNop, OpcodeRLA, OpcodeRLCA, OpcodeRRA, OpcodeRRCA, OpcodeDAA, OpcodeDI, OpcodeEI, OpcodeSTOP, OpcodeCCF, OpcodeRETI, OpcodeHALT:
+	case OpcodeRET, OpcodeNop, OpcodeRLA, OpcodeRLCA, OpcodeRRA, OpcodeRRCA, OpcodeDAA, OpcodeDI, OpcodeEI,
+		OpcodeSTOP, OpcodeCCF, OpcodeSCF, OpcodeRETI, OpcodeHALT:
 		return str
 	case OpcodeRETZ, OpcodeRETC:
 		return fmt.Sprintf("RET %s", str[ln-1:])
@@ -144,7 +153,7 @@ func (di *DisInstruction) Asm() string {
 	case OpcodeLDHLSPe:
 		return fmt.Sprintf("LD HL,SP%s", fmtSignedOffset(di.Raw[1]))
 	case OpcodeCB:
-		cbop := CBOp{Op: cb((di.Raw[0] & 0xf8) >> 3), Target: CBTarget(di.Raw[0] & 0x7)}
+		cbop := CBOp{Op: cb((di.Raw[1] & 0xf8) >> 3), Target: CBTarget(di.Raw[1] & 0x7)}
 		return fmt.Sprintf("%s %s", cbop.Op, cbop.Target)
 	case OpcodeJPHL:
 		return "JP HL"
@@ -395,7 +404,6 @@ func (dis *Disassembler) Disassembly() *Disassembly {
 	}
 
 	var out Disassembly
-	fmt.Printf("prog=%d progdec=%d\n", len(dis.Program.Source), len(dis.Program.Decoded))
 	for _, block := range []*Block{&dis.Program, &dis.HRAM, &dis.WRAM} {
 		if block.Source == nil {
 			continue
@@ -408,7 +416,6 @@ func (dis *Disassembler) Disassembly() *Disassembly {
 				if currDataSection.Raw != nil {
 					out.Data = append(out.Data, currDataSection)
 				}
-
 				currCodeSection.Instructions = append(currCodeSection.Instructions, di)
 				offs += int(di.Size())
 
@@ -433,8 +440,6 @@ func (dis *Disassembler) Disassembly() *Disassembly {
 			out.Data = append(out.Data, currDataSection)
 		}
 	}
-
-	fmt.Printf("len=%d\n", len(out.Code))
 
 	out.PC = dis.PC
 	dis.cachedDisassembly = &out
@@ -517,6 +522,7 @@ func (dis *Disassembler) doRST(vec Addr) {
 func (dis *Disassembler) readNewInstruction(addr Addr, block *Block) (DisInstruction, error) {
 	di := DisInstruction{
 		Address: addr,
+		Visited: true,
 	}
 	if int(addr-block.Begin) >= len(block.Source) {
 		return di, fmt.Errorf("address out of bounds")

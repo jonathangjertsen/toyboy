@@ -10,7 +10,11 @@ func DecodeTileLine(msb, lsb Data8) TileLine {
 		msbMask := msb & (1 << (7 - i))
 		msbMask >>= (7 - i)
 		msbMask <<= 1
-		pixels[i].Color = Color(lsbMask | msbMask)
+		pixels[i].ColorIDX = lsbMask | msbMask
+		pixels[i].Palette[0] = 0
+		pixels[i].Palette[1] = 1
+		pixels[i].Palette[2] = 2
+		pixels[i].Palette[3] = 3
 	}
 	return pixels
 }

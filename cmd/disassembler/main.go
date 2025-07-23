@@ -7,8 +7,7 @@ import (
 )
 
 func main() {
-	rom := "assets/cartridges/01-special.gb"
-	bytes, err := os.ReadFile(rom)
+	bytes, err := os.ReadFile("assets/cartridges/02-interrupts.gb")
 	if err != nil {
 		panic(err)
 	}

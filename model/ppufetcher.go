@@ -25,9 +25,10 @@ type BackgroundFetcher struct {
 	TileOffsetX Addr
 	TileOffsetY Addr
 
-	WindowYReached    bool
-	WindowFetching    bool
-	WindowLineCounter Data8
+	WindowYReached                  bool
+	WindowFetching                  bool
+	WindowLineCounter               Data8
+	WindowPixelRenderedThisScanline bool
 }
 
 func (bgf *BackgroundFetcher) fsm() {
@@ -75,6 +76,7 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 	var addr Addr
 	if bgf.WindowFetching {
 		addr = bgf.PPU.WindowTilemapArea()
+		bgf.WindowPixelRenderedThisScanline = true
 	} else {
 		addr = bgf.PPU.BGTilemapArea()
 	}
@@ -136,16 +138,16 @@ func (bgf *BackgroundFetcher) fetchTileMSB() {
 }
 
 func (bgf *BackgroundFetcher) windowReached() bool {
+	if !bgf.PPU.WindowEnable() {
+		return false
+	}
 	if bgf.PPU.RegWY == bgf.PPU.RegLY {
 		bgf.WindowYReached = true
 	}
 	if !bgf.WindowYReached {
 		return false
 	}
-	if !bgf.PPU.WindowEnable() {
-		return false
-	}
-	if bgf.X < bgf.PPU.RegWX-7 {
+	if bgf.PPU.Shifter.X < bgf.PPU.RegWX-7 {
 		return false
 	}
 	return true
@@ -155,7 +157,17 @@ func (bgf *BackgroundFetcher) pushFIFO() bool {
 	if bgf.PPU.BackgroundFIFO.Level > 0 {
 		return false
 	}
-	bgf.PPU.BackgroundFIFO.Write8(DecodeTileLine(bgf.TileMSB, bgf.TileLSB))
+	line := DecodeTileLine(bgf.TileMSB, bgf.TileLSB)
+	for i := range 8 {
+		line[i].Palette = bgf.PPU.BGPalette
+	}
+	if !bgf.PPU.BGWindowEnable() {
+		for i := range 8 {
+			line[i].ColorIDX = 0
+			line[i].Palette = [4]Color{0, 0, 0, 0}
+		}
+	}
+	bgf.PPU.BackgroundFIFO.Write8(line)
 	return true
 }
 
@@ -209,8 +221,33 @@ func (sf *SpriteFetcher) fetchTileNo() {
 
 func (sf *SpriteFetcher) fetchTileLSB() {
 	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
-	addr := 0x8000 + 16*Addr(sf.TileIndex)
-	addr += 2 * Addr((sf.PPU.RegLY+sf.PPU.RegSCY-obj.Y)%8)
+
+	screenY := sf.PPU.RegLY + sf.PPU.RegSCY
+	offsetInObj := screenY - obj.Y
+
+	addr := Addr(0x8000)
+	if sf.PPU.ObjHeight() == 8 {
+		addr += 16 * Addr(sf.TileIndex)
+		if obj.Attributes.Bit(6) {
+			addr -= 2 * Addr(offsetInObj%8)
+			addr += 2 * 7 // WHY DOES THAT WORK
+		} else {
+			addr += 2 * Addr(offsetInObj%8)
+		}
+	} else {
+		if offsetInObj >= 8 {
+			addr += 16 * Addr(sf.TileIndex&0xfe)
+		} else {
+			addr += 16 * Addr(sf.TileIndex|1)
+		}
+		if obj.Attributes.Bit(6) {
+			addr -= 2 * Addr(offsetInObj%16)
+			addr += 2 * 14 // WHY DOES THAT WORK
+		} else {
+			addr += 2 * Addr(offsetInObj%16)
+		}
+	}
+
 	sf.TileLSBAddr = addr
 	sf.TileLSB = sf.PPU.Bus.VRAM.Read(addr)
 }
@@ -220,14 +257,33 @@ func (sf *SpriteFetcher) fetchTileMSB() {
 }
 
 func (sf *SpriteFetcher) pushFIFO() bool {
-	line := DecodeTileLine(sf.TileMSB, sf.TileLSB)
 	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
+	palette := sf.PPU.ObjPalette(obj.Attributes)
+	line := DecodeTileLine(sf.TileMSB, sf.TileLSB)
+	if obj.Attributes.Bit(5) {
+		for i := range 4 {
+			line[i], line[7-i] = line[7-i], line[i]
+		}
+	}
+	for i := range 8 {
+		line[i].Palette = palette
+	}
+	if !sf.PPU.OBJEnable() {
+		for i := range 8 {
+			line[i].ColorIDX = 0
+		}
+	}
+	if obj.Attributes.Bit(7) {
+		for i := range 8 {
+			line[i].BackgroundPriority = true
+		}
+	}
 	offsetInSprite := sf.PPU.Shifter.X + 8 - obj.X
 	pixelsToPush := 8 - offsetInSprite
 	pos := sf.PPU.SpriteFIFO.ShiftPos
 	for i := range int(pixelsToPush) {
 		incLevel := i >= sf.PPU.SpriteFIFO.Level
-		pushPixel := incLevel || sf.PPU.SpriteFIFO.Slots[pos].Color == ColorWhiteOrTransparent
+		pushPixel := incLevel || sf.PPU.SpriteFIFO.Slots[pos].ColorIDX == 0
 		if pushPixel {
 			pixel := line[int(offsetInSprite)+i]
 			sf.PPU.SpriteFIFO.Slots[pos] = pixel
