@@ -5,7 +5,7 @@ import "fmt"
 type CPU struct {
 	Config *Config
 	PHI    *Clock
-	Bus    *Bus
+	Bus    CPUBusIF
 	Debug  *Debug
 
 	Regs       RegisterFile
@@ -29,25 +29,37 @@ type CPU struct {
 	lastBranchResult int
 }
 
+type CPUBusIF interface {
+	Reset()
+	BeginCoreDump() func()
+	InCoreDump() bool
+	WriteAddress(Addr)
+	WriteData(Data8)
+	GetAddress() Addr
+	GetData() Data8
+	GetCounters(Addr) (uint64, uint64)
+	GetPeripheral(any)
+	PushState() func()
+}
+
 func (cpu *CPU) Reset() {
 	cpu.Regs = RegisterFile{}
 	cpu.Regs.SP = 0xfffe
-	cpu.Interrupts.MemIE.Data[0] = 0
-	cpu.Interrupts.MemIF.Data[0] = 0
-	cpu.Interrupts.IME = false
+	if cpu.Interrupts != nil {
+		cpu.Interrupts.MemIE.Data[0] = 0
+		cpu.Interrupts.MemIF.Data[0] = 0
+		cpu.Interrupts.IME = false
+	}
 	cpu.CBOp = CBOp{}
 	cpu.machineCycle = 0
 	cpu.clockCycle = Cycle{}
-	cpu.Bus.Address = 0
-	cpu.Bus.Data = 0
-	cpu.Bus.inCoreDump = false
+	cpu.Bus.Reset()
 	cpu.wroteToAddressBusThisCycle = false
 	clear(cpu.rewindBuffer)
 	cpu.rewindBufferIdx = 0
 	cpu.nopCount = 0
 
 	if cpu.Config.BootROM.Skip {
-		cpu.Bus.BootROMLock.Lock()
 		cpu.Regs.A = 0x01
 		cpu.Regs.F = 0xB0
 		cpu.Regs.B = 0x00
@@ -91,7 +103,7 @@ func (cpu *CPU) SetSP(v Addr) {
 	if cpu.clockCycle.Falling {
 		panic("SetSP must be called on rising edge")
 	}
-	if v == 0 {
+	if v == 0 && cpu.Config.Debug.PanicOnStackUnderflow {
 		panic("stack underflow")
 	}
 	cpu.Regs.SP = v
@@ -143,7 +155,7 @@ func (cpu *CPU) IncPC() {
 func NewCPU(
 	phi *Clock,
 	interrupts *Interrupts,
-	bus *Bus,
+	bus CPUBusIF,
 	config *Config,
 	debug *Debug,
 ) *CPU {
@@ -170,7 +182,7 @@ func (cpu *CPU) fsm(c Cycle) {
 	var fetch bool
 	if c.C > 0 {
 		cpu.detectRunawayCode()
-		if cpu.Interrupts.PendingInterrupt != 0 {
+		if cpu.Interrupts != nil && cpu.Interrupts.PendingInterrupt != 0 {
 			fetch = cpu.execTransferToISR()
 		} else {
 			fetch = cpu.execCurrentInstruction()
@@ -178,13 +190,16 @@ func (cpu *CPU) fsm(c Cycle) {
 	} else {
 		// initial instruction
 		fetch = true
+		if c.Falling {
+			cpu.machineCycle++
+		}
 	}
 
 	if fetch {
 		if !c.Falling {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		} else if cpu.Interrupts.PendingInterrupt == 0 {
+		} else if cpu.Interrupts == nil || cpu.Interrupts.PendingInterrupt == 0 {
 			cpu.instructionFetch()
 		}
 	} else if c.Falling {
@@ -197,18 +212,16 @@ func (cpu *CPU) fsm(c Cycle) {
 }
 
 func (cpu *CPU) doGBDLog() {
-	cpu.Bus.inCoreDump = true
-	defer func() {
-		cpu.Bus.inCoreDump = false
-	}()
+	end := cpu.Bus.BeginCoreDump()
+	defer end()
 
 	pc := cpu.Regs.PC - 1
 
-	origAddr := cpu.Bus.Address
+	origAddr := cpu.Bus.GetAddress()
 	var pcmem [4]Data8
 	for i := range Addr(4) {
 		cpu.writeAddressBus(pc + i)
-		pcmem[i] = cpu.Bus.Data
+		pcmem[i] = cpu.Bus.GetData()
 	}
 	cpu.writeAddressBus(origAddr)
 
@@ -254,7 +267,7 @@ func (cpu *CPU) instructionFetch() {
 	cpu.machineCycle = 1
 
 	// Read next instruction opcode
-	cpu.Regs.IR = Opcode(cpu.Bus.Data)
+	cpu.Regs.IR = Opcode(cpu.Bus.GetData())
 	cpu.Debug.SetIR(cpu.Regs.IR)
 
 	// Update rewind buffer
@@ -320,7 +333,7 @@ func (cpu *CPU) execTransferToISR() bool {
 }
 
 func (cpu *CPU) writeAddressBus(addr Addr) {
-	if !cpu.Bus.inCoreDump {
+	if !cpu.Bus.InCoreDump() {
 		if cpu.clockCycle.Falling {
 			panic("writeAddressBus must be called on rising edge")
 		}
@@ -333,6 +346,9 @@ func (cpu *CPU) writeAddressBus(addr Addr) {
 }
 
 func (cpu *CPU) applyPendingIME() {
+	if cpu.Interrupts == nil {
+		return
+	}
 	if cpu.Interrupts.setIMENextCycle {
 		cpu.Interrupts.setIMENextCycle = false
 		cpu.Interrupts.SetIME(true)

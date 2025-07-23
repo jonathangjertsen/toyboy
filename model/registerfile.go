@@ -17,7 +17,15 @@ type RegisterFile struct {
 	TempW Data8
 }
 
-func (regs *RegisterFile) setFlag(mask Data8, v bool) {
+const (
+	FlagBitZ = 7
+	FlagBitN = 6
+	FlagBitH = 5
+	FlagBitC = 4
+)
+
+func (regs *RegisterFile) setFlag(bit int, v bool) {
+	mask := Data8(1 << bit)
 	if v {
 		regs.F |= mask
 	} else {
@@ -25,12 +33,12 @@ func (regs *RegisterFile) setFlag(mask Data8, v bool) {
 	}
 }
 
-func (regs *RegisterFile) getFlag(mask Data8) bool {
-	return (regs.F & mask) == mask
+func (regs *RegisterFile) getFlag(bit int) bool {
+	return regs.F.Bit(bit)
 }
 
 func (regs *RegisterFile) GetFlagZ() bool {
-	v := regs.getFlag(0x80)
+	v := regs.getFlag(FlagBitZ)
 	return v
 }
 
@@ -47,31 +55,31 @@ func (regs *RegisterFile) SetFlagsAndA(res ALUResult) {
 }
 
 func (regs *RegisterFile) SetFlagZ(v bool) {
-	regs.setFlag(0x80, v)
+	regs.setFlag(FlagBitZ, v)
 }
 
 func (regs *RegisterFile) GetFlagN() bool {
-	return regs.getFlag(0x40)
+	return regs.getFlag(FlagBitN)
 }
 
 func (regs *RegisterFile) SetFlagN(v bool) {
-	regs.setFlag(0x40, v)
+	regs.setFlag(FlagBitN, v)
 }
 
 func (regs *RegisterFile) GetFlagH() bool {
-	return regs.getFlag(0x20)
+	return regs.getFlag(FlagBitH)
 }
 
 func (regs *RegisterFile) SetFlagH(v bool) {
-	regs.setFlag(0x20, v)
+	regs.setFlag(FlagBitH, v)
 }
 
 func (regs *RegisterFile) GetFlagC() bool {
-	return regs.getFlag(0x10)
+	return regs.getFlag(FlagBitC)
 }
 
 func (regs *RegisterFile) SetFlagC(v bool) {
-	regs.setFlag(0x10, v)
+	regs.setFlag(FlagBitC, v)
 }
 
 func (regs *RegisterFile) SetWZ(v Data16) {

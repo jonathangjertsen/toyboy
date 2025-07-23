@@ -26,9 +26,10 @@ type ConfigROM struct {
 }
 
 type ConfigDebug struct {
-	MaxNOPCount  int
-	GBD          ConfigGBD
-	Disassembler ConfigDisassembler
+	PanicOnStackUnderflow bool
+	MaxNOPCount           int
+	GBD                   ConfigGBD
+	Disassembler          ConfigDisassembler
 }
 
 type ConfigDisassembler struct {
@@ -67,7 +68,8 @@ var DefaultConfig = Config{
 		Location: "assets/bootrom/dmg_boot.bin",
 	},
 	Debug: ConfigDebug{
-		MaxNOPCount: 10,
+		PanicOnStackUnderflow: true,
+		MaxNOPCount:           10,
 		GBD: ConfigGBD{
 			Enable: false,
 			File:   "bin/gbdlog.txt",

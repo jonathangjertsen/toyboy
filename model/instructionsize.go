@@ -13,6 +13,7 @@ var instSize = [256]Size16{
 	OpcodeRST0x38: 1,
 
 	OpcodeLDHLSPe: 2,
+	OpcodeLDSPHL:  1,
 
 	OpcodeLDBCA: 1,
 	OpcodeLDDEA: 1,
@@ -115,6 +116,7 @@ var instSize = [256]Size16{
 
 	OpcodeCPLaka2f: 1,
 	OpcodeCCF:      1,
+	OpcodeSCF:      1,
 	OpcodeDAA:      1,
 	OpcodeEI:       1,
 	OpcodeDI:       1,
@@ -146,14 +148,15 @@ var instSize = [256]Size16{
 	OpcodeSBCL:  1,
 	OpcodeSBCHL: 1,
 
-	OpcodeADDA:  1,
-	OpcodeADDB:  1,
-	OpcodeADDC:  1,
-	OpcodeADDD:  1,
-	OpcodeADDE:  1,
-	OpcodeADDH:  1,
-	OpcodeADDL:  1,
-	OpcodeADDHL: 1,
+	OpcodeADDA:   1,
+	OpcodeADDB:   1,
+	OpcodeADDC:   1,
+	OpcodeADDD:   1,
+	OpcodeADDE:   1,
+	OpcodeADDH:   1,
+	OpcodeADDL:   1,
+	OpcodeADDHL:  1,
+	OpcodeADDSPe: 2,
 
 	OpcodeADCA:  1,
 	OpcodeADCB:  1,

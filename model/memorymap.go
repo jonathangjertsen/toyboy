@@ -2,7 +2,7 @@ package model
 
 import "fmt"
 
-//go:generate go-enum --marshal --flag --nocomments
+//go:generate go-enum --flag --nocomments
 
 // ENUM(
 // Zero                = 0x0000

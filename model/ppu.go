@@ -86,7 +86,6 @@ func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, co
 
 	if config.BootROM.Skip {
 		ppu.RegBGP = 0xfc
-		ppu.RegSCY = 100
 		ppu.RegLCDC = 0x91
 	}
 

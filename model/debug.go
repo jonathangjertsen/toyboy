@@ -28,11 +28,24 @@ func NewDebug(clk *ClockRT, config *ConfigDebug) *Debug {
 }
 
 func (d *Debug) SetPC(addr Addr) {
+	if d == nil {
+		return
+	}
 	d.Disassembler.SetPC(addr)
 	d.Debugger.SetPC(addr)
 }
 
+func (d *Debug) SetIR(op Opcode) {
+	if d == nil {
+		return
+	}
+	d.Debugger.SetIR(op)
+}
+
 func (d *Debug) SetWarning(key string, message string) {
+	if d == nil {
+		return
+	}
 	d.Warnings[key] = UserMessage{
 		Time:    time.Now(),
 		Warn:    true,

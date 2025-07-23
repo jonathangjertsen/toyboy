@@ -211,10 +211,8 @@ func memdump(f io.Writer, mem []MemInfo, start, end, highlight Addr) {
 }
 
 func (cpu *CPU) GetCoreDump() CoreDump {
-	cpu.Bus.CoreDumpBegin()
-	defer func() {
-		cpu.Bus.CoreDumpEnd()
-	}()
+	end := cpu.Bus.BeginCoreDump()
+	defer end()
 
 	var cd CoreDump
 	cd.Regs = cpu.Regs
@@ -229,24 +227,26 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 		cd.ProgramEnd = cpu.Regs.PC + 0x40
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
-	cd.Program = cpu.Bus.getmem(0x0000, AddrCartridgeBank0End)
+	cd.Program = getmem(cpu.Bus, 0x0000, AddrCartridgeBank0End)
 	cd.Disassembly = cpu.Debug.Disassembly()
-	cd.HRAM = cpu.Bus.getmem(AddrHRAMBegin, AddrHRAMEnd)
-	cd.OAM = cpu.Bus.getmem(AddrOAMBegin, AddrOAMEnd)
-	cd.VRAM = cpu.Bus.getmem(AddrVRAMBegin, AddrVRAMEnd)
-	cd.APU = cpu.Bus.getmem(AddrAPUBegin, AddrAPUEnd)
-	cd.PPU.Registers = cpu.Bus.getmem(AddrPPUBegin, AddrPPUEnd)
-	cd.PPU.BGFIFO = cpu.Bus.PPU.BackgroundFIFO.Dump()
-	cd.PPU.SpriteFIFO = cpu.Bus.PPU.SpriteFIFO.Dump()
-	cd.PPU.LastShifted = cpu.Bus.PPU.Shifter.LastShifted
-	cd.PPU.OAMScanCycle = cpu.Bus.PPU.OAMScanCycle
-	cd.PPU.PixelDrawCycle = cpu.Bus.PPU.PixelDrawCycle
-	cd.PPU.HBlankRemainingCycles = cpu.Bus.PPU.HBlankRemainingCycles
-	cd.PPU.VBlankLineRemainingCycles = cpu.Bus.PPU.VBlankLineRemainingCycles
-	cd.PPU.PixelShifter = cpu.Bus.PPU.Shifter
-	cd.PPU.BackgroundFetcher = cpu.Bus.PPU.BackgroundFetcher
-	cd.PPU.SpriteFetcher = cpu.Bus.PPU.SpriteFetcher
-	cd.PPU.OAMBuffer = cpu.Bus.PPU.OAMBuffer
+	cd.HRAM = getmem(cpu.Bus, AddrHRAMBegin, AddrHRAMEnd)
+	cd.OAM = getmem(cpu.Bus, AddrOAMBegin, AddrOAMEnd)
+	cd.VRAM = getmem(cpu.Bus, AddrVRAMBegin, AddrVRAMEnd)
+	cd.APU = getmem(cpu.Bus, AddrAPUBegin, AddrAPUEnd)
+	cd.PPU.Registers = getmem(cpu.Bus, AddrPPUBegin, AddrPPUEnd)
+	var ppu *PPU
+	cpu.Bus.GetPeripheral(&ppu)
+	cd.PPU.BGFIFO = ppu.BackgroundFIFO.Dump()
+	cd.PPU.SpriteFIFO = ppu.SpriteFIFO.Dump()
+	cd.PPU.LastShifted = ppu.Shifter.LastShifted
+	cd.PPU.OAMScanCycle = ppu.OAMScanCycle
+	cd.PPU.PixelDrawCycle = ppu.PixelDrawCycle
+	cd.PPU.HBlankRemainingCycles = ppu.HBlankRemainingCycles
+	cd.PPU.VBlankLineRemainingCycles = ppu.VBlankLineRemainingCycles
+	cd.PPU.PixelShifter = ppu.Shifter
+	cd.PPU.BackgroundFetcher = ppu.BackgroundFetcher
+	cd.PPU.SpriteFetcher = ppu.SpriteFetcher
+	cd.PPU.OAMBuffer = ppu.OAMBuffer
 	cd.RewindBuffer = cpu.rewindBuffer
 	cd.RewindBufferIdx = cpu.rewindBufferIdx
 	cd.RewindBufferFull = cpu.rewindBufferFull
@@ -259,20 +259,16 @@ type MemInfo struct {
 	WriteCounter uint64
 }
 
-func (bus *Bus) getmem(start, end Addr) []MemInfo {
-	address := bus.Address
-	data := bus.Data
-	defer func() {
-		bus.Address = address
-		bus.Data = data
-	}()
+func getmem(bus CPUBusIF, start, end Addr) []MemInfo {
+	pop := bus.PushState()
+	defer pop()
 
 	out := make([]MemInfo, end-start+1)
 	for addr := start; addr <= end; addr++ {
 		memInfo := &out[addr-start]
 		memInfo.ReadCounter, memInfo.WriteCounter = bus.GetCounters(addr)
 		bus.WriteAddress(addr)
-		memInfo.Value = bus.Data
+		memInfo.Value = bus.GetData()
 	}
 
 	return out

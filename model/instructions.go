@@ -1,6 +1,6 @@
 package model
 
-//go:generate go-enum --marshal --flag --values --nocomments
+//go:generate go-enum --marshal --flag --values --nocomments --no-iota
 
 // ENUM(
 // Nop      = 0x00,
@@ -58,6 +58,7 @@ package model
 // INCHLInd = 0x34,
 // DECHLInd = 0x35,
 // LDHLn    = 0x36,
+// SCF      = 0x37,
 // JRCe     = 0x38,
 // ADDHLSP  = 0x39,
 // LDAHLDec = 0x3a,
@@ -234,6 +235,7 @@ package model
 // PUSHHL   = 0xe5,
 // ANDn     = 0xE6,
 // RST0x20  = 0xE7,
+// ADDSPe   = 0xE8,
 // JPHL     = 0xe9,
 // LDnnA    = 0xEA,
 // UndefEB  = 0xEB,
@@ -250,6 +252,7 @@ package model
 // ORn      = 0xF6,
 // RST0x30  = 0xF7,
 // LDHLSPe  = 0xF8,
+// LDSPHL   = 0xF9,
 // LDAnn    = 0xFA,
 // EI       = 0xFB,
 // UndefFC  = 0xFC,

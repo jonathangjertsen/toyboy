@@ -1,8 +1,11 @@
 package model
 
+import "fmt"
+
 type Bus struct {
 	Data    Data8
 	Address Addr
+	Config  *Config
 
 	inCoreDump bool
 
@@ -20,6 +23,78 @@ type Bus struct {
 	Serial      *Serial
 	Prohibited  *Prohibited
 	Timer       *Timer
+}
+
+func (b *Bus) GetPeripheral(ptr any) {
+	switch p := ptr.(type) {
+	case **PPU:
+		*p = b.PPU
+	case **APU:
+		*p = b.APU
+	default:
+		panic(fmt.Errorf("no peripheral of type %T", ptr))
+	}
+}
+
+func (b *Bus) Reset() {
+	b.Address = 0
+	b.Data = 0
+	b.inCoreDump = false
+
+	if b.Config.BootROM.Skip {
+		b.BootROMLock.Lock()
+	}
+}
+
+func (b *Bus) PushState() func() {
+	addr := b.Address
+	data := b.Data
+	pop := func() {
+		b.Address = addr
+		b.Data = data
+	}
+	return pop
+}
+
+func (b *Bus) BeginCoreDump() func() {
+	b.inCoreDump = true
+	b.BootROMLock.CountdownDisable = true
+	b.BootROM.CountdownDisable = true
+	b.VRAM.CountdownDisable = true
+	b.HRAM.CountdownDisable = true
+	b.WRAM.CountdownDisable = true
+	b.APU.CountdownDisable = true
+	b.OAM.CountdownDisable = true
+	b.PPU.MemoryRegion.CountdownDisable = true
+	b.Prohibited.FEA0toFEFF.CountdownDisable = true
+	b.Cartridge.Bank0.CountdownDisable = true
+	b.Timer.Mem.CountdownDisable = true
+	return func() {
+		b.inCoreDump = false
+		b.BootROMLock.CountdownDisable = false
+		b.BootROM.CountdownDisable = false
+		b.VRAM.CountdownDisable = false
+		b.HRAM.CountdownDisable = false
+		b.WRAM.CountdownDisable = false
+		b.APU.CountdownDisable = false
+		b.OAM.CountdownDisable = false
+		b.PPU.MemoryRegion.CountdownDisable = false
+		b.Prohibited.FEA0toFEFF.CountdownDisable = false
+		b.Cartridge.Bank0.CountdownDisable = false
+		b.Timer.Mem.CountdownDisable = false
+	}
+}
+
+func (b *Bus) InCoreDump() bool {
+	return b.inCoreDump
+}
+
+func (b *Bus) GetAddress() Addr {
+	return b.Address
+}
+
+func (b *Bus) GetData() Data8 {
+	return b.Data
 }
 
 func (b *Bus) WriteAddress(addr Addr) {
@@ -70,10 +145,12 @@ func (b *Bus) WriteData(v Data8) {
 	b.Data = v
 	addr := b.Address
 	if addr <= AddrBootROMEnd {
-		if b.BootROMLock.BootOff {
-			panicf("Attempted write to cartridge (addr=%s v=%s)", addr.Hex(), v.Hex())
-		} else {
-			panicf("Attempted write to bootrom (addr=%s v=%s)", addr.Hex(), v.Hex())
+		if !b.inCoreDump {
+			if b.BootROMLock.BootOff {
+				panicf("Attempted write to cartridge (addr=%s v=%s)", addr.Hex(), v.Hex())
+			} else {
+				panicf("Attempted write to bootrom (addr=%s v=%s)", addr.Hex(), v.Hex())
+			}
 		}
 	} else if addr <= AddrCartridgeBankNEnd {
 		b.Cartridge.Write(addr, v)
@@ -108,36 +185,6 @@ func (b *Bus) WriteData(v Data8) {
 			panicf("write to unmapped address %s", addr.Hex())
 		}
 	}
-}
-
-func (b *Bus) CoreDumpBegin() {
-	b.inCoreDump = true
-	b.BootROMLock.CountdownDisable = true
-	b.BootROM.CountdownDisable = true
-	b.VRAM.CountdownDisable = true
-	b.HRAM.CountdownDisable = true
-	b.WRAM.CountdownDisable = true
-	b.APU.CountdownDisable = true
-	b.OAM.CountdownDisable = true
-	b.PPU.MemoryRegion.CountdownDisable = true
-	b.Prohibited.FEA0toFEFF.CountdownDisable = true
-	b.Cartridge.Bank0.CountdownDisable = true
-	b.Timer.Mem.CountdownDisable = true
-}
-
-func (b *Bus) CoreDumpEnd() {
-	b.inCoreDump = false
-	b.BootROMLock.CountdownDisable = false
-	b.BootROM.CountdownDisable = false
-	b.VRAM.CountdownDisable = false
-	b.HRAM.CountdownDisable = false
-	b.WRAM.CountdownDisable = false
-	b.APU.CountdownDisable = false
-	b.OAM.CountdownDisable = false
-	b.PPU.MemoryRegion.CountdownDisable = false
-	b.Prohibited.FEA0toFEFF.CountdownDisable = false
-	b.Cartridge.Bank0.CountdownDisable = false
-	b.Timer.Mem.CountdownDisable = false
 }
 
 func (b *Bus) GetCounters(addr Addr) (uint64, uint64) {

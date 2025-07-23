@@ -149,10 +149,10 @@ func RRA(a Data8, carry bool) ALUResult {
 
 func RLCA(a Data8) ALUResult {
 	var mask Data8
-	if a&80 != 0 {
+	if a.Bit(7) {
 		mask = 1
 	}
-	return ALUResult{Value: a<<1 | mask, C: a&0x80 != 0, Z0: true}
+	return ALUResult{Value: a<<1 | mask, C: a.Bit(7), Z0: true}
 }
 
 func RRCA(a Data8) ALUResult {
@@ -187,6 +187,6 @@ func DAA(a Data8, c, n, h bool) ALUResult {
 	if va&0x100 == 0x100 {
 		c = true
 	}
-	return ALUResult{Value: Data8(va & 0xff), C: c}
+	return ALUResult{Value: Data8(va & 0xff), C: c, N: n}
 
 }

@@ -117,6 +117,7 @@ func (gb *Gameboy) init() {
 	bus.Serial = serial
 	bus.Prohibited = prohibited
 	bus.Timer = timer
+	bus.Config = gb.Config
 
 	debug.HRAM.Source = hram.Data
 	debug.WRAM.Source = wram.Data
