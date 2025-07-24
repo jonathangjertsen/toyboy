@@ -457,7 +457,7 @@ func (dis *Disassembler) insert(di DisInstruction, block *Block) {
 // returns true if unconditional branch, i.e. can never fall through
 func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 	switch di.Opcode {
-	case OpcodeJRNZe, OpcodeJRZe, OpcodeJRe:
+	case OpcodeJRNZe, OpcodeJRZe, OpcodeJRNCe, OpcodeJRCe, OpcodeJRe:
 		e := int8(di.Raw[1])
 
 		// branch taken
@@ -473,7 +473,8 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 			dis.printf("unconditional branch, can never fall through")
 			return true
 		}
-	case OpcodeJPnn, OpcodeJPCnn, OpcodeJPNCnn, OpcodeJPZnn, OpcodeJPNZnn, OpcodeCALLnn:
+	case OpcodeJPnn, OpcodeJPCnn, OpcodeJPNCnn, OpcodeJPZnn, OpcodeJPNZnn,
+		OpcodeCALLnn, OpcodeCALLCnn, OpcodeCALLNCnn, OpcodeCALLZnn, OpcodeCALLNZnn:
 		addr := Addr(join16(di.Raw[2], di.Raw[1]))
 		dis.printf("checking branch-taken for absolute jump")
 		dis.ExploreFrom(addr)
@@ -507,7 +508,55 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 		block.Decoded[di.Address-block.Begin] = DisInstruction{}
 		return true
 	case OpcodeRET, OpcodeRETI, OpcodeJPHL:
+		// will likely go back to somewhere already explored
 		return true
+	case OpcodeRETC, OpcodeRETNC, OpcodeRETZ, OpcodeRETNZ:
+		// will likely go back to somewhere already explored
+		return false
+	case OpcodeLDSPnn, OpcodeLDHLnn, OpcodeLDBCnn, OpcodeLDDEnn,
+		OpcodeLDHLADec, OpcodeLDHLAInc,
+		OpcodeLDAHLInc, OpcodeLDAHLDec,
+		OpcodeCB,
+		OpcodeLDAn, OpcodeLDBn, OpcodeLDCn, OpcodeLDDn, OpcodeLDEn, OpcodeLDHn, OpcodeLDLn, OpcodeLDHLn,
+		OpcodeLDHCA, OpcodeLDnnA, OpcodeLDnnSP, OpcodeLDAnn,
+		OpcodeLDHnA, OpcodeLDHAn,
+		OpcodeLDABC, OpcodeLDADE,
+		OpcodeXORA, OpcodeXORB, OpcodeXORC, OpcodeXORD, OpcodeXORE, OpcodeXORL, OpcodeXORH, OpcodeXORHL, OpcodeXORn,
+		OpcodeINCA, OpcodeINCB, OpcodeINCC, OpcodeINCD, OpcodeINCE, OpcodeINCL, OpcodeINCH, OpcodeINCHL,
+		OpcodeDECA, OpcodeDECB, OpcodeDECC, OpcodeDECD, OpcodeDECE, OpcodeDECL, OpcodeDECH, OpcodeDECHL,
+		OpcodeANDA, OpcodeANDB, OpcodeANDC, OpcodeANDD, OpcodeANDE, OpcodeANDL, OpcodeANDH, OpcodeANDHL, OpcodeANDn,
+		OpcodeORA, OpcodeORB, OpcodeORC, OpcodeORD, OpcodeORE, OpcodeORL, OpcodeORH, OpcodeORHL, OpcodeORn,
+		OpcodeADDA, OpcodeADDB, OpcodeADDC, OpcodeADDD, OpcodeADDE, OpcodeADDL, OpcodeADDH, OpcodeADDHL, OpcodeADDn,
+		OpcodeADCA, OpcodeADCB, OpcodeADCC, OpcodeADCD, OpcodeADCE, OpcodeADCL, OpcodeADCH, OpcodeADCHL, OpcodeADCn,
+		OpcodeSUBA, OpcodeSUBB, OpcodeSUBC, OpcodeSUBD, OpcodeSUBE, OpcodeSUBL, OpcodeSUBH, OpcodeSUBHL, OpcodeSUBn,
+		OpcodeSBCA, OpcodeSBCB, OpcodeSBCC, OpcodeSBCD, OpcodeSBCE, OpcodeSBCL, OpcodeSBCH, OpcodeSBCHL, OpcodeSBCn,
+		OpcodeCPA, OpcodeCPB, OpcodeCPC, OpcodeCPD, OpcodeCPE, OpcodeCPL, OpcodeCPH, OpcodeCPHL, OpcodeCPn,
+		OpcodeLDAA, OpcodeLDAB, OpcodeLDAC, OpcodeLDAD, OpcodeLDAE, OpcodeLDAL, OpcodeLDAH, OpcodeLDAHL,
+		OpcodeLDBA, OpcodeLDBB, OpcodeLDBC, OpcodeLDBD, OpcodeLDBE, OpcodeLDBL, OpcodeLDBH, OpcodeLDBHL,
+		OpcodeLDCA, OpcodeLDCB, OpcodeLDCC, OpcodeLDCD, OpcodeLDCE, OpcodeLDCL, OpcodeLDCH, OpcodeLDCHL,
+		OpcodeLDDA, OpcodeLDDB, OpcodeLDDC, OpcodeLDDD, OpcodeLDDE, OpcodeLDDL, OpcodeLDDH, OpcodeLDDHL,
+		OpcodeLDEA, OpcodeLDEB, OpcodeLDEC, OpcodeLDED, OpcodeLDEE, OpcodeLDEL, OpcodeLDEH, OpcodeLDEHL,
+		OpcodeLDHA, OpcodeLDHB, OpcodeLDHC, OpcodeLDHD, OpcodeLDHE, OpcodeLDHL, OpcodeLDHH, OpcodeLDHHL,
+		OpcodeLDLA, OpcodeLDLB, OpcodeLDLC, OpcodeLDLD, OpcodeLDLE, OpcodeLDLL, OpcodeLDLH, OpcodeLDLHL,
+		OpcodeLDSPHL,
+		OpcodeADDHLBC, OpcodeADDHLDE, OpcodeADDHLHL, OpcodeADDHLSP,
+		OpcodeLDBCA, OpcodeLDDEA,
+		OpcodeLDHLA, OpcodeLDHLB, OpcodeLDHLC, OpcodeLDHLD, OpcodeLDHLE, OpcodeLDHLL, OpcodeLDHLH, OpcodeLDHLSPe,
+		OpcodePUSHAF, OpcodePUSHBC, OpcodePUSHDE, OpcodePUSHHL,
+		OpcodePOPAF, OpcodePOPBC, OpcodePOPDE, OpcodePOPHL,
+		OpcodeRLA, OpcodeRLCA, OpcodeRRCA, OpcodeRRA,
+		OpcodeINCDE, OpcodeINCBC, OpcodeINCSP, OpcodeINCHLInd,
+		OpcodeDECDE, OpcodeDECBC, OpcodeDECSP, OpcodeDECHLInd,
+		OpcodeDAA, OpcodeCCF, OpcodeSCF,
+		OpcodeCPLaka2f,
+		OpcodeNop, OpcodeDI:
+		// non-branching
+		return false
+	case OpcodeEI, OpcodeHALT, OpcodeSTOP:
+		// likely to continue in an interrupt, then return here
+		return false
+	default:
+		panicf("check %s", di.Opcode)
 	}
 
 	return false

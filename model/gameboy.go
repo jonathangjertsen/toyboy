@@ -91,7 +91,7 @@ func (gb *Gameboy) init() {
 	timer := NewTimer(clk, interrupts)
 
 	bootROMLock.OnLock = func() {
-		debug.SetProgram(ByteSlice(cartridge.Bank0.Data))
+		debug.SetProgram(ByteSlice(cartridge.CurrROMBank0.Data))
 		debug.SetPC(0x100)
 	}
 

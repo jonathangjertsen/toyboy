@@ -1,10 +1,5 @@
 package model
 
-import (
-	"io"
-	"os"
-)
-
 type Config struct {
 	Clock   ConfigClock
 	ROM     ConfigROM
@@ -28,32 +23,11 @@ type ConfigROM struct {
 type ConfigDebug struct {
 	PanicOnStackUnderflow bool
 	MaxNOPCount           int
-	GBD                   ConfigGBD
 	Disassembler          ConfigDisassembler
 }
 
 type ConfigDisassembler struct {
 	Trace bool
-}
-
-type ConfigGBD struct {
-	Enable bool
-	File   string
-	gbdf   io.WriteCloser
-}
-
-func (cgbd *ConfigGBD) OpenGBDLogFile() error {
-	f, err := os.Create(cgbd.File)
-	cgbd.gbdf = f
-	return err
-}
-
-func (cgbd *ConfigGBD) CloseGBDLogFile() error {
-	return cgbd.gbdf.Close()
-}
-
-func (cgbd *ConfigGBD) GBDLog(s string) {
-	_, _ = cgbd.gbdf.Write([]byte(s))
 }
 
 var DefaultConfig = Config{
@@ -70,10 +44,6 @@ var DefaultConfig = Config{
 	Debug: ConfigDebug{
 		PanicOnStackUnderflow: true,
 		MaxNOPCount:           10,
-		GBD: ConfigGBD{
-			Enable: false,
-			File:   "bin/gbdlog.txt",
-		},
 		Disassembler: ConfigDisassembler{
 			Trace: true,
 		},

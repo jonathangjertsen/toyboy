@@ -15,7 +15,7 @@ import (
 )
 
 type GridConfig struct {
-	Show          bool
+	ShowGrid      bool
 	Overlay       bool
 	BlockSize     int
 	GridColor     color.RGBA // RGBA grid line color
@@ -50,7 +50,7 @@ type Highlight struct {
 }
 
 var DefaultGridConfig = GridConfig{
-	Show:           true,
+	ShowGrid:       true,
 	Overlay:        false,
 	BlockSize:      8,
 	GridColor:      color.RGBA{R: 136, G: 136, B: 136, A: 255},
@@ -95,7 +95,7 @@ func (gui *GUI) GBGraphics(
 
 	gridSpacingX := 0
 	gridSpacingY := 0
-	if cfg.Show && !cfg.Overlay {
+	if cfg.ShowGrid && !cfg.Overlay {
 		gridSpacingX = gridCols * gridT
 		gridSpacingY = gridRows * gridT
 	}
@@ -126,12 +126,12 @@ func (gui *GUI) GBGraphics(
 	// Draw image pixels
 	for y := 0; y < h; y++ {
 		gridOffsetY := 0
-		if cfg.Show && !cfg.Overlay {
+		if cfg.ShowGrid && !cfg.Overlay {
 			gridOffsetY = (y / blockSize) * gridT
 		}
 		for x := 0; x < w; x++ {
 			gridOffsetX := 0
-			if cfg.Show && !cfg.Overlay {
+			if cfg.ShowGrid && !cfg.Overlay {
 				gridOffsetX = (x / blockSize) * gridT
 			}
 			i := y*w + x
@@ -154,7 +154,7 @@ func (gui *GUI) GBGraphics(
 		}
 	}
 
-	if cfg.Show {
+	if cfg.ShowGrid {
 		// Vertical dashed grid lines
 		for gx := 1; gx <= gridCols; gx++ {
 			baseX := gx * blockSize * scale

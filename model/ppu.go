@@ -152,7 +152,6 @@ func (ppu *PPU) SetSCX(v Data8) {
 
 func (ppu *PPU) SetWY(v Data8) {
 	ppu.RegWY = v
-	fmt.Printf("SetWY %s\n", v.Dec())
 }
 
 func (ppu *PPU) SetWX(v Data8) {
@@ -161,7 +160,6 @@ func (ppu *PPU) SetWX(v Data8) {
 
 func (ppu *PPU) SetLY(v Data8) {
 	ppu.RegLY = v
-	panic("not implemented: SetLY")
 }
 
 func (ppu *PPU) SetLYC(v Data8) {
@@ -427,9 +425,6 @@ func (ppu *PPU) Read(addr Addr) Data8 {
 	case AddrSCX:
 		return ppu.RegSCX
 	case AddrLY:
-		if ppu.Config.Debug.GBD.Enable {
-			return 0x90
-		}
 		return ppu.RegLY
 	case AddrLYC:
 		return ppu.RegLYC

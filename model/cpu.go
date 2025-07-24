@@ -1,7 +1,5 @@
 package model
 
-import "fmt"
-
 type CPU struct {
 	Config *Config
 	PHI    *Clock
@@ -22,9 +20,7 @@ type CPU struct {
 
 	handlers [256]InstructionHandling
 
-	rewindBuffer     []ExecLogEntry
-	rewindBufferIdx  int
-	rewindBufferFull bool
+	rewind *Rewind
 
 	nopCount int
 
@@ -57,8 +53,7 @@ func (cpu *CPU) Reset() {
 	cpu.clockCycle = Cycle{}
 	cpu.Bus.Reset()
 	cpu.wroteToAddressBusThisCycle = false
-	clear(cpu.rewindBuffer)
-	cpu.rewindBufferIdx = 0
+	cpu.rewind.Reset()
 	cpu.nopCount = 0
 
 	if cpu.Config.BootROM.Skip {
@@ -154,12 +149,12 @@ func NewCPU(
 	debug *Debug,
 ) *CPU {
 	cpu := &CPU{
-		Config:       config,
-		PHI:          phi,
-		Bus:          bus,
-		Debug:        debug,
-		Interrupts:   interrupts,
-		rewindBuffer: make([]ExecLogEntry, 8192),
+		Config:     config,
+		PHI:        phi,
+		Bus:        bus,
+		Debug:      debug,
+		Interrupts: interrupts,
+		rewind:     NewRewind(8192),
 	}
 	cpu.handlers = handlers(cpu)
 	phi.AttachDevice(cpu.fsm)
@@ -207,43 +202,6 @@ func (cpu *CPU) fsm(c Cycle) {
 	} else if c.Falling {
 		cpu.machineCycle++
 	}
-
-	if cpu.Config.Debug.GBD.Enable && !c.Falling && fetch && cpu.machineCycle == 1 {
-		cpu.doGBDLog()
-	}
-}
-
-func (cpu *CPU) doGBDLog() {
-	end := cpu.Bus.BeginCoreDump()
-	defer end()
-
-	pc := cpu.Regs.PC - 1
-
-	origAddr := cpu.Bus.GetAddress()
-	var pcmem [4]Data8
-	for i := range Addr(4) {
-		cpu.writeAddressBus(pc + i)
-		pcmem[i] = cpu.Bus.GetData()
-	}
-	cpu.writeAddressBus(origAddr)
-
-	cpu.Config.Debug.GBD.GBDLog(fmt.Sprintf(
-		"A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
-		uint(cpu.Regs.A),
-		uint(cpu.Regs.F),
-		uint(cpu.Regs.B),
-		uint(cpu.Regs.C),
-		uint(cpu.Regs.D),
-		uint(cpu.Regs.E),
-		uint(cpu.Regs.H),
-		uint(cpu.Regs.L),
-		uint(cpu.Regs.SP),
-		uint(pc),
-		uint(pcmem[0]),
-		uint(pcmem[1]),
-		uint(pcmem[2]),
-		uint(pcmem[3]),
-	))
 }
 
 func (cpu *CPU) detectRunawayCode() {
@@ -290,21 +248,10 @@ func (cpu *CPU) instructionFetch() {
 	pop()
 
 	// Update rewind buffer
-	prevIdx := cpu.rewindBufferIdx
-	if prevIdx > 0 {
-		prevIdx--
-	} else {
-		prevIdx = len(cpu.rewindBuffer) - 1
-	}
-	cpu.rewindBuffer[prevIdx].BranchResult = cpu.lastBranchResult
-	cpu.rewindBuffer[cpu.rewindBufferIdx] = ExecLogEntry{Instruction: di}
-
+	cpu.rewind.Curr().BranchResult = cpu.lastBranchResult
 	cpu.lastBranchResult = 0
-	cpu.rewindBufferIdx++
-	if cpu.rewindBufferIdx >= len(cpu.rewindBuffer) {
-		cpu.rewindBufferIdx = 0
-		cpu.rewindBufferFull = true
-	}
+	entry := cpu.rewind.Push()
+	entry.Instruction = di
 
 	// Set PC
 	cpu.Debug.SetPC(cpu.Regs.PC - 1)

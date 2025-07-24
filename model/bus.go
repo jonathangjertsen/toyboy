@@ -67,7 +67,7 @@ func (b *Bus) BeginCoreDump() func() {
 	b.OAM.CountdownDisable = true
 	b.PPU.MemoryRegion.CountdownDisable = true
 	b.Prohibited.FEA0toFEFF.CountdownDisable = true
-	b.Cartridge.Bank0.CountdownDisable = true
+	b.Cartridge.CurrROMBank0.CountdownDisable = true
 	b.Timer.Mem.CountdownDisable = true
 	return func() {
 		b.inCoreDump = false
@@ -80,7 +80,7 @@ func (b *Bus) BeginCoreDump() func() {
 		b.OAM.CountdownDisable = false
 		b.PPU.MemoryRegion.CountdownDisable = false
 		b.Prohibited.FEA0toFEFF.CountdownDisable = false
-		b.Cartridge.Bank0.CountdownDisable = false
+		b.Cartridge.CurrROMBank0.CountdownDisable = false
 		b.Timer.Mem.CountdownDisable = false
 	}
 }
@@ -122,6 +122,9 @@ func (b *Bus) WriteAddress(addr Addr) {
 		b.Data = b.PPU.Read(addr)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
 		b.Data = b.Prohibited.Read(addr)
+	} else if (addr >= 0xff4c && addr <= 0xff4f) || (addr >= 0xff51 && addr <= 0xff70) {
+		// GBC stuff
+		b.Data = 0
 	} else if addr >= 0xff71 && addr <= 0xff7f {
 		b.Data = b.Prohibited.Read(addr)
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
@@ -136,7 +139,7 @@ func (b *Bus) WriteAddress(addr Addr) {
 		b.Data = b.Serial.Read(addr)
 	} else {
 		if !b.inCoreDump {
-			panicf("Read from unmapped address %s", addr.Hex())
+			//panicf("Read from unmapped address %s", addr.Hex())
 		}
 	}
 }
@@ -147,9 +150,9 @@ func (b *Bus) WriteData(v Data8) {
 	if addr <= AddrBootROMEnd {
 		if !b.inCoreDump {
 			if b.BootROMLock.BootOff {
-				panicf("Attempted write to cartridge (addr=%s v=%s)", addr.Hex(), v.Hex())
+				//panicf("Attempted write to cartridge (addr=%s v=%s)", addr.Hex(), v.Hex())
 			} else {
-				panicf("Attempted write to bootrom (addr=%s v=%s)", addr.Hex(), v.Hex())
+				//panicf("Attempted write to bootrom (addr=%s v=%s)", addr.Hex(), v.Hex())
 			}
 		}
 	} else if addr <= AddrCartridgeBankNEnd {
@@ -176,13 +179,15 @@ func (b *Bus) WriteData(v Data8) {
 		b.Prohibited.Write(addr, v)
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
 		b.Timer.Write(addr, v)
+	} else if (addr >= 0xff4c && addr <= 0xff4f) || (addr >= 0xff51 && addr <= 0xff70) {
+		// GBC stuff
 	} else if addr >= 0xff71 && addr <= 0xff7f {
 		b.Prohibited.Write(addr, v)
 	} else if addr == AddrSB || addr == AddrSC {
 		b.Serial.Write(addr, v)
 	} else {
 		if !b.inCoreDump {
-			panicf("write to unmapped address %s", addr.Hex())
+			//panicf("write to unmapped address %s", addr.Hex())
 		}
 	}
 }
@@ -214,6 +219,9 @@ func (b *Bus) GetCounters(addr Addr) (uint64, uint64) {
 		return b.Prohibited.GetCounters(addr)
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
 		return b.Timer.GetCounters(addr)
+	} else if (addr >= 0xff4c && addr <= 0xff4f) || (addr >= 0xff51 && addr <= 0xff70) {
+		// GBC stuff
+		return 0, 0
 	} else if addr >= 0xff71 && addr <= 0xff7f {
 		return b.Prohibited.GetCounters(addr)
 	} else if addr == AddrIF || addr == AddrIE {
@@ -222,7 +230,7 @@ func (b *Bus) GetCounters(addr Addr) (uint64, uint64) {
 		return b.Serial.GetCounters(addr)
 	}
 	if !b.inCoreDump {
-		panicf("GetCounters for unmapped address %s", addr.Hex())
+		//panicf("GetCounters for unmapped address %s", addr.Hex())
 	}
 	return 0, 0
 }

@@ -13,7 +13,7 @@ func main() {
 	}
 	dis := model.NewDisassembler(&model.DefaultConfig.Debug.Disassembler)
 	dis.SetProgram(bytes)
-	dis.ExploreFrom(0x0100)
+	dis.ExploreFrom(model.AddrCartridgeEntryPoint)
 	out := dis.Disassembly()
 	out.Print(os.Stdout)
 }

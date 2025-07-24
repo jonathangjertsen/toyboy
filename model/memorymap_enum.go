@@ -12,145 +12,179 @@ import (
 )
 
 const (
-	AddrZero              Addr = iota
-	AddrBootROMEnd        Addr = iota + 254
-	AddrCartridgeBank0End Addr = iota + 16381
-	AddrCartridgeBankNBegin
-	AddrCartridgeBankNEnd Addr = iota + 32763
-	AddrTileDataBegin
-	AddrTileDataEnd Addr = iota + 38905
-	AddrTileMap0Begin
-	AddrTileMap0End Addr = iota + 39927
-	AddrTileMap1Begin
-	AddrTileMap1End Addr = iota + 40949
-	AddrRAMBegin
-	AddrRAMEnd Addr = iota + 49139
-	AddrWRAMBegin
-	AddrWRAMEnd Addr = iota + 57329
-	AddrEchoRAMBegin
-	AddrEchoRAMEnd Addr = iota + 65007
-	AddrOAMBegin
-	AddrOAMEnd Addr = iota + 65165
-	AddrProhibitedBegin
-	AddrProhibitedEnd Addr = iota + 65259
-	AddrP1
-	AddrSB
-	AddrSC
-	AddrDIV Addr = iota + 65260
-	AddrTIMA
-	AddrTMA
-	AddrTAC
-	AddrIF   Addr = iota + 65267
-	AddrLCDC Addr = iota + 65315
-	AddrSTAT
-	AddrSCY
-	AddrSCX
-	AddrLY
-	AddrLYC
-	AddrDMA
-	AddrBGP
-	AddrOBP0
-	AddrOBP1
-	AddrWY
-	AddrWX
-	AddrNR10 Addr = iota + 65255
-	AddrNR11
-	AddrNR12
-	AddrNR13
-	AddrNR14
-	AddrNR21 Addr = iota + 65256
-	AddrNR22
-	AddrNR23
-	AddrNR24
-	AddrNR30
-	AddrNR31
-	AddrNR32
-	AddrNR33
-	AddrNR34
-	AddrNR41 Addr = iota + 65257
-	AddrNR42
-	AddrNR43
-	AddrNR44
-	AddrNR50
-	AddrNR51
-	AddrNR52
-	AddrBootROMLock Addr = iota + 65298
-	AddrHRAMBegin   Addr = iota + 65345
-	AddrHRAMEnd     Addr = iota + 65470
-	AddrIE
+	AddrZero                 Addr = 0
+	AddrBootROMEnd           Addr = 255
+	AddrCartridgeEntryPoint  Addr = 256
+	AddrNintendoLogoBegin    Addr = 260
+	AddrNintendoLogoEnd      Addr = 307
+	AddrTitleBegin           Addr = 308
+	AddrTitleEnd             Addr = 323
+	AddrNewLicenseeCodeBegin Addr = 324
+	AddrNewLicenseeCodeEnd   Addr = 325
+	AddrSGBFlag              Addr = 326
+	AddrCartridgeType        Addr = 327
+	AddrROMSize              Addr = 328
+	AddrRAMSize              Addr = 329
+	AddrDestCode             Addr = 330
+	AddrOldLicenseeCode      Addr = 331
+	AddrMaskROMVersionNo     Addr = 332
+	AddrHeaderChecksum       Addr = 333
+	AddrGlobalChecksumBegin  Addr = 334
+	AddrGlobalChecksumEnd    Addr = 335
+	AddrCartridgeBank0End    Addr = 16383
+	AddrCartridgeBankNBegin  Addr = 16384
+	AddrCartridgeBankNEnd    Addr = 32767
+	AddrTileDataBegin        Addr = 32768
+	AddrTileDataEnd          Addr = 38911
+	AddrTileMap0Begin        Addr = 38912
+	AddrTileMap0End          Addr = 39935
+	AddrTileMap1Begin        Addr = 39936
+	AddrTileMap1End          Addr = 40959
+	AddrCartridgeRAMBegin    Addr = 40960
+	AddrCartridgeRAMEnd      Addr = 49151
+	AddrWRAMBegin            Addr = 49152
+	AddrWRAMEnd              Addr = 57343
+	AddrEchoRAMBegin         Addr = 57344
+	AddrEchoRAMEnd           Addr = 65023
+	AddrOAMBegin             Addr = 65024
+	AddrOAMEnd               Addr = 65183
+	AddrProhibitedBegin      Addr = 65184
+	AddrProhibitedEnd        Addr = 65279
+	AddrP1                   Addr = 65280
+	AddrSB                   Addr = 65281
+	AddrSC                   Addr = 65282
+	AddrDIV                  Addr = 65284
+	AddrTIMA                 Addr = 65285
+	AddrTMA                  Addr = 65286
+	AddrTAC                  Addr = 65287
+	AddrIF                   Addr = 65295
+	AddrLCDC                 Addr = 65344
+	AddrSTAT                 Addr = 65345
+	AddrSCY                  Addr = 65346
+	AddrSCX                  Addr = 65347
+	AddrLY                   Addr = 65348
+	AddrLYC                  Addr = 65349
+	AddrDMA                  Addr = 65350
+	AddrBGP                  Addr = 65351
+	AddrOBP0                 Addr = 65352
+	AddrOBP1                 Addr = 65353
+	AddrWY                   Addr = 65354
+	AddrWX                   Addr = 65355
+	AddrNR10                 Addr = 65296
+	AddrNR11                 Addr = 65297
+	AddrNR12                 Addr = 65298
+	AddrNR13                 Addr = 65299
+	AddrNR14                 Addr = 65300
+	AddrNR21                 Addr = 65302
+	AddrNR22                 Addr = 65303
+	AddrNR23                 Addr = 65304
+	AddrNR24                 Addr = 65305
+	AddrNR30                 Addr = 65306
+	AddrNR31                 Addr = 65307
+	AddrNR32                 Addr = 65308
+	AddrNR33                 Addr = 65309
+	AddrNR34                 Addr = 65310
+	AddrNR41                 Addr = 65312
+	AddrNR42                 Addr = 65313
+	AddrNR43                 Addr = 65314
+	AddrNR44                 Addr = 65315
+	AddrNR50                 Addr = 65316
+	AddrNR51                 Addr = 65317
+	AddrNR52                 Addr = 65318
+	AddrBootROMLock          Addr = 65360
+	AddrHRAMBegin            Addr = 65408
+	AddrHRAMEnd              Addr = 65534
+	AddrIE                   Addr = 65535
 )
 
 var ErrInvalidAddr = errors.New("not a valid Addr")
 
-const _AddrName = "ZeroBootROMEndCartridgeBank0EndCartridgeBankNBeginCartridgeBankNEndTileDataBeginTileDataEndTileMap0BeginTileMap0EndTileMap1BeginTileMap1EndRAMBeginRAMEndWRAMBeginWRAMEndEchoRAMBeginEchoRAMEndOAMBeginOAMEndProhibitedBeginProhibitedEndP1SBSCDIVTIMATMATACIFLCDCSTATSCYSCXLYLYCDMABGPOBP0OBP1WYWXNR10NR11NR12NR13NR14NR21NR22NR23NR24NR30NR31NR32NR33NR34NR41NR42NR43NR44NR50NR51NR52BootROMLockHRAMBeginHRAMEndIE"
+const _AddrName = "ZeroBootROMEndCartridgeEntryPointNintendoLogoBeginNintendoLogoEndTitleBeginTitleEndNewLicenseeCodeBeginNewLicenseeCodeEndSGBFlagCartridgeTypeROMSizeRAMSizeDestCodeOldLicenseeCodeMaskROMVersionNoHeaderChecksumGlobalChecksumBeginGlobalChecksumEndCartridgeBank0EndCartridgeBankNBeginCartridgeBankNEndTileDataBeginTileDataEndTileMap0BeginTileMap0EndTileMap1BeginTileMap1EndCartridgeRAMBeginCartridgeRAMEndWRAMBeginWRAMEndEchoRAMBeginEchoRAMEndOAMBeginOAMEndProhibitedBeginProhibitedEndP1SBSCDIVTIMATMATACIFLCDCSTATSCYSCXLYLYCDMABGPOBP0OBP1WYWXNR10NR11NR12NR13NR14NR21NR22NR23NR24NR30NR31NR32NR33NR34NR41NR42NR43NR44NR50NR51NR52BootROMLockHRAMBeginHRAMEndIE"
 
 var _AddrMap = map[Addr]string{
-	AddrZero:                _AddrName[0:4],
-	AddrBootROMEnd:          _AddrName[4:14],
-	AddrCartridgeBank0End:   _AddrName[14:31],
-	AddrCartridgeBankNBegin: _AddrName[31:50],
-	AddrCartridgeBankNEnd:   _AddrName[50:67],
-	AddrTileDataBegin:       _AddrName[67:80],
-	AddrTileDataEnd:         _AddrName[80:91],
-	AddrTileMap0Begin:       _AddrName[91:104],
-	AddrTileMap0End:         _AddrName[104:115],
-	AddrTileMap1Begin:       _AddrName[115:128],
-	AddrTileMap1End:         _AddrName[128:139],
-	AddrRAMBegin:            _AddrName[139:147],
-	AddrRAMEnd:              _AddrName[147:153],
-	AddrWRAMBegin:           _AddrName[153:162],
-	AddrWRAMEnd:             _AddrName[162:169],
-	AddrEchoRAMBegin:        _AddrName[169:181],
-	AddrEchoRAMEnd:          _AddrName[181:191],
-	AddrOAMBegin:            _AddrName[191:199],
-	AddrOAMEnd:              _AddrName[199:205],
-	AddrProhibitedBegin:     _AddrName[205:220],
-	AddrProhibitedEnd:       _AddrName[220:233],
-	AddrP1:                  _AddrName[233:235],
-	AddrSB:                  _AddrName[235:237],
-	AddrSC:                  _AddrName[237:239],
-	AddrDIV:                 _AddrName[239:242],
-	AddrTIMA:                _AddrName[242:246],
-	AddrTMA:                 _AddrName[246:249],
-	AddrTAC:                 _AddrName[249:252],
-	AddrIF:                  _AddrName[252:254],
-	AddrLCDC:                _AddrName[254:258],
-	AddrSTAT:                _AddrName[258:262],
-	AddrSCY:                 _AddrName[262:265],
-	AddrSCX:                 _AddrName[265:268],
-	AddrLY:                  _AddrName[268:270],
-	AddrLYC:                 _AddrName[270:273],
-	AddrDMA:                 _AddrName[273:276],
-	AddrBGP:                 _AddrName[276:279],
-	AddrOBP0:                _AddrName[279:283],
-	AddrOBP1:                _AddrName[283:287],
-	AddrWY:                  _AddrName[287:289],
-	AddrWX:                  _AddrName[289:291],
-	AddrNR10:                _AddrName[291:295],
-	AddrNR11:                _AddrName[295:299],
-	AddrNR12:                _AddrName[299:303],
-	AddrNR13:                _AddrName[303:307],
-	AddrNR14:                _AddrName[307:311],
-	AddrNR21:                _AddrName[311:315],
-	AddrNR22:                _AddrName[315:319],
-	AddrNR23:                _AddrName[319:323],
-	AddrNR24:                _AddrName[323:327],
-	AddrNR30:                _AddrName[327:331],
-	AddrNR31:                _AddrName[331:335],
-	AddrNR32:                _AddrName[335:339],
-	AddrNR33:                _AddrName[339:343],
-	AddrNR34:                _AddrName[343:347],
-	AddrNR41:                _AddrName[347:351],
-	AddrNR42:                _AddrName[351:355],
-	AddrNR43:                _AddrName[355:359],
-	AddrNR44:                _AddrName[359:363],
-	AddrNR50:                _AddrName[363:367],
-	AddrNR51:                _AddrName[367:371],
-	AddrNR52:                _AddrName[371:375],
-	AddrBootROMLock:         _AddrName[375:386],
-	AddrHRAMBegin:           _AddrName[386:395],
-	AddrHRAMEnd:             _AddrName[395:402],
-	AddrIE:                  _AddrName[402:404],
+	AddrZero:                 _AddrName[0:4],
+	AddrBootROMEnd:           _AddrName[4:14],
+	AddrCartridgeEntryPoint:  _AddrName[14:33],
+	AddrNintendoLogoBegin:    _AddrName[33:50],
+	AddrNintendoLogoEnd:      _AddrName[50:65],
+	AddrTitleBegin:           _AddrName[65:75],
+	AddrTitleEnd:             _AddrName[75:83],
+	AddrNewLicenseeCodeBegin: _AddrName[83:103],
+	AddrNewLicenseeCodeEnd:   _AddrName[103:121],
+	AddrSGBFlag:              _AddrName[121:128],
+	AddrCartridgeType:        _AddrName[128:141],
+	AddrROMSize:              _AddrName[141:148],
+	AddrRAMSize:              _AddrName[148:155],
+	AddrDestCode:             _AddrName[155:163],
+	AddrOldLicenseeCode:      _AddrName[163:178],
+	AddrMaskROMVersionNo:     _AddrName[178:194],
+	AddrHeaderChecksum:       _AddrName[194:208],
+	AddrGlobalChecksumBegin:  _AddrName[208:227],
+	AddrGlobalChecksumEnd:    _AddrName[227:244],
+	AddrCartridgeBank0End:    _AddrName[244:261],
+	AddrCartridgeBankNBegin:  _AddrName[261:280],
+	AddrCartridgeBankNEnd:    _AddrName[280:297],
+	AddrTileDataBegin:        _AddrName[297:310],
+	AddrTileDataEnd:          _AddrName[310:321],
+	AddrTileMap0Begin:        _AddrName[321:334],
+	AddrTileMap0End:          _AddrName[334:345],
+	AddrTileMap1Begin:        _AddrName[345:358],
+	AddrTileMap1End:          _AddrName[358:369],
+	AddrCartridgeRAMBegin:    _AddrName[369:386],
+	AddrCartridgeRAMEnd:      _AddrName[386:401],
+	AddrWRAMBegin:            _AddrName[401:410],
+	AddrWRAMEnd:              _AddrName[410:417],
+	AddrEchoRAMBegin:         _AddrName[417:429],
+	AddrEchoRAMEnd:           _AddrName[429:439],
+	AddrOAMBegin:             _AddrName[439:447],
+	AddrOAMEnd:               _AddrName[447:453],
+	AddrProhibitedBegin:      _AddrName[453:468],
+	AddrProhibitedEnd:        _AddrName[468:481],
+	AddrP1:                   _AddrName[481:483],
+	AddrSB:                   _AddrName[483:485],
+	AddrSC:                   _AddrName[485:487],
+	AddrDIV:                  _AddrName[487:490],
+	AddrTIMA:                 _AddrName[490:494],
+	AddrTMA:                  _AddrName[494:497],
+	AddrTAC:                  _AddrName[497:500],
+	AddrIF:                   _AddrName[500:502],
+	AddrLCDC:                 _AddrName[502:506],
+	AddrSTAT:                 _AddrName[506:510],
+	AddrSCY:                  _AddrName[510:513],
+	AddrSCX:                  _AddrName[513:516],
+	AddrLY:                   _AddrName[516:518],
+	AddrLYC:                  _AddrName[518:521],
+	AddrDMA:                  _AddrName[521:524],
+	AddrBGP:                  _AddrName[524:527],
+	AddrOBP0:                 _AddrName[527:531],
+	AddrOBP1:                 _AddrName[531:535],
+	AddrWY:                   _AddrName[535:537],
+	AddrWX:                   _AddrName[537:539],
+	AddrNR10:                 _AddrName[539:543],
+	AddrNR11:                 _AddrName[543:547],
+	AddrNR12:                 _AddrName[547:551],
+	AddrNR13:                 _AddrName[551:555],
+	AddrNR14:                 _AddrName[555:559],
+	AddrNR21:                 _AddrName[559:563],
+	AddrNR22:                 _AddrName[563:567],
+	AddrNR23:                 _AddrName[567:571],
+	AddrNR24:                 _AddrName[571:575],
+	AddrNR30:                 _AddrName[575:579],
+	AddrNR31:                 _AddrName[579:583],
+	AddrNR32:                 _AddrName[583:587],
+	AddrNR33:                 _AddrName[587:591],
+	AddrNR34:                 _AddrName[591:595],
+	AddrNR41:                 _AddrName[595:599],
+	AddrNR42:                 _AddrName[599:603],
+	AddrNR43:                 _AddrName[603:607],
+	AddrNR44:                 _AddrName[607:611],
+	AddrNR50:                 _AddrName[611:615],
+	AddrNR51:                 _AddrName[615:619],
+	AddrNR52:                 _AddrName[619:623],
+	AddrBootROMLock:          _AddrName[623:634],
+	AddrHRAMBegin:            _AddrName[634:643],
+	AddrHRAMEnd:              _AddrName[643:650],
+	AddrIE:                   _AddrName[650:652],
 }
 
 // String implements the Stringer interface.
@@ -171,70 +205,87 @@ func (x Addr) IsValid() bool {
 var _AddrValue = map[string]Addr{
 	_AddrName[0:4]:     AddrZero,
 	_AddrName[4:14]:    AddrBootROMEnd,
-	_AddrName[14:31]:   AddrCartridgeBank0End,
-	_AddrName[31:50]:   AddrCartridgeBankNBegin,
-	_AddrName[50:67]:   AddrCartridgeBankNEnd,
-	_AddrName[67:80]:   AddrTileDataBegin,
-	_AddrName[80:91]:   AddrTileDataEnd,
-	_AddrName[91:104]:  AddrTileMap0Begin,
-	_AddrName[104:115]: AddrTileMap0End,
-	_AddrName[115:128]: AddrTileMap1Begin,
-	_AddrName[128:139]: AddrTileMap1End,
-	_AddrName[139:147]: AddrRAMBegin,
-	_AddrName[147:153]: AddrRAMEnd,
-	_AddrName[153:162]: AddrWRAMBegin,
-	_AddrName[162:169]: AddrWRAMEnd,
-	_AddrName[169:181]: AddrEchoRAMBegin,
-	_AddrName[181:191]: AddrEchoRAMEnd,
-	_AddrName[191:199]: AddrOAMBegin,
-	_AddrName[199:205]: AddrOAMEnd,
-	_AddrName[205:220]: AddrProhibitedBegin,
-	_AddrName[220:233]: AddrProhibitedEnd,
-	_AddrName[233:235]: AddrP1,
-	_AddrName[235:237]: AddrSB,
-	_AddrName[237:239]: AddrSC,
-	_AddrName[239:242]: AddrDIV,
-	_AddrName[242:246]: AddrTIMA,
-	_AddrName[246:249]: AddrTMA,
-	_AddrName[249:252]: AddrTAC,
-	_AddrName[252:254]: AddrIF,
-	_AddrName[254:258]: AddrLCDC,
-	_AddrName[258:262]: AddrSTAT,
-	_AddrName[262:265]: AddrSCY,
-	_AddrName[265:268]: AddrSCX,
-	_AddrName[268:270]: AddrLY,
-	_AddrName[270:273]: AddrLYC,
-	_AddrName[273:276]: AddrDMA,
-	_AddrName[276:279]: AddrBGP,
-	_AddrName[279:283]: AddrOBP0,
-	_AddrName[283:287]: AddrOBP1,
-	_AddrName[287:289]: AddrWY,
-	_AddrName[289:291]: AddrWX,
-	_AddrName[291:295]: AddrNR10,
-	_AddrName[295:299]: AddrNR11,
-	_AddrName[299:303]: AddrNR12,
-	_AddrName[303:307]: AddrNR13,
-	_AddrName[307:311]: AddrNR14,
-	_AddrName[311:315]: AddrNR21,
-	_AddrName[315:319]: AddrNR22,
-	_AddrName[319:323]: AddrNR23,
-	_AddrName[323:327]: AddrNR24,
-	_AddrName[327:331]: AddrNR30,
-	_AddrName[331:335]: AddrNR31,
-	_AddrName[335:339]: AddrNR32,
-	_AddrName[339:343]: AddrNR33,
-	_AddrName[343:347]: AddrNR34,
-	_AddrName[347:351]: AddrNR41,
-	_AddrName[351:355]: AddrNR42,
-	_AddrName[355:359]: AddrNR43,
-	_AddrName[359:363]: AddrNR44,
-	_AddrName[363:367]: AddrNR50,
-	_AddrName[367:371]: AddrNR51,
-	_AddrName[371:375]: AddrNR52,
-	_AddrName[375:386]: AddrBootROMLock,
-	_AddrName[386:395]: AddrHRAMBegin,
-	_AddrName[395:402]: AddrHRAMEnd,
-	_AddrName[402:404]: AddrIE,
+	_AddrName[14:33]:   AddrCartridgeEntryPoint,
+	_AddrName[33:50]:   AddrNintendoLogoBegin,
+	_AddrName[50:65]:   AddrNintendoLogoEnd,
+	_AddrName[65:75]:   AddrTitleBegin,
+	_AddrName[75:83]:   AddrTitleEnd,
+	_AddrName[83:103]:  AddrNewLicenseeCodeBegin,
+	_AddrName[103:121]: AddrNewLicenseeCodeEnd,
+	_AddrName[121:128]: AddrSGBFlag,
+	_AddrName[128:141]: AddrCartridgeType,
+	_AddrName[141:148]: AddrROMSize,
+	_AddrName[148:155]: AddrRAMSize,
+	_AddrName[155:163]: AddrDestCode,
+	_AddrName[163:178]: AddrOldLicenseeCode,
+	_AddrName[178:194]: AddrMaskROMVersionNo,
+	_AddrName[194:208]: AddrHeaderChecksum,
+	_AddrName[208:227]: AddrGlobalChecksumBegin,
+	_AddrName[227:244]: AddrGlobalChecksumEnd,
+	_AddrName[244:261]: AddrCartridgeBank0End,
+	_AddrName[261:280]: AddrCartridgeBankNBegin,
+	_AddrName[280:297]: AddrCartridgeBankNEnd,
+	_AddrName[297:310]: AddrTileDataBegin,
+	_AddrName[310:321]: AddrTileDataEnd,
+	_AddrName[321:334]: AddrTileMap0Begin,
+	_AddrName[334:345]: AddrTileMap0End,
+	_AddrName[345:358]: AddrTileMap1Begin,
+	_AddrName[358:369]: AddrTileMap1End,
+	_AddrName[369:386]: AddrCartridgeRAMBegin,
+	_AddrName[386:401]: AddrCartridgeRAMEnd,
+	_AddrName[401:410]: AddrWRAMBegin,
+	_AddrName[410:417]: AddrWRAMEnd,
+	_AddrName[417:429]: AddrEchoRAMBegin,
+	_AddrName[429:439]: AddrEchoRAMEnd,
+	_AddrName[439:447]: AddrOAMBegin,
+	_AddrName[447:453]: AddrOAMEnd,
+	_AddrName[453:468]: AddrProhibitedBegin,
+	_AddrName[468:481]: AddrProhibitedEnd,
+	_AddrName[481:483]: AddrP1,
+	_AddrName[483:485]: AddrSB,
+	_AddrName[485:487]: AddrSC,
+	_AddrName[487:490]: AddrDIV,
+	_AddrName[490:494]: AddrTIMA,
+	_AddrName[494:497]: AddrTMA,
+	_AddrName[497:500]: AddrTAC,
+	_AddrName[500:502]: AddrIF,
+	_AddrName[502:506]: AddrLCDC,
+	_AddrName[506:510]: AddrSTAT,
+	_AddrName[510:513]: AddrSCY,
+	_AddrName[513:516]: AddrSCX,
+	_AddrName[516:518]: AddrLY,
+	_AddrName[518:521]: AddrLYC,
+	_AddrName[521:524]: AddrDMA,
+	_AddrName[524:527]: AddrBGP,
+	_AddrName[527:531]: AddrOBP0,
+	_AddrName[531:535]: AddrOBP1,
+	_AddrName[535:537]: AddrWY,
+	_AddrName[537:539]: AddrWX,
+	_AddrName[539:543]: AddrNR10,
+	_AddrName[543:547]: AddrNR11,
+	_AddrName[547:551]: AddrNR12,
+	_AddrName[551:555]: AddrNR13,
+	_AddrName[555:559]: AddrNR14,
+	_AddrName[559:563]: AddrNR21,
+	_AddrName[563:567]: AddrNR22,
+	_AddrName[567:571]: AddrNR23,
+	_AddrName[571:575]: AddrNR24,
+	_AddrName[575:579]: AddrNR30,
+	_AddrName[579:583]: AddrNR31,
+	_AddrName[583:587]: AddrNR32,
+	_AddrName[587:591]: AddrNR33,
+	_AddrName[591:595]: AddrNR34,
+	_AddrName[595:599]: AddrNR41,
+	_AddrName[599:603]: AddrNR42,
+	_AddrName[603:607]: AddrNR43,
+	_AddrName[607:611]: AddrNR44,
+	_AddrName[611:615]: AddrNR50,
+	_AddrName[615:619]: AddrNR51,
+	_AddrName[619:623]: AddrNR52,
+	_AddrName[623:634]: AddrBootROMLock,
+	_AddrName[634:643]: AddrHRAMBegin,
+	_AddrName[643:650]: AddrHRAMEnd,
+	_AddrName[650:652]: AddrIE,
 }
 
 // ParseAddr attempts to convert a string to a Addr.

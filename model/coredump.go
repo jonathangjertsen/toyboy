@@ -7,20 +7,18 @@ import (
 )
 
 type CoreDump struct {
-	Cycle            Cycle
-	Regs             RegisterFile
-	ProgramStart     Addr
-	ProgramEnd       Addr
-	Program          MemDump
-	HRAM             MemDump
-	OAM              MemDump
-	VRAM             MemDump
-	APU              MemDump
-	PPU              PPUDump
-	RewindBuffer     []ExecLogEntry
-	RewindBufferIdx  int
-	RewindBufferFull bool
-	Disassembly      *Disassembly
+	Cycle        Cycle
+	Regs         RegisterFile
+	ProgramStart Addr
+	ProgramEnd   Addr
+	Program      MemDump
+	HRAM         MemDump
+	OAM          MemDump
+	VRAM         MemDump
+	APU          MemDump
+	PPU          PPUDump
+	Rewind       *Rewind
+	Disassembly  *Disassembly
 }
 
 type PPUDump struct {
@@ -247,9 +245,7 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	cd.PPU.BackgroundFetcher = ppu.BackgroundFetcher
 	cd.PPU.SpriteFetcher = ppu.SpriteFetcher
 	cd.PPU.OAMBuffer = ppu.OAMBuffer
-	cd.RewindBuffer = cpu.rewindBuffer
-	cd.RewindBufferIdx = cpu.rewindBufferIdx
-	cd.RewindBufferFull = cpu.rewindBufferFull
+	cd.Rewind = cpu.rewind
 	return cd
 }
 
@@ -295,12 +291,8 @@ func (cpu *CPU) Dump() {
 }
 
 func (cd *CoreDump) PrintRewindBuffer(f io.Writer) {
-	var start int
-	if cd.RewindBufferFull {
-		start = (cd.RewindBufferIdx + 1) % len(cd.RewindBuffer)
-	}
-	for i := start; i != cd.RewindBufferIdx; i = (i + 1) % len(cd.RewindBuffer) {
-		entry := cd.RewindBuffer[i]
+	for i := cd.Rewind.Start(); i != cd.Rewind.End(); i = cd.Rewind.Next(i) {
+		entry := cd.Rewind.At(i)
 		extra := ""
 		if entry.BranchResult == +1 {
 			extra = "(taken)"

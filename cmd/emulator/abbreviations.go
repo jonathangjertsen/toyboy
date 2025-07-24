@@ -9,6 +9,7 @@ type C = layout.Context
 type D = layout.Dimensions
 type F = layout.Flex
 type FC = layout.FlexChild
+type W = layout.Widget
 
 var R = layout.Rigid
 
