@@ -1,28 +1,26 @@
 package plugin
 
 import (
-	"sync/atomic"
 	"time"
 )
 
 type ClockMeasurement struct {
-	counter atomic.Uint64
-	t0      time.Time
+	initCount uint64
+	counter   *uint64
+	t0        time.Time
 }
 
-func NewClockMeasurement() *ClockMeasurement {
-	return &ClockMeasurement{}
+func NewClockMeasurement(counter *uint64) *ClockMeasurement {
+	return &ClockMeasurement{
+		counter: counter,
+	}
 }
 
 func (cm *ClockMeasurement) Start() {
-	cm.counter.Store(0)
+	cm.initCount = *cm.counter
 	cm.t0 = time.Now()
 }
 
 func (cm *ClockMeasurement) Stop() (uint64, time.Duration) {
-	return cm.counter.Load(), time.Since(cm.t0)
-}
-
-func (cm *ClockMeasurement) Clocked() {
-	cm.counter.Add(1)
+	return *cm.counter - cm.initCount, time.Since(cm.t0)
 }

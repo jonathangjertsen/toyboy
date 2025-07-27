@@ -14,30 +14,8 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-type GridConfig struct {
-	ShowGrid      bool
-	Overlay       bool
-	BlockSize     int
-	GridColor     color.RGBA // RGBA grid line color
-	FillColor     color.RGBA // RGBA fill/background
-	DashLen       int
-	GridThickness int
-
-	ShowAddress    bool
-	AddressFont    font.Face
-	StartAddress   model.Addr
-	BlockIncrement model.Addr
-	LineIncrement  model.Addr
-	DecimalAddress bool
-
-	ShowOffsets bool
-}
-
-func (gc GridConfig) WithMem(startAddr model.Addr, blockIncrement model.Addr) GridConfig {
-	gc.StartAddress = startAddr
-	gc.BlockIncrement = blockIncrement
-	gc.ShowAddress = true
-	return gc
+var fonts = map[string]font.Face{
+	"Basic": basicfont.Face7x13,
 }
 
 type Highlight struct {
@@ -49,16 +27,10 @@ type Highlight struct {
 	Font      font.Face
 }
 
-var DefaultGridConfig = GridConfig{
+var DefaultGridConfig = ConfigGraphics{
 	ShowGrid:       true,
-	Overlay:        false,
 	BlockSize:      8,
-	GridColor:      color.RGBA{R: 136, G: 136, B: 136, A: 255},
-	FillColor:      color.RGBA{R: 240, G: 240, B: 240, A: 255},
-	DashLen:        4,
-	GridThickness:  1,
 	ShowAddress:    false,
-	AddressFont:    basicfont.Face7x13,
 	StartAddress:   0x8000,
 	BlockIncrement: 16,
 }
@@ -78,14 +50,13 @@ func (gui *GUI) GBGraphics(
 	gtx C,
 	w, h int,
 	fb []model.Color,
-	scale int,
-	cfg GridConfig,
+	cfg ConfigGraphics,
 	highlights []Highlight,
 ) D {
 	blockSize := cfg.BlockSize
 	gridCols := (w / blockSize) - 1
 	gridRows := (h / blockSize) - 1
-	gridT := cfg.GridThickness
+	gridT := gui.Config.GUI.Graphics.GridThickness
 
 	// Prepare a fast lookup for highlights
 	highlightMap := make(map[[2]int]color.RGBA)
@@ -95,43 +66,47 @@ func (gui *GUI) GBGraphics(
 
 	gridSpacingX := 0
 	gridSpacingY := 0
-	if cfg.ShowGrid && !cfg.Overlay {
+	if cfg.ShowGrid && !gui.Config.GUI.Graphics.Overlay {
 		gridSpacingX = gridCols * gridT
 		gridSpacingY = gridRows * gridT
 	}
 
 	// Compute width for text labels
+	face, ok := fonts[gui.Config.GUI.Graphics.Font]
+	if !ok {
+		face = basicfont.Face7x13
+	}
 	labelWidth := 0
 	if cfg.ShowAddress {
-		labelWidth = (font.MeasureString(cfg.AddressFont, "ffffh ") + fixed.I(1)/2).Round()
+		labelWidth = (font.MeasureString(face, "ffffh ") + fixed.I(1)/2).Round()
 	}
 	labelHeight := 0
 	if cfg.ShowOffsets {
-		labelHeight = cfg.AddressFont.Metrics().Height.Ceil() + 2
+		labelHeight = face.Metrics().Height.Ceil() + 2
 	}
 
 	// Adjust final image size to fit address labels
-	sw := w*scale + gridSpacingX + labelWidth
-	sh := h*scale + gridSpacingY + labelHeight
+	sw := w*cfg.Scale + gridSpacingX + labelWidth
+	sh := h*cfg.Scale + gridSpacingY + labelHeight
 	dr := image.Rect(0, 0, sw, sh)
 	img := image.NewRGBA(dr)
 
 	// Fill background
 	for y := 0; y < sh; y++ {
 		for x := 0; x < sw; x++ {
-			img.SetRGBA(x+labelWidth, y+labelHeight, cfg.FillColor)
+			img.SetRGBA(x+labelWidth, y+labelHeight, gui.Config.GUI.Graphics.FillColor)
 		}
 	}
 
 	// Draw image pixels
 	for y := 0; y < h; y++ {
 		gridOffsetY := 0
-		if cfg.ShowGrid && !cfg.Overlay {
+		if cfg.ShowGrid && !gui.Config.GUI.Graphics.Overlay {
 			gridOffsetY = (y / blockSize) * gridT
 		}
 		for x := 0; x < w; x++ {
 			gridOffsetX := 0
-			if cfg.ShowGrid && !cfg.Overlay {
+			if cfg.ShowGrid && !gui.Config.GUI.Graphics.Overlay {
 				gridOffsetX = (x / blockSize) * gridT
 			}
 			i := y*w + x
@@ -143,11 +118,11 @@ func (gui *GUI) GBGraphics(
 				col = blendRGBA(col, hlCol)
 			}
 
-			dstX := x*scale + gridOffsetX
-			dstY := y*scale + gridOffsetY
+			dstX := x*cfg.Scale + gridOffsetX
+			dstY := y*cfg.Scale + gridOffsetY
 
-			for dy := 0; dy < scale; dy++ {
-				for dx := 0; dx < scale; dx++ {
+			for dy := 0; dy < cfg.Scale; dy++ {
+				for dx := 0; dx < cfg.Scale; dx++ {
 					img.SetRGBA(dstX+dx+labelWidth, dstY+dy+labelHeight, col)
 				}
 			}
@@ -157,8 +132,8 @@ func (gui *GUI) GBGraphics(
 	if cfg.ShowGrid {
 		// Vertical dashed grid lines
 		for gx := 1; gx <= gridCols; gx++ {
-			baseX := gx * blockSize * scale
-			if !cfg.Overlay {
+			baseX := gx * blockSize * cfg.Scale
+			if !gui.Config.GUI.Graphics.Overlay {
 				baseX += (gx - 1) * gridT
 			}
 			for t := 0; t < gridT; t++ {
@@ -167,9 +142,9 @@ func (gui *GUI) GBGraphics(
 					continue
 				}
 				for y := 0; y < sh; y++ {
-					useDash := ((y / scale) % cfg.DashLen) < (cfg.DashLen / 2)
+					useDash := ((y / cfg.Scale) % gui.Config.GUI.Graphics.DashLen) < (gui.Config.GUI.Graphics.DashLen / 2)
 					if useDash {
-						img.SetRGBA(x+labelWidth, y+labelHeight, cfg.GridColor)
+						img.SetRGBA(x+labelWidth, y+labelHeight, gui.Config.GUI.Graphics.GridColor)
 					}
 				}
 			}
@@ -177,8 +152,8 @@ func (gui *GUI) GBGraphics(
 
 		// Horizontal dashed grid lines
 		for gy := 1; gy <= gridRows; gy++ {
-			baseY := gy * blockSize * scale
-			if !cfg.Overlay {
+			baseY := gy * blockSize * cfg.Scale
+			if !gui.Config.GUI.Graphics.Overlay {
 				baseY += (gy - 1) * gridT
 			}
 			for t := 0; t < gridT; t++ {
@@ -187,9 +162,9 @@ func (gui *GUI) GBGraphics(
 					continue
 				}
 				for x := 0; x < sw; x++ {
-					useDash := ((x / scale) % cfg.DashLen) < (cfg.DashLen / 2)
+					useDash := ((x / cfg.Scale) % gui.Config.GUI.Graphics.DashLen) < (gui.Config.GUI.Graphics.DashLen / 2)
 					if useDash {
-						img.SetRGBA(x+labelWidth, y+labelHeight, cfg.GridColor)
+						img.SetRGBA(x+labelWidth, y+labelHeight, gui.Config.GUI.Graphics.GridColor)
 					}
 				}
 			}
@@ -199,15 +174,15 @@ func (gui *GUI) GBGraphics(
 		drawer := &font.Drawer{
 			Dst:  img,
 			Src:  image.NewUniform(color.Black),
-			Face: cfg.AddressFont,
+			Face: face,
 		}
-		fontHeight := cfg.AddressFont.Metrics().Height.Ceil()
+		fontHeight := face.Metrics().Height.Ceil()
 		margin := 4
 		lastY := -9999 // ensure first label is always drawn
 
 		address := cfg.StartAddress
 		for row := 0; row < h/blockSize; row++ {
-			yPix := row*blockSize*scale + row*gridT + fontHeight
+			yPix := row*blockSize*cfg.Scale + row*gridT + fontHeight
 
 			// Avoid overlap with previous label
 			if yPix-lastY >= fontHeight+margin {
@@ -235,11 +210,11 @@ func (gui *GUI) GBGraphics(
 		drawer := &font.Drawer{
 			Dst:  img,
 			Src:  image.NewUniform(color.Black),
-			Face: cfg.AddressFont,
+			Face: face,
 		}
-		fontWidth := font.MeasureString(cfg.AddressFont, "00h").Ceil()
+		fontWidth := font.MeasureString(face, "00h").Ceil()
 		for col := 0; col < w/blockSize; col++ {
-			xPix := col*blockSize*scale + col*gridT + labelWidth
+			xPix := col*blockSize*cfg.Scale + col*gridT + labelWidth
 			var text string
 			offset := model.Addr(col) * cfg.BlockIncrement
 			if cfg.DecimalAddress {
@@ -247,11 +222,11 @@ func (gui *GUI) GBGraphics(
 			} else {
 				text = fmt.Sprintf("%02Xh", offset)
 			}
-			textX := xPix + (blockSize*scale-fontWidth)/2
+			textX := xPix + (blockSize*cfg.Scale-fontWidth)/2
 			if textX < labelWidth {
 				textX = labelWidth
 			}
-			drawer.Dot = fixed.P(textX, cfg.AddressFont.Metrics().Ascent.Ceil())
+			drawer.Dot = fixed.P(textX, face.Metrics().Ascent.Ceil())
 			drawer.DrawString(text)
 		}
 	}
@@ -261,10 +236,10 @@ func (gui *GUI) GBGraphics(
 			continue
 		}
 
-		textX := hl.BlockX*blockSize*scale + hl.BlockX*gridT + labelWidth
-		textY := hl.BlockY*blockSize*scale + hl.BlockY*gridT + labelHeight
-		blockW := blockSize * scale
-		blockH := blockSize * scale
+		textX := hl.BlockX*blockSize*cfg.Scale + hl.BlockX*gridT + labelWidth
+		textY := hl.BlockY*blockSize*cfg.Scale + hl.BlockY*gridT + labelHeight
+		blockW := blockSize * cfg.Scale
+		blockH := blockSize * cfg.Scale
 
 		textWidth := font.MeasureString(hl.Font, hl.Text).Ceil()
 		textHeight := hl.Font.Metrics().Height.Ceil()

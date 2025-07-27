@@ -1,7 +1,5 @@
 package model
 
-import "fmt"
-
 //go:generate go-enum --flag --no-iota --nocomments
 
 // ENUM(
@@ -146,74 +144,6 @@ func (a Addr) LSB() Data8 {
 
 func (a Addr) Split() (Data8, Data8) {
 	return Data16(a).Split()
-}
-
-type Data16 uint16
-
-func (a Data16) Bit(i int) bool {
-	if i < 0 || i > 15 {
-		panic(i)
-	}
-	return a&(1<<i) != 0
-}
-
-func (a Data16) MSB() Data8 {
-	return Data8(a >> 8)
-}
-
-func (a Data16) LSB() Data8 {
-	return Data8(a)
-}
-
-func (a Data16) Hex() string {
-	return Hex16(uint16(a))
-}
-
-func (a Data16) Dec() string {
-	return fmt.Sprintf("%dd", a)
-}
-
-func (a Data16) Split() (Data8, Data8) {
-	return a.MSB(), a.LSB()
-}
-
-type Data8 uint8
-
-func (a Data8) Bit(i int) bool {
-	if i < 0 || i > 7 {
-		panic(i)
-	}
-	return a&(1<<i) != 0
-}
-
-func (a Data8) SignBit() bool {
-	return a.Bit(7)
-}
-
-func (a Data8) SignedOffset() Offset8 {
-	return Offset8(int8(uint8(a)))
-}
-func (a Data8) SignedAbs() Data8 {
-	if a.SignBit() {
-		return Data8(-int8(a))
-	}
-	return a
-}
-
-func (a Data8) Hex() string {
-	return Hex8(uint8(a))
-}
-
-func (a Data8) Dec() string {
-	return fmt.Sprintf("%dd", a)
-}
-
-func Hex16(x uint16) string {
-	return fmt.Sprintf("%04xh", x)
-}
-
-func Hex8(x uint8) string {
-	return fmt.Sprintf("%02xh", x)
 }
 
 type Size16 uint16

@@ -8,8 +8,8 @@ type Config struct {
 }
 
 type ConfigBootROM struct {
-	Location string
-	Skip     bool
+	Variant string
+	Skip    bool
 }
 
 type ConfigClock struct {
@@ -22,7 +22,6 @@ type ConfigROM struct {
 
 type ConfigDebug struct {
 	PanicOnStackUnderflow bool
-	MaxNOPCount           int
 	Disassembler          ConfigDisassembler
 }
 
@@ -38,12 +37,11 @@ var DefaultConfig = Config{
 		"assets/cartridges/01-special.gb",
 	},
 	BootROM: ConfigBootROM{
-		Skip:     false,
-		Location: "assets/bootrom/dmg_boot.bin",
+		Skip:    false,
+		Variant: "DMGBoot",
 	},
 	Debug: ConfigDebug{
 		PanicOnStackUnderflow: true,
-		MaxNOPCount:           10,
 		Disassembler: ConfigDisassembler{
 			Trace: true,
 		},

@@ -2,6 +2,8 @@ package model
 
 type Timer struct {
 	Mem              MemoryRegion
+	APU              *APU
+	Interrupts       *Interrupts
 	DIV              Data16
 	prevAndResult    bool
 	preReloadCounter int
@@ -14,39 +16,61 @@ const (
 	offsTAC  = 3
 )
 
-var timerBitPos = [4]int{9, 3, 5, 7}
+var timerBitMask = [4]Data16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
 
-func NewTimer(clock *ClockRT, interrupts *Interrupts) *Timer {
+func NewTimer(clock *ClockRT, apu *APU, interrupts *Interrupts) *Timer {
 	t := &Timer{
-		Mem: NewMemoryRegion(clock, AddrTimerBegin, SizeTimer),
+		Mem:        NewMemoryRegion(clock, AddrTimerBegin, SizeTimer),
+		APU:        apu,
+		Interrupts: interrupts,
 	}
 
-	// https://hacktix.github.io/GBEDG/timers/#timer-operation
-	// We only act on the rising edge of the clock, so divide by 2
-	// and act on both rising and falling edges of that divided clock
-	clock.Divide(2).AttachDevice(func(c Cycle) {
-		t.DIV++
-		t.Mem.Data[offsDIV] = t.DIV.MSB()
-		tac := t.Mem.Data[offsTAC]
-		bit := t.DIV.Bit(timerBitPos[tac&0x3])
-		enable := tac.Bit(2)
-		andResult := bit && enable
-		if t.prevAndResult && !andResult {
-			t.Mem.Data[offsTIMA]++
-			if t.Mem.Data[offsTIMA] == 0 {
-				t.preReloadCounter = 4
-			}
-		}
-		t.prevAndResult = andResult
-		if t.preReloadCounter > 0 {
-			t.preReloadCounter--
-			if t.preReloadCounter == 0 {
-				t.Mem.Data[offsTIMA] = t.Mem.Data[offsTMA]
-				interrupts.IRQSet(IntSourceTimer)
-			}
-		}
-	})
+	clock.timer = t
 	return t
+}
+
+// Tick the DIV timer
+// Runs every cycle, so this code path is extremely hot
+func (t *Timer) tickDIVTimer() {
+	// https://gbdev.io/pandocs/Audio_details.html#div-apu
+	// A “DIV-APU” counter is increased every time DIV’s bit 4 (5 in double-speed mode) goes from 1 to 0
+	div := t.DIV
+	if div&(Bit4|Bit3) == Bit4 { // bit 4 set, bit 3 clear => next time bit 4 will go low
+		t.APU.incDIVAPU()
+	}
+	div++
+	t.DIV = div
+
+	t.Mem.Data[offsDIV] = Data8(div >> 8)
+	tac := t.Mem.Data[offsTAC]
+	var andResult bool
+	if tac&Bit2 != 0 {
+		switch tac & (Bit0 | Bit1) {
+		case 0:
+			andResult = (div&Bit9 != 0)
+		case 1:
+			andResult = (div&Bit3 != 0)
+		case 2:
+			andResult = (div&Bit5 != 0)
+		case 3:
+			andResult = (div&Bit7 != 0)
+		}
+	}
+	if t.prevAndResult && !andResult {
+		tima := &t.Mem.Data[offsTIMA]
+		*tima++
+		if *tima == 0 {
+			t.preReloadCounter = 4
+		}
+	}
+	t.prevAndResult = andResult
+	if t.preReloadCounter > 0 {
+		t.preReloadCounter--
+		if t.preReloadCounter == 0 {
+			t.Mem.Data[offsTIMA] = t.Mem.Data[offsTMA]
+			t.Interrupts.IRQSet(IntSourceTimer)
+		}
+	}
 }
 
 func (t *Timer) Write(addr Addr, v Data8) {
@@ -70,8 +94,4 @@ func (t *Timer) Write(addr Addr, v Data8) {
 
 func (t *Timer) Read(addr Addr) Data8 {
 	return t.Mem.Read(addr)
-}
-
-func (t *Timer) GetCounters(addr Addr) (uint64, uint64) {
-	return t.Mem.GetCounters(addr)
 }

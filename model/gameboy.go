@@ -1,13 +1,10 @@
 package model
 
-import "os"
-
 type Gameboy struct {
 	Config *Config
 
 	CLK       *ClockRT
 	Debug     *Debug
-	PHI       *Clock
 	CPU       *CPU
 	PPU       *PPU
 	Cartridge *Cartridge
@@ -29,12 +26,8 @@ func (gb *Gameboy) Step() {
 
 func (gb *Gameboy) SoftReset() {
 	gb.CLK.Sync(func() {
-		gb.CLK.cycle.C = 0
-		gb.CLK.cycle.Falling = false
-		for i := range gb.CLK.divided {
-			gb.CLK.divided[i].counter = 0
-			gb.CLK.divided[i].cycle = 0
-		}
+		gb.CLK.Cycle.C = 0
+		gb.CLK.Cycle.Falling = false
 		gb.CPU.Reset()
 		gb.PPU.Reset()
 	})
@@ -44,17 +37,9 @@ func (gb *Gameboy) GetCoreDump() CoreDump {
 	var cd CoreDump
 	gb.CLK.Sync(func() {
 		cd = gb.CPU.GetCoreDump()
-		cd.Cycle = gb.CLK.cycle
+		cd.Cycle = gb.CLK.Cycle
 	})
 	return cd
-}
-
-func (gb *Gameboy) GetViewport() ViewPort {
-	var vp ViewPort
-	gb.CLK.Sync(func() {
-		vp = gb.PPU.LastFrame
-	})
-	return vp
 }
 
 func NewGameboy(
@@ -63,11 +48,11 @@ func NewGameboy(
 	gameboy := &Gameboy{
 		Config: config,
 	}
-	gameboy.init()
+	gameboy.Init()
 	return gameboy
 }
 
-func (gb *Gameboy) init() {
+func (gb *Gameboy) Init() {
 	clk := NewRealtimeClock(gb.Config.Clock)
 
 	debug := NewDebug(clk, &gb.Config.Debug)
@@ -88,7 +73,7 @@ func (gb *Gameboy) init() {
 	joypad := NewJoypad(clk, interrupts)
 	serial := NewSerial(clk)
 	prohibited := NewProhibited(clk)
-	timer := NewTimer(clk, interrupts)
+	timer := NewTimer(clk, apu, interrupts)
 
 	bootROMLock.OnLock = func() {
 		debug.SetProgram(ByteSlice(cartridge.CurrROMBank0.Data))
@@ -97,11 +82,9 @@ func (gb *Gameboy) init() {
 
 	bus := &Bus{}
 
-	cpuClock := clk.Divide(4)
-	cpu := NewCPU(cpuClock, interrupts, bus, gb.Config, debug)
+	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug)
 
-	ppuClock := clk.Divide(2)
-	ppu := NewPPU(clk, ppuClock, interrupts, bus, gb.Config, debug)
+	ppu := NewPPU(clk, interrupts, bus, gb.Config, debug)
 
 	bus.BootROMLock = bootROMLock
 	bus.BootROM = &bootROM
@@ -123,7 +106,6 @@ func (gb *Gameboy) init() {
 	debug.WRAM.Source = wram.Data
 
 	gb.CLK = clk
-	gb.PHI = cpuClock
 	gb.CPU = cpu
 	gb.Cartridge = cartridge
 	gb.PPU = ppu
@@ -133,11 +115,4 @@ func (gb *Gameboy) init() {
 	gb.CPU.Reset()
 
 	clk.Onpanic = gb.CPU.Dump
-
-	romData, err := os.ReadFile(gb.Config.ROM.Location)
-	if err != nil {
-		gb.Debug.SetWarning("LoadROM", "Couldn't open ROM file")
-	} else {
-		gb.Cartridge.LoadROM(romData)
-	}
 }

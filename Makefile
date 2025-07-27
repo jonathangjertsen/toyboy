@@ -2,7 +2,11 @@ all: emulator roms disassembler
 
 roms: rom-hello-world rom-empty rom-unbricked
 
-.PHONY: run
+.PHONY: run deps
+
+deps-linux:
+	go install github.com/wailsapp/wails/v2/cmd/wails@latest
+	wails doctor
 
 gen:
 	go generate ./...
@@ -11,7 +15,10 @@ disassembler: gen
 	go build -o bin/disassembler github.com/jonathangjertsen/toyboy/cmd/disassembler
 
 emulator: gen
-	go build -o bin/emulator github.com/jonathangjertsen/toyboy/cmd/emulator
+	wails build -debug
+
+server: 
+	go build -o bin/server github.com/jonathangjertsen/toyboy/cmd/server
 
 rom-empty:
 	cd assets/cartridges/asm;\
@@ -35,8 +42,8 @@ install-gio:
 	go install gioui.org/cmd/gogio@latest
 	sudo apt install gcc pkg-config libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-x11-dev libgles2-mesa-dev libegl1-mesa-dev libffi-dev libxcursor-dev libvulkan-dev
 
-run: emulator rom-empty rom-hello-world rom-unbricked
-	APP_ENV=development bin/emulator
+run: emulator rom-empty rom-hello-world rom-unbricked server
+	build/bin/emulator
 
 run-dis: disassembler
 	bin/disassembler

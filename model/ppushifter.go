@@ -20,7 +20,7 @@ func (ps *Shifter) fsm() {
 		}
 	}
 
-	pixel, havePixel := ps.getPixel()
+	pixel, havePixel := ps.pixelMixer()
 	if !havePixel {
 		return
 	}
@@ -33,13 +33,13 @@ func (ps *Shifter) fsm() {
 	ps.PPU.Debug.SetX(ps.X)
 }
 
-func (ps *Shifter) getPixel() (Pixel, bool) {
+func (ps *Shifter) pixelMixer() (Pixel, bool) {
 	spritePixel, haveSpritePixel := ps.PPU.SpriteFIFO.ShiftOut()
 	bgPixel, haveBGPixel := ps.PPU.BackgroundFIFO.ShiftOut()
 	if haveSpritePixel && haveBGPixel {
-		if spritePixel.ColorIDX == 0 {
+		if spritePixel.ColorIDX() == 0 {
 			return bgPixel, true
-		} else if spritePixel.BackgroundPriority && bgPixel.ColorIDX != 0 {
+		} else if spritePixel.BGPriority() && bgPixel.ColorIDXBGPriority > 0 { // strictly speaking should be bgPixel.ColorIDX() > 0, but BGPriority is never set on background pixels
 			return bgPixel, true
 		} else {
 			return spritePixel, true

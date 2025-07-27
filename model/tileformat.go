@@ -1,20 +1,14 @@
 package model
 
+const DefaultPalette = (0 << 0) | (1 << 2) | (2 << 4) | (3 << 6)
+
 type TileLine [8]Pixel
 
 func DecodeTileLine(msb, lsb Data8) TileLine {
 	var pixels TileLine
 	for i := range 8 {
-		lsbMask := lsb & (1 << (7 - i))
-		lsbMask >>= (7 - i)
-		msbMask := msb & (1 << (7 - i))
-		msbMask >>= (7 - i)
-		msbMask <<= 1
-		pixels[i].ColorIDX = lsbMask | msbMask
-		pixels[i].Palette[0] = 0
-		pixels[i].Palette[1] = 1
-		pixels[i].Palette[2] = 2
-		pixels[i].Palette[3] = 3
+		pixels[i].ColorIDXBGPriority = ((lsb >> (7 - i)) & 1) | (((msb >> (7 - i)) & 1) << 1)
+		pixels[i].Palette = DefaultPalette
 	}
 	return pixels
 }

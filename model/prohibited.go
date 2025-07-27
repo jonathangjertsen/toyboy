@@ -32,13 +32,3 @@ func (p *Prohibited) Write(addr Addr, v Data8) {
 	}
 	panicf("unknown address %s", addr.Hex())
 }
-
-func (p *Prohibited) GetCounters(addr Addr) (uint64, uint64) {
-	if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
-		return p.FEA0toFEFF.GetCounters(addr)
-	} else if addr >= 0xff71 && addr <= 0xff7f {
-		return p.FF71toFF7F.GetCounters(addr)
-	}
-	panicf("unknown address %s", addr.Hex())
-	return 0, 0
-}

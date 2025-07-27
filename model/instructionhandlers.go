@@ -360,7 +360,7 @@ func (cpu *CPU) jre(e edge) bool {
 	case edge{2, false}:
 	case edge{2, true}:
 	case edge{3, false}:
-		if cpu.Regs.TempZ.SignBit() {
+		if cpu.Regs.TempZ&SignBit8 != 0 {
 			cpu.SetPC(cpu.Regs.PC - Addr(cpu.Regs.TempZ.SignedAbs()))
 		} else {
 			cpu.SetPC(cpu.Regs.PC + Addr(cpu.Regs.TempZ))
@@ -1277,7 +1277,7 @@ func (cpu *CPU) addspe(e edge) bool {
 	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
 	case edge{2, false}:
-		zSign := cpu.Regs.TempZ.Bit(7)
+		zSign := cpu.Regs.TempZ&Bit7 != 0
 		result := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
 		cpu.Regs.TempZ = result.Value
 		cpu.Regs.TempW = 0
@@ -1383,7 +1383,7 @@ func (cpu *CPU) ldhlspe(e edge) bool {
 	case edge{2, true}:
 	case edge{3, false}:
 		adj := Data8(0x00)
-		if cpu.Regs.TempZ.Bit(7) {
+		if cpu.Regs.TempZ&Bit7 != 0 {
 			adj = 0xff
 		}
 		res := ADD(cpu.Regs.SP.MSB(), adj, cpu.Regs.GetFlagC())

@@ -33,7 +33,7 @@ func (regs *RegisterFile) setFlag(bit int, v bool) {
 	}
 }
 
-func (regs *RegisterFile) getFlag(bit int) bool {
+func (regs *RegisterFile) getFlag(bit uint) bool {
 	return regs.F.Bit(bit)
 }
 

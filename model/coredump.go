@@ -138,7 +138,7 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 	fmt.Fprintf(f, "\n")
 	fmt.Fprintf(f, "BGFIFO: /[")
 	for i := range ppu.BGFIFO.Level {
-		fmt.Fprintf(f, "%d", ppu.BGFIFO.Slots[i].ColorIDX)
+		fmt.Fprintf(f, "%d", ppu.BGFIFO.Slots[i].ColorIDX())
 	}
 	for range 8 - ppu.BGFIFO.Level {
 		fmt.Fprintf(f, " ")
@@ -147,7 +147,7 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 	fmt.Fprintf(f, "       [%d]\n", ppu.LastShifted)
 	fmt.Fprintf(f, " SFIFO: \\[")
 	for i := range ppu.SpriteFIFO.Level {
-		fmt.Fprintf(f, "%d", ppu.SpriteFIFO.Slots[i].ColorIDX)
+		fmt.Fprintf(f, "%d", ppu.SpriteFIFO.Slots[i].ColorIDX())
 	}
 	for range 8 - ppu.SpriteFIFO.Level {
 		fmt.Fprintf(f, " ")
@@ -250,22 +250,20 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 }
 
 type MemInfo struct {
-	Value        Data8
-	ReadCounter  uint64
-	WriteCounter uint64
+	Value Data8
 }
 
 func getmem(bus CPUBusIF, start, end Addr) []MemInfo {
-	pop := bus.PushState()
-	defer pop()
+	addr, data := bus.PushState()
 
 	out := make([]MemInfo, end-start+1)
 	for addr := start; addr <= end; addr++ {
 		memInfo := &out[addr-start]
-		memInfo.ReadCounter, memInfo.WriteCounter = bus.GetCounters(addr)
 		bus.WriteAddress(addr)
 		memInfo.Value = bus.GetData()
 	}
+
+	bus.PopState(addr, data)
 
 	return out
 }

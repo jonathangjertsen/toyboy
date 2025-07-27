@@ -1,0 +1,8 @@
+{
+    "name": "toyboy",
+    "outputfilename": "emulator",
+    "frontend:install": "",
+    "frontend:build": "",
+    "author": {
+    }
+  }

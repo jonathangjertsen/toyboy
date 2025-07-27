@@ -1,7 +1,8 @@
 package model
 
 type Clock struct {
-	devices []func(c Cycle)
+	Curr    Cycle
+	Devices []func(c Cycle)
 }
 
 type Cycle struct {
@@ -14,23 +15,24 @@ func NewClock() *Clock {
 	return clock
 }
 
-func (c *Clock) Cycle(currCycle uint64) {
-	c.Rising(currCycle)
-	c.Falling(currCycle)
+func (c *Clock) Cycle() {
+	c.Rising()
+	c.Falling()
+	c.Curr.C++
 }
 
-func (c *Clock) Rising(currCycle uint64) {
-	for _, dev := range c.devices {
-		dev(Cycle{currCycle, false})
+func (c *Clock) Rising() {
+	for _, dev := range c.Devices {
+		dev(Cycle{c.Curr.C, false})
 	}
 }
 
-func (c *Clock) Falling(currCycle uint64) {
-	for _, dev := range c.devices {
-		dev(Cycle{currCycle, true})
+func (c *Clock) Falling() {
+	for _, dev := range c.Devices {
+		dev(Cycle{c.Curr.C, true})
 	}
 }
 
 func (c *Clock) AttachDevice(dev func(c Cycle)) {
-	c.devices = append(c.devices, dev)
+	c.Devices = append(c.Devices, dev)
 }

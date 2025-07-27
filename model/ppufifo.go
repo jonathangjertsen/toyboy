@@ -15,27 +15,22 @@ func (fifo *FIFO) Clear() {
 }
 
 func (fifo *FIFO) ShiftOut() (Pixel, bool) {
-	var p Pixel
 	if fifo.Level == 0 {
-		return p, false
+		return Pixel{}, false
 	}
 	fifo.Level--
-	p = fifo.Slots[fifo.ShiftPos]
-	fifo.ShiftPos++
-	if fifo.ShiftPos == 8 {
-		fifo.ShiftPos = 0
-	}
+	p := fifo.Slots[fifo.ShiftPos]
+	fifo.ShiftPos = (fifo.ShiftPos + 1) & 7
 	return p, true
 }
 
 func (fifo *FIFO) Write8(pixels [8]Pixel) {
-	pos := fifo.ShiftPos
-	for i := range 8 {
-		fifo.Slots[pos] = pixels[i]
-		pos++
-		if pos == 8 {
-			pos = 0
-		}
+	if fifo.ShiftPos == 0 {
+		fifo.Slots = pixels
+	} else {
+		remaining := 8 - fifo.ShiftPos
+		copy(fifo.Slots[fifo.ShiftPos:], pixels[:remaining])
+		copy(fifo.Slots[:fifo.ShiftPos], pixels[remaining:])
 	}
 	fifo.Level = 8
 }

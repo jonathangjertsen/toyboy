@@ -34,7 +34,6 @@ type PPU struct {
 	// For other systems to hook in
 	MemoryRegion MemoryRegion
 	Debug        *Debug
-	FrameClock   *Clock
 	FrameCount   uint64
 	Config       *Config
 
@@ -52,9 +51,9 @@ type PPU struct {
 	Shifter           Shifter
 	BackgroundFIFO    FIFO
 	SpriteFIFO        FIFO
-	BGPalette         [4]Color
-	OBJPalette0       [4]Color
-	OBJPalette1       [4]Color
+	BGPalette         Data8
+	OBJPalette0       Data8
+	OBJPalette1       Data8
 
 	// HBlank/VBlank state
 	HBlankRemainingCycles     uint64
@@ -64,19 +63,20 @@ type PPU struct {
 	FBBackground FrameBuffer
 	FBWindow     FrameBuffer
 	FBViewport   ViewPort
-	LastFrame    ViewPort
+
+	FrameSync chan func(*ViewPort)
 }
 
-func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, config *Config, debug *Debug) *PPU {
+func NewPPU(rtClock *ClockRT, interrupts *Interrupts, bus *Bus, config *Config, debug *Debug) *PPU {
 	ppu := &PPU{
 		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, SizePPU),
 		Bus:          bus,
 		Debug:        debug,
 		Interrupts:   interrupts,
 		Stat:         Stat{Interrupts: interrupts},
-		FrameClock:   NewClock(),
 		DMA:          DMA{Bus: bus},
 		Config:       config,
+		FrameSync:    make(chan func(*ViewPort), 1),
 	}
 	ppu.BackgroundFetcher.PPU = ppu
 	ppu.SpriteFetcher.PPU = ppu
@@ -90,52 +90,57 @@ func NewPPU(rtClock *ClockRT, clock *Clock, interrupts *Interrupts, bus *Bus, co
 	}
 
 	ppu.beginFrame()
-	clock.AttachDevice(ppu.fsm)
+	rtClock.ppu = ppu
 	return ppu
+}
+
+func (ppu *PPU) Sync(f func(*ViewPort)) {
+	done := make(chan struct{})
+	ppu.FrameSync <- func(vp *ViewPort) {
+		f(vp)
+		done <- struct{}{}
+	}
+	<-done
 }
 
 func (ppu *PPU) Reset() {
 	ppu.FrameCount = 0
 }
 
-func (ppu *PPU) Enabled() bool {
-	return ppu.RegLCDC.Bit(7)
-}
-
 func (ppu *PPU) WindowTilemapArea() Addr {
-	if ppu.RegLCDC.Bit(6) {
+	if ppu.RegLCDC&Bit6 != 0 {
 		return AddrTileMap1Begin
 	}
 	return AddrTileMap0Begin
 }
 
 func (ppu *PPU) WindowEnable() bool {
-	if !ppu.RegLCDC.Bit(0) {
+	if ppu.RegLCDC&Bit0 == 0 {
 		return false // DMG only
 	}
-	return ppu.RegLCDC.Bit(5)
+	return ppu.RegLCDC&Bit5 != 0
 }
 
 func (ppu *PPU) BGTilemapArea() Addr {
-	if ppu.RegLCDC.Bit(3) {
+	if ppu.RegLCDC&Bit3 != 0 {
 		return AddrTileMap1Begin
 	}
 	return AddrTileMap0Begin
 }
 
 func (ppu *PPU) ObjHeight() Data8 {
-	if ppu.RegLCDC.Bit(2) {
+	if ppu.RegLCDC&Bit2 != 0 {
 		return 16
 	}
 	return 8
 }
 
 func (ppu *PPU) OBJEnable() bool {
-	return ppu.RegLCDC.Bit(1)
+	return ppu.RegLCDC&Bit1 != 0
 }
 
 func (ppu *PPU) BGWindowEnable() bool {
-	return ppu.RegLCDC.Bit(0)
+	return ppu.RegLCDC&Bit0 != 0
 }
 
 func (ppu *PPU) SetLCDC(v Data8) {
@@ -169,29 +174,17 @@ func (ppu *PPU) SetLYC(v Data8) {
 
 func (ppu *PPU) SetBGP(v Data8) {
 	ppu.RegBGP = v
-
-	ppu.BGPalette[0] = Color((v >> 0) & 0x3)
-	ppu.BGPalette[1] = Color((v >> 2) & 0x3)
-	ppu.BGPalette[2] = Color((v >> 4) & 0x3)
-	ppu.BGPalette[3] = Color((v >> 6) & 0x3)
+	ppu.BGPalette = v
 }
 
 func (ppu *PPU) SetOBP0(v Data8) {
 	ppu.RegOBP0 = v
-
-	ppu.OBJPalette0[0] = Color((v >> 0) & 0x3)
-	ppu.OBJPalette0[1] = Color((v >> 2) & 0x3)
-	ppu.OBJPalette0[2] = Color((v >> 4) & 0x3)
-	ppu.OBJPalette0[3] = Color((v >> 6) & 0x3)
+	ppu.OBJPalette0 = v
 }
 
 func (ppu *PPU) SetOBP1(v Data8) {
 	ppu.RegOBP1 = v
-
-	ppu.OBJPalette1[0] = Color((v >> 0) & 0x3)
-	ppu.OBJPalette1[1] = Color((v >> 2) & 0x3)
-	ppu.OBJPalette1[2] = Color((v >> 4) & 0x3)
-	ppu.OBJPalette1[3] = Color((v >> 6) & 0x3)
+	ppu.OBJPalette1 = v
 }
 
 func (ppu *PPU) Dump() {
@@ -202,11 +195,10 @@ func (ppu *PPU) Dump() {
 	fmt.Printf("\n--------\n")
 }
 
-func (ppu *PPU) fsm(c Cycle) {
-	if !ppu.Enabled() {
-		return
+func (ppu *PPU) fsm() {
+	if ppu.DMA.Source != 0 {
+		ppu.DMA.fsm()
 	}
-	ppu.DMA.fsm(c)
 	switch ppu.Mode {
 	case PPUModeVBlank:
 		ppu.fsmVBlank()
@@ -270,14 +262,14 @@ func (ppu *PPU) beginHBlank() {
 	}
 }
 
-func (ppu *PPU) ObjPalette(attribs Data8) [4]Color {
-	var palette [4]Color
-	if attribs.Bit(4) {
+func (ppu *PPU) ObjPalette(attribs Data8) Data8 {
+	var palette Data8
+	if attribs&Bit4 != 0 {
 		palette = ppu.OBJPalette1
 	} else {
 		palette = ppu.OBJPalette0
 	}
-	palette[0] = ColorWhiteOrTransparent
+	palette &= 0xfc
 	return palette
 }
 
@@ -291,7 +283,7 @@ func (ppu *PPU) beginVBlank() {
 	// TODO: do we ever clear the VBlank interrupt?
 	ppu.Interrupts.IRQSet(IntSourceVBlank)
 
-	ppu.FrameClock.Cycle(ppu.FrameCount)
+	ppu.FrameCount++
 }
 
 func (ppu *PPU) fsmOAMScan() {
@@ -377,7 +369,11 @@ func (ppu *PPU) fsmVBlank() {
 		return
 	}
 
-	ppu.LastFrame = ppu.FBViewport
+	nSyncers := len(ppu.FrameSync)
+	for range nSyncers {
+		f := <-ppu.FrameSync
+		f(&ppu.FBViewport)
+	}
 	ppu.IncRegLY()
 
 	if ppu.RegLY == 0 {

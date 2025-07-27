@@ -13,8 +13,8 @@ func (d *DMA) Write(v Data8) {
 	d.Dest = AddrOAMBegin
 }
 
-func (d *DMA) fsm(c Cycle) {
-	if c.Falling || d.Source == 0 {
+func (d *DMA) fsm() {
+	if d.Source == 0 {
 		return
 	}
 

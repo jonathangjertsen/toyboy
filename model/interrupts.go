@@ -82,17 +82,6 @@ func (ints *Interrupts) SetIME(v bool) {
 	}
 }
 
-func (ints *Interrupts) GetCounters(addr Addr) (uint64, uint64) {
-	switch Addr(addr) {
-	case AddrIF:
-		return ints.MemIF.GetCounters(addr)
-	case AddrIE:
-		return ints.MemIE.GetCounters(addr)
-	}
-	panicv(addr)
-	return 0, 0
-}
-
 func (ints *Interrupts) PendInterrupt(in IntSource) {
 	ints.IME = false
 	ints.MemIF.Data[0] &= ^in.Mask()

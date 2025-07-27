@@ -90,23 +90,23 @@ func RL(a Data8, carry bool) ALUResult {
 	if carry {
 		mask = 0x01
 	}
-	return ALUResult{Value: a<<1 | mask, C: a.Bit(7)}
+	return ALUResult{Value: a<<1 | mask, C: a&Bit7 != 0}
 }
 
 func SLA(a Data8) ALUResult {
-	return ALUResult{Value: a << 1, C: a.Bit(7)}
+	return ALUResult{Value: a << 1, C: a&Bit7 != 0}
 }
 
 func SRA(a Data8) ALUResult {
 	var mask Data8
-	if a.Bit(7) {
+	if a&Bit7 != 0 {
 		mask = 0x80
 	}
-	return ALUResult{Value: a>>1 | mask, C: a.Bit(0)}
+	return ALUResult{Value: a>>1 | mask, C: a&Bit0 != 0}
 }
 
 func RLC(a Data8) ALUResult {
-	b7 := a.Bit(7)
+	b7 := a&Bit7 != 0
 	var mask Data8
 	if b7 {
 		mask = 0x01
@@ -115,7 +115,7 @@ func RLC(a Data8) ALUResult {
 }
 
 func SRL(a Data8) ALUResult {
-	return ALUResult{Value: a >> 1, C: a.Bit(0)}
+	return ALUResult{Value: a >> 1, C: a&Bit0 != 0}
 }
 
 func RLA(a Data8, carry bool) ALUResult {
@@ -133,7 +133,7 @@ func RR(a Data8, carry bool) ALUResult {
 }
 
 func RRC(a Data8) ALUResult {
-	b0 := a.Bit(0)
+	b0 := a&Bit0 != 0
 	var mask Data8
 	if b0 {
 		mask = 0x80
@@ -149,10 +149,10 @@ func RRA(a Data8, carry bool) ALUResult {
 
 func RLCA(a Data8) ALUResult {
 	var mask Data8
-	if a.Bit(7) {
+	if a&Bit7 != 0 {
 		mask = 1
 	}
-	return ALUResult{Value: a<<1 | mask, C: a.Bit(7), Z0: true}
+	return ALUResult{Value: a<<1 | mask, C: a&Bit7 != 0, Z0: true}
 }
 
 func RRCA(a Data8) ALUResult {

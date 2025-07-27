@@ -9,17 +9,21 @@ import (
 type ClockRT struct {
 	ticker          *time.Ticker
 	tickInterval    time.Duration
-	cycle           Cycle
-	cyclesPerTick   uint64
+	Cycle           Cycle
+	mCyclesPerTick  int
 	resume          chan struct{}
 	pause           chan struct{}
 	stop            chan struct{}
 	jobs            chan func()
 	uiDevices       []func()
-	divided         []clockRTDivided
 	Onpanic         func()
 	pauseAfterCycle atomic.Int32
 	Running         atomic.Bool
+
+	cpu   *CPU
+	ppu   *PPU
+	apu   *APU
+	timer *Timer
 }
 
 // Executes the function in the clocks' goroutine
@@ -61,12 +65,6 @@ type clockRTDivided struct {
 	cycle   uint64
 }
 
-func (clockRT *ClockRT) Divide(top uint64) *Clock {
-	clock := NewClock()
-	clockRT.divided = append(clockRT.divided, clockRTDivided{clock, top, 0, 0})
-	return clock
-}
-
 func (clockRT *ClockRT) wait() {
 	clockRT.Running.Store(false)
 	for {
@@ -93,7 +91,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64) {
 	if clockRT.tickInterval < cycleInterval {
 		clockRT.tickInterval = cycleInterval
 	}
-	clockRT.cyclesPerTick = uint64(clockRT.tickInterval / cycleInterval)
+	clockRT.mCyclesPerTick = int(clockRT.tickInterval / (4 * cycleInterval))
 	if clockRT.ticker != nil {
 		clockRT.ticker.Reset(clockRT.tickInterval)
 	}
@@ -110,11 +108,13 @@ func (clockRT *ClockRT) run(initSpeedPercent float64) {
 
 	clockRT.wait()
 	clockRT.ticker = time.NewTicker(clockRT.tickInterval)
+	uiTicker := time.NewTicker(time.Second / 60)
 	for {
 		var exit bool
 		select {
 		case <-clockRT.ticker.C:
-			clockRT.Cycles(clockRT.cyclesPerTick)
+			clockRT.MCycle(clockRT.mCyclesPerTick)
+		case <-uiTicker.C:
 			clockRT.uiCycle()
 		case <-clockRT.resume:
 			fmt.Printf("Ignored resume\n")
@@ -156,31 +156,80 @@ func (clockRT *ClockRT) Stop() {
 	clockRT.stop <- struct{}{}
 }
 
-func (clockRT *ClockRT) Cycle(currCycle uint64) {
-	for i := range clockRT.divided {
-		div := &clockRT.divided[i]
-
-		if div.counter == 0 {
-			// TODO: should just be Rising, and the Falling part is commented out below.
-			// This breaks the CPU somehow, though.
-			div.clock.Cycle(div.cycle)
-			div.cycle++
-			div.counter = div.top
-		} /*else if div.counter == (div.top >> 1) {
-			div.clock.Falling(div.cycle)
-			div.cycle++
-		}*/
-		div.counter--
-	}
-}
-
-func (clockRT *ClockRT) Cycles(n uint64) {
+func (clockRT *ClockRT) MCycle(n int) {
 	for range n {
-		clockRT.Cycle(clockRT.cycle.C)
+		// Breakpoints will stop here, right before executing next M-cycle
 		if clockRT.pauseAfterCycle.Load() > 0 {
 			clockRT.wait()
 			clockRT.pauseAfterCycle.Add(-1)
 		}
-		clockRT.cycle.C++
+
+		m := clockRT.Cycle.C >> 2
+		clockRT.Cycle.C += 4
+
+		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
+		clockRT.cpu.fsm(Cycle{m, false})
+		clockRT.cpu.fsm(Cycle{m, true})
+
+		// Clock the peripherals.
+		// 99.99% of the time, both PPU and APU are on, so we clock everything
+		if clockRT.ppu.RegLCDC&clockRT.apu.MasterCtl&Bit7 != 0 {
+			// T0
+			clockRT.timer.tickDIVTimer()
+			clockRT.apu.Wave.clock()
+			clockRT.apu.Pulse1.clock()
+			clockRT.apu.Pulse2.clock()
+			if clockRT.Cycle.C&0xf == 0 {
+				clockRT.apu.Noise.clock()
+			}
+			clockRT.ppu.fsm()
+
+			// T1
+			clockRT.timer.tickDIVTimer()
+
+			// T2
+			clockRT.timer.tickDIVTimer()
+			clockRT.apu.Wave.clock()
+			clockRT.ppu.fsm()
+
+			// T3
+			clockRT.timer.tickDIVTimer()
+		} else {
+			clockRT.mCycleSlowPath(
+				clockRT.ppu.RegLCDC&Bit7 != 0,
+				clockRT.apu.MasterCtl&Bit7 != 0,
+			)
+		}
 	}
+}
+
+func (clockRT *ClockRT) mCycleSlowPath(ppu, apu bool) {
+	// T0
+	clockRT.timer.tickDIVTimer()
+	if ppu {
+		clockRT.ppu.fsm()
+	}
+	if apu {
+		clockRT.apu.Wave.clock()
+		clockRT.apu.Pulse1.clock()
+		clockRT.apu.Pulse2.clock()
+		if clockRT.Cycle.C&0xf == 0 {
+			clockRT.apu.Noise.clock()
+		}
+	}
+
+	// T1
+	clockRT.timer.tickDIVTimer()
+
+	// T2
+	clockRT.timer.tickDIVTimer()
+	if ppu {
+		clockRT.ppu.fsm()
+	}
+	if apu {
+		clockRT.apu.Wave.clock()
+	}
+
+	// T3
+	clockRT.timer.tickDIVTimer()
 }

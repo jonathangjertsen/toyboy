@@ -31,6 +31,9 @@ func (d *Debug) SetPC(addr Addr) {
 	if d == nil {
 		return
 	}
+	if addr != 0 {
+		addr--
+	}
 	d.Disassembler.SetPC(addr)
 	d.Debugger.SetPC(addr)
 }

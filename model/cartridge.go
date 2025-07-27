@@ -60,9 +60,9 @@ func (cart *Cartridge) SetRAMBank(which Data8) {
 
 func (cart *Cartridge) Read(addr Addr) Data8 {
 	if addr <= AddrCartridgeBank0End {
-		return cart.CurrROMBank0.Read(addr)
+		return cart.CurrROMBank0.Data[addr]
 	}
-	return cart.CurrROMBankN.Read(addr)
+	return cart.CurrROMBankN.Data[addr-AddrCartridgeBankNBegin]
 }
 
 func (cart *Cartridge) Write(addr Addr, v Data8) {
@@ -111,15 +111,4 @@ func (cart *Cartridge) updateBank() {
 	if newROMBank != cart.SelectedROMBank {
 		cart.SetROMBank(newROMBank)
 	}
-}
-
-func (cart *Cartridge) GetCounters(addr Addr) (uint64, uint64) {
-	if addr <= AddrCartridgeBank0End {
-		return cart.CurrROMBank0.GetCounters(addr)
-	}
-	if addr <= AddrCartridgeBankNEnd {
-		// TODO
-		return cart.CurrROMBankN.GetCounters(addr)
-	}
-	return 0, 0
 }

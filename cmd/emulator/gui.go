@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"image"
 	"image/color"
 	"io"
 	"log"
@@ -15,6 +16,8 @@ import (
 	"gioui.org/font"
 	"gioui.org/layout"
 	"gioui.org/op"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
 	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
@@ -28,6 +31,8 @@ type GUI struct {
 	Config      *Config
 	GB          *model.Gameboy
 	JoypadState model.JoypadState
+
+	ToggleButtons map[string]*widget.Clickable
 
 	ClockMeasurement  *plugin.ClockMeasurement
 	GBFPSMeasurement  *plugin.ClockMeasurement
@@ -74,49 +79,18 @@ type GUI struct {
 func NewGUI(config *Config) *GUI {
 	gui := &GUI{
 		Config: config,
-		KeyboardControl: NewKeyboardControl(ButtonMapping{
-			A:              "L",
-			B:              "K",
-			Up:             "W",
-			Left:           "A",
-			Down:           "S",
-			Right:          "D",
-			Start:          "M",
-			Select:         "N",
-			SOCDResolution: SOCDResolutionOppositeNeutral,
-		}),
+		KeyboardControl: NewKeyboardControl(),
 		Theme: material.NewTheme().WithPalette(material.Palette{
 			Bg:         color.NRGBA{R: 245, G: 245, B: 245, A: 255},
 			ContrastBg: color.NRGBA{R: 220, G: 220, B: 220, A: 255},
 			Fg:         color.NRGBA{R: 45, G: 156, B: 219, A: 255},
 			ContrastFg: color.NRGBA{R: 35, G: 146, B: 209, A: 255},
 		}),
+		ToggleButtons: make(map[string]*widget.Clickable),
 	}
-	gui.initGameboy()
 	return gui
 }
 
-func (gui *GUI) initGameboy() {
-	gb := model.NewGameboy(&gui.Config.Model)
-
-	gui.GB = gb
-
-	// Measure clock freq
-	gui.ClockMeasurement = plugin.NewClockMeasurement()
-	gb.PHI.AttachDevice(func(c model.Cycle) {
-		if c.Falling {
-			gui.ClockMeasurement.Clocked()
-		}
-	})
-
-	// Measure gameboy FPS
-	gui.GBFPSMeasurement = plugin.NewClockMeasurement()
-	gb.PPU.FrameClock.AttachDevice(func(c model.Cycle) {
-		if c.Falling {
-			gui.GBFPSMeasurement.Clocked()
-		}
-	})
-}
 
 func (gui *GUI) Run() {
 	window := new(app.Window)
@@ -202,9 +176,9 @@ func (gui *GUI) Interactions(gtx C) {
 	// TODO: avg over more frames
 	cycles, duration := gui.ClockMeasurement.Stop()
 	defer gui.ClockMeasurement.Start()
-	us := uint64(duration / time.Microsecond)
+	us := 
 	if us > 0 {
-		gui.LastFrameCPS = float64(cycles) * 1_000_000 / float64(us)
+		gui.LastFrameCPS = float64(cycles) * 1_000_000 / float64(uint64(duration / time.Microsecond))
 	} else {
 		gui.LastFrameCPS = 0
 	}
@@ -231,7 +205,7 @@ func (gui *GUI) Interactions(gtx C) {
 
 func (gui *GUI) label(name string) FC {
 	return R(func(gtx C) D {
-		lbl := material.Label(&gui.Theme, unit.Sp(14), name)
+		lbl := material.Label(&gui.Theme, unit.Sp(20), name)
 		lbl.Font.Typeface = "monospace"
 		lbl.Font.Weight = font.Black
 		lbl.Alignment = text.Start
@@ -239,27 +213,18 @@ func (gui *GUI) label(name string) FC {
 	})
 }
 
-func (gui *GUI) mem(f func(io.Writer), list *widget.List, config ConfigBox) W {
+func (gui *GUI) mem(f func(io.Writer), list *widget.List) W {
 	return func(gtx C) D {
 		buf := bytes.Buffer{}
 		f(&buf)
 		txt := buf.String()
 		lines := strings.Split(txt, "\n")
-		return layout.Stack{}.Layout(
-			gtx,
-			layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-				gtx.Constraints.Min.X = int(unit.Dp(config.Width))
-				gtx.Constraints.Max.X = int(unit.Dp(config.Width))
-				gtx.Constraints.Min.Y = int(unit.Dp(config.Height))
-				gtx.Constraints.Max.Y = int(unit.Dp(config.Height))
-				return material.List(&gui.Theme, list).Layout(gtx, len(lines), func(gtx layout.Context, index int) layout.Dimensions {
-					lbl := material.Label(&gui.Theme, unit.Sp(14), lines[index])
-					lbl.Font.Typeface = "monospace"
-					lbl.Alignment = text.Start
-					return lbl.Layout(gtx)
-				})
-			}),
-		)
+		return material.List(&gui.Theme, list).Layout(gtx, len(lines), func(gtx layout.Context, index int) layout.Dimensions {
+			lbl := material.Label(&gui.Theme, unit.Sp(14), lines[index])
+			lbl.Font.Typeface = "monospace"
+			lbl.Alignment = text.Start
+			return lbl.Layout(gtx)
+		})
 	}
 }
 
@@ -272,162 +237,223 @@ func (gui *GUI) Render(gtx C) {
 		Spacer(25, 0),
 		R(func(gtx C) D {
 			var memviews []FC
-			if gui.Config.GUI.VRAMMem.Box.Show {
-				memviews = append(memviews, R(func(gtx C) D {
-					return Column(
-						gtx,
-						gui.Box("VRAM",
-							gui.mem(
-								gui.CoreDump.PrintVRAM,
-								&gui.VRAMScroll,
-								gui.Config.GUI.VRAMMem.Box,
-							)),
-					)
-				}))
-			}
-			if gui.Config.GUI.WRAMMem.Box.Show {
-				memviews = append(memviews, R(func(gtx C) D {
-					return Column(
-						gtx,
-						gui.Box("WRAM", gui.mem(
+			memviews = append(memviews, R(func(gtx C) D {
+				return Column(
+					gtx,
+					gui.Box("VRAM",
+						&gui.Config.GUI.VRAMMem.Box,
+						gui.mem(
+							gui.CoreDump.PrintVRAM,
+							&gui.VRAMScroll,
+						)),
+				)
+			}))
+			memviews = append(memviews, R(func(gtx C) D {
+				return Column(
+					gtx,
+					gui.Box("WRAM",
+						&gui.Config.GUI.WRAMMem.Box,
+						gui.mem(
 							gui.CoreDump.PrintWRAM,
 							&gui.WRAMScroll,
-							gui.Config.GUI.WRAMMem.Box,
 						)),
-					)
-				}))
-			}
-			prog := gui.Config.GUI.ProgMem.Box.Show
-			hram := gui.Config.GUI.HRAMMem.Box.Show
-			oam := gui.Config.GUI.OAMMem.Box.Show
-			if prog || hram || oam {
-				memviews = append(memviews, R(func(gtx C) D {
-					var smallViews []FC
-					if prog {
-						smallViews = append(smallViews,
-							gui.Box("Program", gui.mem(
-								gui.CoreDump.PrintProgram,
-								&gui.ProgramScroll,
-								gui.Config.GUI.ProgMem.Box,
-							)),
-						)
-					}
-					if hram {
-						smallViews = append(smallViews,
-							gui.Box("HRAM", gui.mem(
-								gui.CoreDump.PrintHRAM,
-								&gui.HRAMScroll,
-								gui.Config.GUI.HRAMMem.Box,
-							)),
-						)
-					}
-					if oam {
-						smallViews = append(smallViews,
-							gui.Box("OAM", gui.mem(
-								gui.CoreDump.PrintOAM,
-								&gui.OAMScroll,
-								gui.Config.GUI.OAMMem.Box,
-							)),
-						)
-					}
-					return Column(gtx, smallViews...)
-				}))
-			}
-			if gui.Config.GUI.Rewind.Box.Show {
-				memviews = append(memviews,
-					R(func(gtx C) D {
-						return Column(
-							gtx,
-							gui.Box("Last executed instructions", gui.mem(
+				)
+			}))
+			memviews = append(memviews, R(func(gtx C) D {
+				var smallViews []FC
+				smallViews = append(smallViews,
+					gui.Box("Program",
+						&gui.Config.GUI.ProgMem.Box,
+						gui.mem(
+							gui.CoreDump.PrintProgram,
+							&gui.ProgramScroll,
+						)),
+				)
+				smallViews = append(smallViews,
+					gui.Box("HRAM",
+						&gui.Config.GUI.HRAMMem.Box,
+						gui.mem(
+							gui.CoreDump.PrintHRAM,
+							&gui.HRAMScroll,
+						)),
+				)
+				smallViews = append(smallViews,
+					gui.Box("OAM",
+						&gui.Config.GUI.OAMMem.Box,
+						gui.mem(
+							gui.CoreDump.PrintOAM,
+							&gui.OAMScroll,
+						)),
+				)
+				return Column(gtx, smallViews...)
+			}))
+			memviews = append(memviews,
+				R(func(gtx C) D {
+					return Column(
+						gtx,
+						gui.Box("Execution log",
+							&gui.Config.GUI.Rewind.Box,
+							gui.mem(
 								gui.CoreDump.PrintRewindBuffer,
 								&gui.RewindBufferScroll,
-								gui.Config.GUI.Rewind.Box,
 							)),
-						)
-					}),
-				)
-			}
-			if gui.Config.GUI.Disassembly.Box.Show {
-				memviews = append(memviews,
-					R(func(gtx C) D {
-						return Column(
-							gtx,
-							gui.Box("Disassembly", gui.mem(
+					)
+				}),
+			)
+			memviews = append(memviews,
+				R(func(gtx C) D {
+					return Column(
+						gtx,
+						gui.Box("Disassembly",
+							&gui.Config.GUI.Disassembly.Box,
+							gui.mem(
 								gui.CoreDump.PrintDisassembly,
 								&gui.DisassemblyScroll,
-								gui.Config.GUI.Disassembly.Box,
 							)),
-						)
-					}),
-				)
-			}
-			timing := gui.Config.GUI.Timing.Box.Show
-			registers := gui.Config.GUI.Registers.Box.Show
-			apu := gui.Config.GUI.APU.Box.Show
-			if timing || registers || apu {
-				memviews = append(memviews,
-					R(func(gtx C) D {
-						var smallViews []FC
-						if timing {
-							smallViews = append(smallViews,
-								gui.Box("Speed", gui.mem(func(w io.Writer) {
-									fmt.Fprintf(w, "System clock:           %.0f\n", 4*gui.LastFrameCPS)
-									fmt.Fprintf(w, "CPU clock:              %.0f\n", gui.LastFrameCPS)
-									fmt.Fprintf(w, "Target emulation speed: %.2f%%\n", gui.Config.Model.Clock.SpeedPercent)
-									fmt.Fprintf(w, "Actual emulation speed: %.2f%%\n", (100*4*gui.LastFrameCPS)/4194304)
-									fmt.Fprintf(w, "Gameboy FPS:            %.0f\n", gui.LastFrameGBFPS)
-									fmt.Fprintf(w, "GUI FPS:                %.0f\n", gui.LastFrameGUIFPS)
-								}, &gui.TimingScroll, gui.Config.GUI.Timing.Box),
-								))
-						}
-						if registers {
-							smallViews = append(smallViews,
-								gui.Box("Registers", gui.mem(
+					)
+				}),
+			)
+			memviews = append(memviews,
+				R(func(gtx C) D {
+					var smallViews []FC
+					smallViews = append(smallViews,
+						gui.Box("Speed", &gui.Config.GUI.Timing.Box,
+							gui.mem(func(w io.Writer) {
+								fmt.Fprintf(w, "System clock:           %.0f\n", 4*gui.LastFrameCPS)
+								fmt.Fprintf(w, "CPU clock:              %.0f\n", gui.LastFrameCPS)
+								fmt.Fprintf(w, "Target emulation speed: %.2f%%\n", gui.Config.Model.Clock.SpeedPercent)
+								fmt.Fprintf(w, "Actual emulation speed: %.2f%%\n", (100*4*gui.LastFrameCPS)/4194304)
+								fmt.Fprintf(w, "Gameboy FPS:            %.0f\n", gui.LastFrameGBFPS)
+								fmt.Fprintf(w, "GUI FPS:                %.0f\n", gui.LastFrameGUIFPS)
+							}, &gui.TimingScroll),
+						))
+					smallViews = append(smallViews, R(func(gtx C) D {
+						return Row(
+							gtx,
+							gui.Box("Registers",
+								&gui.Config.GUI.Registers.Box,
+								gui.mem(
 									gui.CoreDump.PrintRegs,
 									&gui.RegistersScroll,
-									gui.Config.GUI.Registers.Box,
-								)),
-							)
-						}
-						if apu {
-							smallViews = append(smallViews,
-								gui.Box("APU", gui.mem(
+								),
+							),
+							gui.Box("APU",
+								&gui.Config.GUI.APU.Box,
+								gui.mem(
 									gui.CoreDump.PrintAPU,
 									&gui.APUScroll,
-									gui.Config.GUI.APU.Box,
-								)),
-							)
-						}
-						return Column(gtx, smallViews...)
-					}))
-			}
-			if gui.Config.GUI.PPU.Box.Show {
-				memviews = append(memviews,
-					R(func(gtx C) D {
-						return Column(
-							gtx,
-							gui.Box(
-								"PPU",
-								gui.mem(gui.CoreDump.PrintPPU, &gui.PPUScroll, gui.Config.GUI.PPU.Box),
+								),
 							),
 						)
 					}))
-			}
+					return Column(gtx, smallViews...)
+				}))
+			memviews = append(memviews,
+				R(func(gtx C) D {
+					return Column(
+						gtx,
+						gui.Box(
+							"PPU",
+							&gui.Config.GUI.PPU.Box,
+							gui.mem(gui.CoreDump.PrintPPU, &gui.PPUScroll),
+						),
+					)
+				}))
 			return Row(gtx, memviews...)
 		}),
+		gui.PlayArea(),
 		gui.Graphics(),
 		Spacer(25, 0),
 	)
 }
+func (gui *GUI) Box(title string, config *ConfigBox, content ...W) FC {
+	// Get or create toggle button for this box
+	toggleBtn, ok := gui.ToggleButtons[title]
+	if !ok {
+		toggleBtn = new(widget.Clickable)
+		gui.ToggleButtons[title] = toggleBtn
+	}
 
-func (gui *GUI) Box(title string, content ...W) FC {
 	return R(func(gtx C) D {
-		out := make([]FC, 1+len(content))
-		out[0] = gui.label(title)
-		for i, w := range content {
-			out[i+1] = R(w)
+		// Check if toggle button was clicked
+		if toggleBtn.Clicked(gtx) {
+			config.Show = !config.Show
+			gui.Config.Save()
 		}
-		return Column(gtx, out...)
+
+		gtx.Constraints.Min.X = int(unit.Dp(config.Width))
+		gtx.Constraints.Max.X = int(unit.Dp(config.Width))
+
+		if config.Show {
+			gtx.Constraints.Min.Y = int(unit.Dp(config.Height))
+			gtx.Constraints.Max.Y = int(unit.Dp(config.Height))
+		} else {
+			gtx.Constraints.Min.Y = int(unit.Dp(70))
+			gtx.Constraints.Max.Y = int(unit.Dp(70))
+		}
+
+		borderOuter := layout.UniformInset(8)
+		return borderOuter.Layout(gtx, func(gtx C) D {
+			borderInner := layout.UniformInset(8)
+			inner := borderInner.Layout(gtx, func(gtx C) D {
+				return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+					// Title row with toggle button
+					layout.Rigid(func(gtx C) D {
+						return layout.Flex{
+							Axis:    layout.Horizontal,
+							Spacing: layout.SpaceBetween,
+						}.Layout(gtx,
+							gui.label(title),
+							layout.Rigid(func(gtx C) D {
+								buttonText := "hide"
+								if !config.Show {
+									buttonText = "show"
+								}
+
+								btn := material.Button(&gui.Theme, toggleBtn, buttonText)
+								btn.Background = color.NRGBA{R: 220, G: 220, B: 220, A: 255}
+								btn.Color = color.NRGBA{R: 0, G: 0, B: 0, A: 255}
+
+								gtx.Constraints.Min = image.Point{}
+								gtx.Constraints.Max = image.Pt(80, 40)
+
+								return btn.Layout(gtx)
+							}),
+						)
+
+					}),
+					// Content (only show if not collapsed)
+					layout.Rigid(func(gtx C) D {
+						if !config.Show {
+							return D{}
+						}
+
+						// Add spacer between title and content
+						return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
+							Spacer(10, 1),
+							layout.Rigid(func(gtx C) D {
+								// Layout all content widgets vertically
+								widgets := make([]layout.FlexChild, len(content))
+								for i, w := range content {
+									w := w // capture loop variable
+									widgets[i] = layout.Rigid(func(gtx C) D {
+										return w(gtx)
+									})
+								}
+								return layout.Flex{Axis: layout.Vertical}.Layout(gtx, widgets...)
+							}),
+						)
+					}),
+				)
+			})
+
+			// Draw border around the whole box
+			paint.FillShape(gtx.Ops, color.NRGBA{A: 128}, clip.Stroke{
+				Path:  clip.Rect{Max: inner.Size}.Path(),
+				Width: 2,
+			}.Op())
+			return inner
+		})
 	})
 }
 
@@ -436,138 +462,125 @@ func (gui *GUI) Button(clickable *widget.Clickable, text string) FC {
 		return material.Button(&gui.Theme, clickable, text).Layout(gtx)
 	})
 }
-
-func (gui *GUI) NumberInput(gtx C, editor *widget.Editor, placeholder string, f func(text string)) D {
+func (gui *GUI) NumberInput(editor *widget.Editor, what string, placeholder string, f func(text string)) FC {
 	editor.SingleLine = true
 	editor.Alignment = text.Middle
 	f(editor.Text())
-	return layout.Inset{
-		Top:    unit.Dp(0),
-		Right:  unit.Dp(170),
-		Bottom: unit.Dp(40),
-		Left:   unit.Dp(170),
-	}.Layout(gtx, func(gtx C) D {
-		return widget.Border{
-			Color:        color.NRGBA{R: 204, G: 204, B: 204, A: 255},
-			CornerRadius: unit.Dp(3),
-			Width:        unit.Dp(2),
-		}.Layout(gtx, material.Editor(&gui.Theme, editor, placeholder).Layout)
+	return R(func(gtx C) D {
+		return layout.Flex{
+			Axis:      layout.Horizontal,
+			Spacing:   layout.SpaceBetween,
+			Alignment: layout.Middle,
+		}.Layout(gtx,
+			R(func(gtx C) D {
+				inset := layout.Inset{Right: unit.Dp(8)}
+				return inset.Layout(gtx, func(gtx C) D {
+					lbl := material.Label(&gui.Theme, unit.Sp(14), what)
+					lbl.Font.Typeface = "monospace"
+					lbl.Font.Weight = font.Black
+					lbl.Alignment = text.Start
+					return lbl.Layout(gtx)
+				})
+			}),
+			R(func(gtx C) D {
+				inset := layout.Inset{Left: unit.Dp(8)}
+				return inset.Layout(gtx, func(gtx C) D {
+					gtx.Constraints.Min.X = gtx.Dp(unit.Dp(200))
+					gtx.Constraints.Max.X = gtx.Dp(unit.Dp(200))
+					gtx.Constraints.Min.Y = gtx.Dp(unit.Dp(20))
+					gtx.Constraints.Max.Y = gtx.Dp(unit.Dp(20))
+					return widget.Border{
+						Color:        color.NRGBA{R: 204, G: 204, B: 204, A: 255},
+						CornerRadius: unit.Dp(3),
+						Width:        unit.Dp(2),
+					}.Layout(gtx, material.Editor(&gui.Theme, editor, placeholder).Layout)
+				})
+			}),
+		)
 	})
 }
 
 func (gui *GUI) PlayArea() FC {
 	return R(func(gtx C) D {
-		confViewport := DefaultGridConfig
-		confViewport.ShowGrid = false
-		confViewport.ShowAddress = true
-		confViewport.StartAddress = 0
-		confViewport.BlockIncrement = 8
-		confViewport.LineIncrement = 1
-		confViewport.ShowOffsets = true
-		confViewport.DecimalAddress = true
+		return layout.Center.Layout(gtx, func(gtx C) D {
+			var views []FC
 
-		confJoypad := DefaultGridConfig
-		confJoypad.ShowAddress = false
-		confJoypad.ShowGrid = false
-
-		var views []FC
-
-		if gui.Config.GUI.ViewPort.Box.Show {
 			views = append(views,
-				gui.label(fmt.Sprintf("Viewport (X=%d,Y=%d)", gui.CoreDump.PPU.BackgroundFetcher.X, (gui.CoreDump.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value)/8)),
-				R(func(gtx C) D {
-					vp := gui.GB.GetViewport()
-					pixels := vp.Flatten()
-					var highlights []Highlight
-					if !gui.GB.CLK.Running.Load() {
-						highlights = append(highlights, Highlight{
-							BlockX: int(gui.CoreDump.PPU.PixelShifter.X) / 8,
-							BlockY: int(gui.CoreDump.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value) / 8,
-							Color:  color.RGBA{R: 255, A: 128},
-						})
+				gui.Box(
+					"Viewport",
+					&gui.Config.GUI.ViewPort.Box,
+					func(gtx C) D {
+						vp := gui.GB.GetViewport()
+						pixels := vp.Flatten()
+						var highlights []Highlight
+						if !gui.GB.CLK.Running.Load() {
+							highlights = append(highlights, Highlight{
+								BlockX: int(gui.CoreDump.PPU.PixelShifter.X) / 8,
+								BlockY: int(gui.CoreDump.PPU.Registers[model.AddrLY-model.AddrPPUBegin].Value) / 8,
+								Color:  color.RGBA{R: 255, A: 128},
+							})
+						}
+						return gui.GBGraphics(
+							gtx,
+							160,
+							144,
+							pixels[:],
+							gui.Config.GUI.ViewPort.Graphics,
+							highlights,
+						)
+					},
+				),
+			)
+			views = append(views, gui.Box("Joypad",
+				&gui.Config.GUI.JoyPad.Box,
+				func(gtx C) D {
+					joypadViz := make([]model.Color, 8*6*8*4)
+					highlights := [8]Highlight{}
+
+					setButton := func(h *Highlight, x, y int, pressed bool, text string) {
+						h.BlockX = x
+						h.BlockY = y
+						h.Text = text
+						h.Font = basicfont.Face7x13
+						h.TextColor = color.RGBA{R: 0, B: 0, G: 0, A: 255}
+						if pressed {
+							h.Color = color.RGBA{R: 255, B: 0, G: 0, A: 80}
+						} else {
+							h.Color = color.RGBA{R: 0, B: 0, G: 0, A: 40}
+						}
 					}
+					setButton(&highlights[0], 1, 0, gui.JoypadState.Up, "Up")
+					setButton(&highlights[1], 0, 1, gui.JoypadState.Left, "Lf")
+					setButton(&highlights[2], 2, 1, gui.JoypadState.Right, "Ri")
+					setButton(&highlights[3], 1, 2, gui.JoypadState.Down, "Dn")
+					setButton(&highlights[4], 4, 1, gui.JoypadState.B, "B")
+					setButton(&highlights[5], 5, 0, gui.JoypadState.A, "A")
+					setButton(&highlights[6], 5, 3, gui.JoypadState.Start, "St")
+					setButton(&highlights[7], 3, 3, gui.JoypadState.Select, "Se")
+
 					return gui.GBGraphics(
 						gtx,
-						160,
-						144,
-						pixels[:],
-						4,
-						confViewport,
-						highlights,
+						8*6,
+						8*4,
+						joypadViz,
+						gui.Config.GUI.JoyPad.Graphics,
+						highlights[:],
 					)
-				}),
-			)
-		}
-		if gui.Config.GUI.JoyPad.Box.Show {
-			views = append(views, gui.Box("Joypad", func(gtx C) D {
-				joypadViz := make([]model.Color, 8*6*8*4)
-				highlights := [8]Highlight{}
+				}))
 
-				setButton := func(h *Highlight, x, y int, pressed bool, text string) {
-					h.BlockX = x
-					h.BlockY = y
-					h.Text = text
-					h.Font = basicfont.Face7x13
-					h.TextColor = color.RGBA{R: 0, B: 0, G: 0, A: 255}
-					if pressed {
-						h.Color = color.RGBA{R: 255, B: 0, G: 0, A: 80}
-					} else {
-						h.Color = color.RGBA{R: 0, B: 0, G: 0, A: 40}
-					}
-				}
-				setButton(&highlights[0], 1, 0, gui.JoypadState.Up, "Up")
-				setButton(&highlights[1], 0, 1, gui.JoypadState.Left, "Lf")
-				setButton(&highlights[2], 2, 1, gui.JoypadState.Right, "Ri")
-				setButton(&highlights[3], 1, 2, gui.JoypadState.Down, "Dn")
-				setButton(&highlights[4], 4, 1, gui.JoypadState.B, "B")
-				setButton(&highlights[5], 5, 0, gui.JoypadState.A, "A")
-				setButton(&highlights[6], 5, 3, gui.JoypadState.Start, "St")
-				setButton(&highlights[7], 3, 3, gui.JoypadState.Select, "Se")
-
-				return gui.GBGraphics(
-					gtx,
-					8*6,
-					8*4,
-					joypadViz,
-					8,
-					confJoypad,
-					highlights[:],
-				)
-			}))
-		}
-
-		return Column(gtx, views...)
+			return Column(gtx, views...)
+		})
 	})
 }
 
 func (gui *GUI) Graphics() FC {
 	return R(func(gtx C) D {
 		var views []FC
-		viewPort := gui.Config.GUI.ViewPort.Box.Show
-		joyPad := gui.Config.GUI.JoyPad.Box.Show
-		if viewPort || joyPad {
-			views = append(views, gui.PlayArea())
-		}
-		if gui.Config.GUI.TileData.Box.Show {
-			views = append(views, gui.TileData())
-		}
-		if gui.Config.GUI.TileMap1.Box.Show {
-			views = append(views, gui.TileMap1())
-		}
-		if gui.Config.GUI.TileMap2.Box.Show {
-			views = append(views, gui.TileMap2())
-		}
-		oamBuf := gui.Config.GUI.OAMBuffer.Box.Show
-		oamGraphics := gui.Config.GUI.OAMGraphics.Box.Show
-		oamList := gui.Config.GUI.OAMList.Box.Show
-		if oamBuf || oamGraphics || oamList {
-			views = append(views, gui.OAMColumn())
-		}
-		if gui.Config.GUI.Debugger.Box.Show {
-			views = append(views,
-				gui.Debugger(),
-			)
-		}
+		views = append(views, gui.TileData())
+		views = append(views, gui.TileMap1())
+		views = append(views, gui.TileMap2())
+		views = append(views, gui.OAMColumn())
+		views = append(views, gui.Debugger())
 		return Row(gtx, views...)
 	})
 }
@@ -576,17 +589,17 @@ func (gui *GUI) TileData() FC {
 	return R(func(gtx C) D {
 		return Column(
 			gtx,
-			gui.Box("Tile data", func(gtx C) D {
-				return gui.GBGraphics(
-					gtx,
-					192,
-					128,
-					tiledata(gui.VRAM),
-					2,
-					DefaultGridConfig.WithMem(0x8000, 16),
-					nil,
-				)
-			}),
+			gui.Box("Tile data", &gui.Config.GUI.TileData.Box,
+				func(gtx C) D {
+					return gui.GBGraphics(
+						gtx,
+						192,
+						128,
+						tiledata(gui.VRAM),
+						gui.Config.GUI.TileData.Graphics,
+						nil,
+					)
+				}),
 		)
 	})
 }
@@ -595,17 +608,17 @@ func (gui *GUI) TileMap1() FC {
 	return R(func(gtx C) D {
 		return Column(
 			gtx,
-			gui.Box("Tile map 1", func(gtx C) D {
-				return gui.GBGraphics(
-					gtx,
-					256,
-					256,
-					tilemap(gui.VRAM, 0x9800, gui.CoreDump.PPU.Registers[0].Value&model.Data8(1<<4) == 0),
-					2,
-					DefaultGridConfig.WithMem(0x9800, 1),
-					nil,
-				)
-			}),
+			gui.Box("Tile map 1", &gui.Config.GUI.TileMap1.Box,
+				func(gtx C) D {
+					return gui.GBGraphics(
+						gtx,
+						256,
+						256,
+						tilemap(gui.VRAM, 0x9800, gui.CoreDump.PPU.Registers[0].Value&model.Data8(1<<4) == 0),
+						gui.Config.GUI.TileMap1.Graphics,
+						nil,
+					)
+				}),
 		)
 	})
 }
@@ -614,17 +627,17 @@ func (gui *GUI) TileMap2() FC {
 	return R(func(gtx C) D {
 		return Column(
 			gtx,
-			gui.Box("Tile map 2", func(gtx C) D {
-				return gui.GBGraphics(
-					gtx,
-					256,
-					256,
-					tilemap(gui.VRAM, 0x9c00, gui.CoreDump.PPU.Registers[0].Value&model.Data8(1<<4) == 0),
-					2,
-					DefaultGridConfig.WithMem(0x9c00, 1),
-					nil,
-				)
-			}),
+			gui.Box("Tile map 2", &gui.Config.GUI.TileMap2.Box,
+				func(gtx C) D {
+					return gui.GBGraphics(
+						gtx,
+						256,
+						256,
+						tilemap(gui.VRAM, 0x9c00, gui.CoreDump.PPU.Registers[0].Value&model.Data8(1<<4) == 0),
+						gui.Config.GUI.TileMap2.Graphics,
+						nil,
+					)
+				}),
 		)
 	})
 }
@@ -632,9 +645,9 @@ func (gui *GUI) TileMap2() FC {
 func (gui *GUI) OAMColumn() FC {
 	return R(func(gtx C) D {
 		var views []FC
-		if gui.Config.GUI.OAMBuffer.Box.Show {
-			views = append(views,
-				gui.Box("OAM buffer", func(gtx C) D {
+		views = append(views,
+			gui.Box("OAM buffer", &gui.Config.GUI.OAMBuffer.Box,
+				func(gtx C) D {
 					highlights := make([]Highlight, 10-gui.CoreDump.PPU.OAMBuffer.Level)
 					for i := range highlights {
 						highlights[i].BlockX = gui.CoreDump.PPU.OAMBuffer.Level + i
@@ -645,145 +658,103 @@ func (gui *GUI) OAMColumn() FC {
 						80,
 						8,
 						oambuffer(gui.VRAM, gui.CoreDump.PPU.OAMBuffer),
-						4,
-						DefaultGridConfig,
+						gui.Config.GUI.OAMBuffer.Graphics,
 						highlights,
 					)
 				}),
-			)
-		}
-		if gui.Config.GUI.OAMGraphics.Box.Show {
-			views = append(views,
-				gui.Box("OAM", func(gtx C) D {
+		)
+		views = append(views,
+			gui.Box("OAM graphics", &gui.Config.GUI.OAMGraphics.Box,
+				func(gtx C) D {
 					return gui.GBGraphics(
 						gtx,
 						80,
 						32,
 						oam(gui.VRAM, gui.CoreDump.OAM.Bytes()),
-						4,
-						DefaultGridConfig.WithMem(model.AddrOAMBegin, 4),
+						gui.Config.GUI.OAMGraphics.Graphics,
 						nil,
 					)
 				}),
-			)
-		}
-		if gui.Config.GUI.OAMList.Box.Show {
-			views = append(views,
-				gui.Box("OAM attributes", gui.mem(
+		)
+		views = append(views,
+			gui.Box("OAM attributes", &gui.Config.GUI.OAMList.Box,
+				gui.mem(
 					gui.CoreDump.PrintOAMAttrs,
 					&gui.OAMAttrScroll,
-					gui.Config.GUI.OAMList.Box,
 				)),
-			)
-		}
+		)
 
 		return Column(gtx, views...)
 	})
 }
 
 func (gui *GUI) Debugger() FC {
-	return R(func(gtx C) D {
-		return Column(
-			gtx,
-			gui.label(fmt.Sprintf("Running=%v", gui.GB.CLK.Running.Load())),
-			gui.label(fmt.Sprintf("Clock: %d, Falling=%v", gui.CoreDump.Cycle.C, gui.CoreDump.Cycle.Falling)),
-			R(func(gtx C) D {
-				return Row(
-					gtx,
-					gui.Button(&gui.StepButton, "Step"),
-					gui.Button(&gui.StartButton, "Run"),
-					gui.Button(&gui.PauseButton, "Pause"),
-					gui.Button(&gui.ResetButton, "Reset"),
-				)
-			}),
-			R(func(gtx C) D {
-				return Row(
-					gtx,
-					gui.Box("Step cycles", func(gtx C) D {
-						return gui.NumberInput(gtx, &gui.StepCyclesInput, "cycles", func(text string) {
-							cycles, err := strconv.ParseUint(text, 10, 64)
-							if err == nil && cycles > 0 {
-								gui.StepCycles = cycles
-							}
-						})
-					}),
-				)
-			}),
-			R(func(gtx C) D {
-				return Row(
-					gtx,
-					gui.Box("Speed%", func(gtx C) D {
-						return gui.NumberInput(gtx, &gui.SpeedInput, "speed", func(text string) {
-							targetPercent, err := strconv.ParseFloat(text, 64)
-							if err == nil && targetPercent > 0 && targetPercent < 10000 {
-								if gui.Config.Model.Clock.SpeedPercent != targetPercent {
-									gui.Config.Model.Clock.SpeedPercent = targetPercent
-									gui.GB.CLK.SetSpeedPercent(gui.Config.Model.Clock.SpeedPercent)
-									gui.Config.Save()
-								}
-							}
-						})
-					}),
-				)
-			}),
-			R(func(gtx C) D {
-				return Row(
-					gtx,
-					gui.Box("PC breakpoint", func(gtx C) D {
-						return gui.NumberInput(gtx, &gui.BreakPCInput, "breakPC", func(text string) {
-							breakPC, err := strconv.ParseInt(text, 16, 64)
-							if err != nil {
-								breakPC = -1
-							}
-							if gui.GB.Debug.BreakPC.Load() != breakPC {
-								gui.GB.Debug.BreakPC.Store(breakPC)
-							}
-						})
-					}),
-				)
-			}),
-			R(func(gtx C) D {
-				return Row(
-					gtx,
-					gui.Box("Opcode breakpoint", func(gtx C) D {
-						return gui.NumberInput(gtx, &gui.BreakIRInput, "breakIR", func(text string) {
-							breakIR, err := strconv.ParseInt(text, 16, 64)
-							if err != nil {
-								breakIR = -1
-							}
-							if gui.GB.Debug.BreakIR.Load() != breakIR {
-								gui.GB.Debug.BreakIR.Store(breakIR)
-							}
-						})
-					}),
-				)
-			}),
-			R(func(gtx C) D {
-				return Row(
-					gtx,
-					gui.Box("PPU breakpoint", func(gtx C) D {
-						return gui.NumberInput(gtx, &gui.BreakXInput, "breakX", func(text string) {
-							breakX, err := strconv.ParseInt(text, 10, 64)
-							if err != nil {
-								breakX = -1
-							}
-							if gui.GB.Debug.BreakX.Load() != breakX {
-								gui.GB.Debug.BreakX.Store(breakX)
-							}
-						})
-					}, func(gtx C) D {
-						return gui.NumberInput(gtx, &gui.BreakYInput, "breakY", func(text string) {
-							breakY, err := strconv.ParseInt(text, 10, 64)
-							if err != nil {
-								breakY = -1
-							}
-							if gui.GB.Debug.BreakY.Load() != breakY {
-								gui.GB.Debug.BreakY.Store(breakY)
-							}
-						})
-					}),
-				)
-			}),
-		)
-	})
+	return gui.Box("Debugger", &gui.Config.GUI.Debugger.Box,
+		func(gtx C) D {
+			return Column(
+				gtx,
+				gui.label(fmt.Sprintf("Running=%v", gui.GB.CLK.Running.Load())),
+				gui.label(fmt.Sprintf("Clock: %d, Falling=%v", gui.CoreDump.Cycle.C, gui.CoreDump.Cycle.Falling)),
+				R(func(gtx C) D {
+					return Row(
+						gtx,
+						gui.Button(&gui.StepButton, "Step"),
+						gui.Button(&gui.StartButton, "Run"),
+						gui.Button(&gui.PauseButton, "Pause"),
+						gui.Button(&gui.ResetButton, "Reset"),
+					)
+				}),
+				gui.NumberInput(&gui.StepCyclesInput, "Step Cycles", "cycles", func(text string) {
+					cycles, err := strconv.ParseUint(text, 10, 64)
+					if err == nil && cycles > 0 {
+						gui.StepCycles = cycles
+					}
+				}),
+				gui.NumberInput(&gui.SpeedInput, "Speed%", "speed", func(text string) {
+					targetPercent, err := strconv.ParseFloat(text, 64)
+					if err == nil && targetPercent > 0 && targetPercent < 10000 {
+						if gui.Config.Model.Clock.SpeedPercent != targetPercent {
+							gui.Config.Model.Clock.SpeedPercent = targetPercent
+							gui.GB.CLK.SetSpeedPercent(gui.Config.Model.Clock.SpeedPercent)
+							gui.Config.Save()
+						}
+					}
+				}),
+				gui.NumberInput(&gui.BreakPCInput, "PC breakpoint", "breakPC", func(text string) {
+					breakPC, err := strconv.ParseInt(text, 16, 64)
+					if err != nil {
+						breakPC = -1
+					}
+					if gui.GB.Debug.BreakPC.Load() != breakPC {
+						gui.GB.Debug.BreakPC.Store(breakPC)
+					}
+				}),
+				gui.NumberInput(&gui.BreakIRInput, "IR breakpoint", "breakIR", func(text string) {
+					breakIR, err := strconv.ParseInt(text, 16, 64)
+					if err != nil {
+						breakIR = -1
+					}
+					if gui.GB.Debug.BreakIR.Load() != breakIR {
+						gui.GB.Debug.BreakIR.Store(breakIR)
+					}
+				}), gui.NumberInput(&gui.BreakXInput, "PPU X breakpoint", "breakX", func(text string) {
+					breakX, err := strconv.ParseInt(text, 10, 64)
+					if err != nil {
+						breakX = -1
+					}
+					if gui.GB.Debug.BreakX.Load() != breakX {
+						gui.GB.Debug.BreakX.Store(breakX)
+					}
+				}),
+				gui.NumberInput(&gui.BreakYInput, "PPU Y breakpoint", "breakY", func(text string) {
+					breakY, err := strconv.ParseInt(text, 10, 64)
+					if err != nil {
+						breakY = -1
+					}
+					if gui.GB.Debug.BreakY.Load() != breakY {
+						gui.GB.Debug.BreakY.Store(breakY)
+					}
+				}),
+			)
+		})
 }

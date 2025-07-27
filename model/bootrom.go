@@ -1,8 +1,7 @@
 package model
 
 import (
-	"fmt"
-	"os"
+	"github.com/jonathangjertsen/toyboy/assets"
 )
 
 type BootROMLock struct {
@@ -41,13 +40,11 @@ func (brl *BootROMLock) Lock() {
 
 func NewBootROM(clk *ClockRT, config ConfigBootROM) MemoryRegion {
 	bootrom := NewMemoryRegion(clk, AddrZero, SizeBootROM)
-	// todo: static fs
-	f, err := os.ReadFile(config.Location)
-	if err != nil {
-		panic(fmt.Sprintf("failed to load boot rom: %v", err))
-	} else if len(f) != 256 {
-		panic(fmt.Sprintf("len(bootrom)=%d", len(f)))
+
+	if config.Variant == "DMGBoot" {
+		bootrom.Data = Data8Slice(assets.DMGBoot)
+	} else {
+		panic("unknown boot ROM")
 	}
-	bootrom.Data = Data8Slice(f)
 	return bootrom
 }

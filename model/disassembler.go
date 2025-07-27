@@ -109,8 +109,9 @@ func (di *DisInstruction) Asm() string {
 		return fmt.Sprintf("%s A, %s", str[:ln-1], str[ln-1:])
 	case OpcodeADDHL, OpcodeSUBHL, OpcodeANDHL, OpcodeORHL, OpcodeADCHL, OpcodeSBCHL, OpcodeXORHL, OpcodeCPHL:
 		return fmt.Sprintf("%s A, (HL)", str[:ln-2])
-	case OpcodeLDABC, OpcodeLDADE,
-		OpcodeLDAHL, OpcodeLDBHL, OpcodeLDCHL, OpcodeLDDHL, OpcodeLDEHL, OpcodeLDHHL, OpcodeLDLHL:
+	case OpcodeLDABC, OpcodeLDADE:
+		return fmt.Sprintf("LD A, %s", str[ln-2:])
+	case OpcodeLDAHL, OpcodeLDBHL, OpcodeLDCHL, OpcodeLDDHL, OpcodeLDEHL, OpcodeLDHHL, OpcodeLDLHL:
 		return fmt.Sprintf("LD %s, (HL)", str[ln-3:ln-2])
 	case OpcodeLDHLA, OpcodeLDHLB, OpcodeLDHLC, OpcodeLDHLD, OpcodeLDHLE, OpcodeLDHLH, OpcodeLDHLL:
 		return fmt.Sprintf("LD (HL), %s", str[ln-1:])
@@ -163,7 +164,7 @@ func (di *DisInstruction) Asm() string {
 }
 
 func fmtSignedOffset(offs Data8) string {
-	if offs.SignBit() {
+	if offs&SignBit8 != 0 {
 		return fmt.Sprintf("-$%s", offs.SignedAbs().Hex())
 	}
 	return fmt.Sprintf("$%s", offs.Hex())
@@ -299,7 +300,7 @@ func (dis *Disassembler) SetProgram(program []byte) {
 	dis.cachedDisassembly = nil
 }
 
-func (dis *Disassembler) printf(format string, args ...any) {
+func (dis *Disassembler) print(msg string) {
 	if !dis.Config.Trace {
 		return
 	}
@@ -309,8 +310,7 @@ func (dis *Disassembler) printf(format string, args ...any) {
 	if dis.stackIdx > 0 {
 		fmt.Printf("%s ", dis.stack[dis.stackIdx-1].Hex())
 	}
-	fmt.Printf(format, args...)
-	fmt.Printf("\n")
+	fmt.Println(msg)
 }
 
 func (dis *Disassembler) SetPC(address Addr) {
@@ -324,38 +324,39 @@ func (dis *Disassembler) SetPC(address Addr) {
 }
 
 func (dis *Disassembler) ExploreFrom(address Addr) {
-	//dis.printf("SetPC %s", address.Hex())
 	dis.stack = append(dis.stack, address)
 	dis.stackIdx++
-	defer func() {
-		dis.stackIdx--
-		dis.stack = dis.stack[:dis.stackIdx]
-		dis.PC = address
-	}()
 
+	dis.exploreFromInner(address)
+
+	dis.stackIdx--
+	dis.stack = dis.stack[:dis.stackIdx]
+	dis.PC = address
+}
+
+func (dis *Disassembler) exploreFromInner(address Addr) {
 	for {
 		var block *Block
 		if int(address) < len(dis.Program.Source) {
 			block = &dis.Program
 		} else if address >= AddrHRAMBegin && address <= AddrHRAMEnd {
 			if !dis.HRAM.CanExplore {
-				dis.printf("reached HRAM address before setting HRAM")
+				dis.print("reached HRAM address before setting HRAM")
 				return
 			}
 			block = &dis.HRAM
 		} else if address >= AddrWRAMBegin && address <= AddrWRAMEnd {
 			if !dis.WRAM.CanExplore {
-				dis.printf("reached WRAM address before setting WRAM")
+				dis.print("reached WRAM address before setting WRAM")
 				return
 			}
 			block = &dis.WRAM
 		} else {
-			dis.printf("reached address outside of program, WRAM and HRAM")
+			dis.print("reached address outside of program, WRAM and HRAM")
 			return
 		}
 
 		if block.Decoded[address-block.Begin].Size() > 0 {
-			//dis.printf("already seen this address")
 			return
 		}
 
@@ -367,7 +368,7 @@ func (dis *Disassembler) ExploreFrom(address Addr) {
 			}
 			if block.Source[next] == 0x00 {
 				if i == maxConsecutiveNops-1 {
-					dis.printf("too many nops ahead, probably not code")
+					dis.print("too many nops ahead, probably not code")
 					return
 				}
 			} else {
@@ -383,7 +384,7 @@ func (dis *Disassembler) ExploreFrom(address Addr) {
 
 		for i := range Addr(di.Size()) {
 			if block.Decoded[address+i-block.Begin].Size() > 0 {
-				dis.printf("at offset %s there is an existing instruction, returning", i.Dec())
+				dis.print("slices an existing instruction, returning")
 				return
 			}
 		}
@@ -447,7 +448,12 @@ func (dis *Disassembler) Disassembly() *Disassembly {
 }
 
 func (dis *Disassembler) insert(di DisInstruction, block *Block) {
-	dis.printf("insert %v at %s:%s", di.Opcode, di.Address.Hex(), (di.Address + Addr(di.Size()) - 1).Hex())
+	if dis.Config.Trace {
+		dis.print(fmt.Sprintf("insert %s at %s:%s", di.Asm(), di.Address.Hex(), (di.Address + Addr(di.Size()) - 1).Hex()))
+	}
+	if di.Address == 0xa8 {
+		panic("here")
+	}
 	for addr := di.Address; addr != di.Address+Addr(di.Size()); addr++ {
 		block.Decoded[addr-block.Begin] = di
 	}
@@ -461,7 +467,9 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 		e := int8(di.Raw[1])
 
 		// branch taken
-		dis.printf("checking branch-taken for relative jump")
+		if dis.Config.Trace {
+			dis.print("checking branch-taken for relative jump @ " + di.Asm())
+		}
 		if e > 0 {
 			dis.ExploreFrom(di.Address + Addr(di.Size()) + Addr(e))
 		} else {
@@ -470,19 +478,21 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 
 		// branch not taken will be inspected after this
 		if di.Opcode == OpcodeJRe {
-			dis.printf("unconditional branch, can never fall through")
+			dis.print("unconditional branch, can never fall through")
 			return true
 		}
 	case OpcodeJPnn, OpcodeJPCnn, OpcodeJPNCnn, OpcodeJPZnn, OpcodeJPNZnn,
 		OpcodeCALLnn, OpcodeCALLCnn, OpcodeCALLNCnn, OpcodeCALLZnn, OpcodeCALLNZnn:
 		addr := Addr(join16(di.Raw[2], di.Raw[1]))
-		dis.printf("checking branch-taken for absolute jump")
+		if dis.Config.Trace {
+			dis.print("checking branch-taken for absolute jump @ " + di.Asm())
+		}
 		dis.ExploreFrom(addr)
 		if di.Opcode == OpcodeJPnn || di.Opcode == OpcodeJPHL {
-			dis.printf("unconditional branch, can never fall through")
+			dis.print("unconditional branch, can never fall through")
 			return true
 		} else if di.Opcode == OpcodeCALLnn {
-			dis.printf("will probably return here")
+			dis.print("will probably return here")
 			// We don't fall thru here, but structured programs would return here from RET.
 			// Unless the code adjusts the return address in stack memory.
 			// If that happens AND there is data just after this section, it will be interpreted as code
@@ -504,7 +514,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 	case OpcodeRST0x38:
 		dis.doRST(0x38)
 	case OpcodeUndefD3, OpcodeUndefDB, OpcodeUndefDD, OpcodeUndefE3, OpcodeUndefE4, OpcodeUndefEB, OpcodeUndefEC, OpcodeUndefED, OpcodeUndefF4, OpcodeUndefFC, OpcodeUndefFD:
-		dis.printf("dropping undefined instruction %02x", di.Opcode)
+		dis.print("dropping undefined instruction " + di.Opcode.String())
 		block.Decoded[di.Address-block.Begin] = DisInstruction{}
 		return true
 	case OpcodeRET, OpcodeRETI, OpcodeJPHL:
@@ -563,9 +573,9 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 }
 
 func (dis *Disassembler) doRST(vec Addr) {
-	dis.printf("unconditional function call to %s", vec.Hex())
+	dis.print("unconditional function call to %s" + vec.Hex())
 	dis.ExploreFrom(vec)
-	dis.printf("will probably return here")
+	dis.print("will probably return here")
 }
 
 func (dis *Disassembler) readNewInstruction(addr Addr, block *Block) (DisInstruction, error) {

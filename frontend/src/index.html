@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge, Chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+    <!-- Main Source Files -->
+    <link rel="stylesheet" href="main.css" />
+</head>
+
+<body id="app" class="app">
+    <header>
+        <!--  -->
+    </header>
+    <main>
+        <div class="play-area">
+            <p>Speed: <span id="fps"></span>%</p>
+            <canvas id="lcd" width="160" height="144" style="image-rendering: pixelated; width:640px; height: 576px;"></canvas>
+        </div>
+
+		<h1>Select ROM</h1>
+        <input type="file" id="romInput" multiple style="display: none;">
+        <button id="romInputButton">Choose ROM</button>
+        <div id="fileInfo">
+            <p>No files uploaded yet</p>
+        </div>
+        <script src="framebuffer.js"></script>
+        <script src="webgl.js"></script>
+        <script src="lcd.js"></script>
+        <script src="localstorage.js"></script>
+        <script src="config.js"></script>
+        <script src="roms.js"></script>
+        <script src="ui.js"></script>
+        <script src="main.js"></script>
+    </main>
+    <footer>
+        <!--  -->
+    </footer>
+</body>

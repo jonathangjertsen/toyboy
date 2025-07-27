@@ -17,7 +17,3 @@ func (ser *Serial) Read(addr Addr) Data8 {
 func (ser *Serial) Write(addr Addr, v Data8) {
 	ser.Mem.Write(addr, v)
 }
-
-func (ser *Serial) GetCounters(addr Addr) (uint64, uint64) {
-	return ser.Mem.GetCounters(addr)
-}

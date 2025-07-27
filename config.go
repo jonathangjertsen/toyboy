@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"os"
 
 	"github.com/jonathangjertsen/toyboy/model"
@@ -12,6 +13,14 @@ var DefaultConfig = Config{
 	Location: "config.json",
 	Model:    model.DefaultConfig,
 	GUI: ConfigGUI{
+		Graphics: ConfigGraphicsGlobal{
+			Overlay:       false,
+			DashLen:       4,
+			GridThickness: 1,
+			GridColor:     color.RGBA{136, 136, 136, 255},
+			FillColor:     color.RGBA{240, 240, 240, 255},
+			Font:          "Basic",
+		},
 		VRAMMem: ConfigVRAM{
 			Box: ConfigBox{
 				Show: true,
@@ -108,6 +117,7 @@ type Config struct {
 }
 
 type ConfigGUI struct {
+	Graphics    ConfigGraphicsGlobal
 	VRAMMem     ConfigVRAM
 	WRAMMem     ConfigWRAM
 	ProgMem     ConfigProgram
@@ -184,36 +194,61 @@ type ConfigRegisters struct {
 	Box ConfigBox
 }
 
-type ConfigPlayArea struct {
-	Box ConfigBox
-}
-
 type ConfigViewPort struct {
-	Box ConfigBox
+	Box      ConfigBox
+	Graphics ConfigGraphics
 }
 
 type ConfigJoyPad struct {
-	Box ConfigBox
+	Box      ConfigBox
+	Graphics ConfigGraphics
 }
 
 type ConfigTileData struct {
-	Box ConfigBox
+	Box      ConfigBox
+	Graphics ConfigGraphics
 }
 
 type ConfigTileMap struct {
-	Box ConfigBox
+	Box      ConfigBox
+	Graphics ConfigGraphics
 }
 
 type ConfigOAMBuffer struct {
-	Box ConfigBox
+	Box      ConfigBox
+	Graphics ConfigGraphics
 }
 
 type ConfigOAMGraphics struct {
-	Box ConfigBox
+	Box      ConfigBox
+	Graphics ConfigGraphics
 }
 
 type ConfigOAMList struct {
 	Box ConfigBox
+}
+
+type ConfigGraphicsGlobal struct {
+	Overlay       bool
+	GridColor     color.RGBA // RGBA grid line color
+	FillColor     color.RGBA // RGBA fill/background
+	DashLen       int
+	GridThickness int
+	Font          string
+}
+
+type ConfigGraphics struct {
+	ShowGrid  bool
+	BlockSize int
+	Scale     int
+
+	ShowAddress    bool
+	StartAddress   model.Addr
+	BlockIncrement model.Addr
+	LineIncrement  model.Addr
+	DecimalAddress bool
+
+	ShowOffsets bool
 }
 
 func LoadConfig(location string) (Config, error) {
@@ -229,13 +264,13 @@ func LoadConfig(location string) (Config, error) {
 	return config, nil
 }
 
-func (conf *Config) Save() {
+func (conf *Config) Save() error {
 	jsonData, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
-		fmt.Printf("marshalling config: %v", err)
-		return
+		return fmt.Errorf("marshalling config: %w", err)
 	}
 	if err := os.WriteFile(conf.Location, jsonData, 0o666); err != nil {
-		fmt.Printf("failed to save config file: %v", err)
+		return fmt.Errorf("failed to save config file: %v", err)
 	}
+	return nil
 }

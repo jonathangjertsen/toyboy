@@ -135,11 +135,12 @@ func (tb *TestBus) BeginCoreDump() func() {
 	return func() {}
 }
 
-func (tb *TestBus) PushState() func() {
-	addr, data := tb.addr, tb.data
-	return func() {
-		tb.addr, tb.data = addr, data
-	}
+func (tb *TestBus) PushState() (model.Addr, model.Data8) {
+	return tb.addr, tb.data
+}
+
+func (tb *TestBus) PopState(addr model.Addr, data model.Data8) {
+	tb.addr, tb.data = addr, data
 }
 
 func (tb *TestBus) Reset() {
@@ -180,7 +181,7 @@ func (tb *TestBus) GetPeripheral(any) {
 func Run(t *testing.T, tcs []TestCase) {
 	t.Helper()
 	for i, tc := range tcs {
-		clock := model.NewClock()
+		clock := model.NewRealtimeClock(model.DefaultConfig.Clock)
 		testBus := TestBus{}
 		config := model.DefaultConfig
 		config.Debug.PanicOnStackUnderflow = false
@@ -200,11 +201,7 @@ func Run(t *testing.T, tcs []TestCase) {
 			testBus.RAM[entry.Addr] = model.Data8(entry.Val)
 		}
 
-		for i, cyc := range tc.Cycles {
-			_ = cyc
-			clock.Cycle(uint64(i))
-		}
-		clock.Cycle(uint64(len(tc.Cycles)))
+		clock.MCycle(len(tc.Cycles) / 4)
 
 		if have, want := cpu.Regs.A, tc.Final.A; have != want {
 			t.Fatalf("Test %d Register A have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String())
