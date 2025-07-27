@@ -31,7 +31,7 @@ func NewTimer(clock *ClockRT, apu *APU, interrupts *Interrupts) *Timer {
 
 // Tick the DIV timer
 // Runs every cycle, so this code path is extremely hot
-func (t *Timer) tickDIVTimer() {
+func (t *Timer) tickDIV() {
 	// https://gbdev.io/pandocs/Audio_details.html#div-apu
 	// A “DIV-APU” counter is increased every time DIV’s bit 4 (5 in double-speed mode) goes from 1 to 0
 	div := t.DIV
@@ -44,23 +44,18 @@ func (t *Timer) tickDIVTimer() {
 	t.Mem.Data[offsDIV] = Data8(div >> 8)
 	tac := t.Mem.Data[offsTAC]
 	var andResult bool
+	var clockSelect Data16
 	if tac&Bit2 != 0 {
-		switch tac & (Bit0 | Bit1) {
-		case 0:
-			andResult = (div&Bit9 != 0)
-		case 1:
-			andResult = (div&Bit3 != 0)
-		case 2:
-			andResult = (div&Bit5 != 0)
-		case 3:
-			andResult = (div&Bit7 != 0)
-		}
+		clockSelect = clockSelectBits[tac&(Bit0|Bit1)]
 	}
+	andResult = (div&clockSelect != 0)
 	if t.prevAndResult && !andResult {
 		tima := &t.Mem.Data[offsTIMA]
-		*tima++
-		if *tima == 0 {
+		if *tima == 0xFF {
 			t.preReloadCounter = 4
+			*tima = 0
+		} else {
+			*tima++
 		}
 	}
 	t.prevAndResult = andResult
@@ -71,6 +66,13 @@ func (t *Timer) tickDIVTimer() {
 			t.Interrupts.IRQSet(IntSourceTimer)
 		}
 	}
+}
+
+var clockSelectBits = [4]Data16{
+	Bit9,
+	Bit3,
+	Bit5,
+	Bit7,
 }
 
 func (t *Timer) Write(addr Addr, v Data8) {

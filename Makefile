@@ -17,9 +17,6 @@ disassembler: gen
 emulator: gen
 	wails build -debug
 
-server: 
-	go build -o bin/server github.com/jonathangjertsen/toyboy/cmd/server
-
 rom-empty:
 	cd assets/cartridges/asm;\
 	rgbasm -o empty.o empty.asm;\
@@ -42,7 +39,7 @@ install-gio:
 	go install gioui.org/cmd/gogio@latest
 	sudo apt install gcc pkg-config libwayland-dev libx11-dev libx11-xcb-dev libxkbcommon-x11-dev libgles2-mesa-dev libegl1-mesa-dev libffi-dev libxcursor-dev libvulkan-dev
 
-run: emulator rom-empty rom-hello-world rom-unbricked server
+run: emulator rom-empty rom-hello-world rom-unbricked
 	build/bin/emulator
 
 run-dis: disassembler

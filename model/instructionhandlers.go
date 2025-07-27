@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-type InstructionHandling func(e edge) bool
+type InstructionHandling func(e int) bool
 
 type CBOp struct {
 	Op     cb
@@ -27,11 +27,6 @@ func (cbv cb) Is3Cycles() bool {
 
 func (cb CBOp) String() string {
 	return fmt.Sprintf("%s %s", cb.Op, cb.Target)
-}
-
-type edge struct {
-	Cycle   int
-	Falling bool
 }
 
 func handlers(cpu *CPU) [256]InstructionHandling {
@@ -305,15 +300,29 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeRST0x28:  cpu.rst(0x28),
 		OpcodeRST0x30:  cpu.rst(0x30),
 		OpcodeRST0x38:  cpu.rst(0x38),
+		OpcodeUndefD3:  cpu.notImplemented,
+		OpcodeUndefDB:  cpu.notImplemented,
+		OpcodeUndefDD:  cpu.notImplemented,
+		OpcodeUndefE3:  cpu.notImplemented,
+		OpcodeUndefE4:  cpu.notImplemented,
+		OpcodeUndefEB:  cpu.notImplemented,
+		OpcodeUndefEC:  cpu.notImplemented,
+		OpcodeUndefED:  cpu.notImplemented,
+		OpcodeUndefF4:  cpu.notImplemented,
+		OpcodeUndefFC:  cpu.notImplemented,
+		OpcodeUndefFD:  cpu.notImplemented,
 	}
 }
 
-func (cpu *CPU) singleCycle(name string, f func()) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) notImplemented(e int) bool {
+	panicf("not implemented opcode %v", cpu.Regs.IR)
+	return false
+}
+
+func (cpu *CPU) singleCycle(name string, f func()) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
-			return true
-		case edge{1, true}:
+		case 1:
 			f()
 			return true
 		default:
@@ -323,113 +332,88 @@ func (cpu *CPU) singleCycle(name string, f func()) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) jphl(e edge) bool {
+func (cpu *CPU) jphl(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.SetPC(Addr(cpu.GetHL()))
 		return true
-	case edge{1, true}:
-		return true
 	default:
 		panicv(e)
 	}
 	return false
 }
 
-func (cpu *CPU) halt(e edge) bool {
+func (cpu *CPU) halt(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.halted = true
 		return true
-	case edge{1, true}:
-		return true
 	default:
 		panicv(e)
 	}
 	return false
 }
 
-func (cpu *CPU) jre(e edge) bool {
+func (cpu *CPU) jre(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
 	// TODO: this impl is not exactly correct
-	case edge{2, false}:
-	case edge{2, true}:
-	case edge{3, false}:
+	case 2:
+	case 3:
 		if cpu.Regs.TempZ&SignBit8 != 0 {
 			cpu.SetPC(cpu.Regs.PC - Addr(cpu.Regs.TempZ.SignedAbs()))
 		} else {
 			cpu.SetPC(cpu.Regs.PC + Addr(cpu.Regs.TempZ))
 		}
 		return true
-	case edge{3, true}:
-		return true
 	default:
 		panicv(e)
 	}
 	return false
 }
 
-func (cpu *CPU) jpnn(e edge) bool {
+func (cpu *CPU) jpnn(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{2, true}:
 		cpu.Regs.TempW = cpu.Bus.GetData()
-	case edge{3, false}:
-	case edge{3, true}:
-	case edge{4, false}:
+	case 3:
+	case 4:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 		return true
-	case edge{4, true}:
-		return true
 	default:
 		panicv(e)
 	}
 	return false
 }
 
-func (cpu *CPU) jrcce(f func() bool) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) jrcce(f func() bool) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
+		case 2:
 			if f() {
 				cpu.lastBranchResult = +1
-			} else {
-				cpu.lastBranchResult = -1
-				return true
-			}
-		case edge{2, true}:
-			if cpu.lastBranchResult == +1 {
 				newPC := Data16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ)))
 				cpu.Regs.SetWZ(newPC)
 			} else {
+				cpu.lastBranchResult = -1
 				return true
 			}
-		case edge{3, false}:
+		case 3:
 			if cpu.lastBranchResult == +1 {
 				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
-				return true
-			} else {
-				panicv(e)
-			}
-		case edge{3, true}:
-			if cpu.lastBranchResult == +1 {
 				return true
 			} else {
 				panicv(e)
@@ -441,20 +425,18 @@ func (cpu *CPU) jrcce(f func() bool) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) jpccnn(f func() bool) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) jpccnn(f func() bool) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
+		case 2:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		case edge{2, true}:
 			cpu.Regs.TempW = cpu.Bus.GetData()
-		case edge{3, false}:
+		case 3:
 			if f() {
 				cpu.lastBranchResult = +1
 				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
@@ -462,18 +444,7 @@ func (cpu *CPU) jpccnn(f func() bool) func(e edge) bool {
 				cpu.lastBranchResult = -1
 				return true
 			}
-		case edge{3, true}:
-			if cpu.lastBranchResult == +1 {
-			} else {
-				return true
-			}
-		case edge{4, false}:
-			if cpu.lastBranchResult == +1 {
-				return true
-			} else {
-				panicv(e)
-			}
-		case edge{4, true}:
+		case 4:
 			if cpu.lastBranchResult == +1 {
 				return true
 			} else {
@@ -486,24 +457,19 @@ func (cpu *CPU) jpccnn(f func() bool) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) push(msb, lsb *Data8) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) push(msb, lsb *Data8) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(cpu.Regs.SP)
-		case edge{1, true}:
 			cpu.Bus.WriteData(*msb)
-		case edge{2, false}:
+		case 2:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(cpu.Regs.SP)
-		case edge{2, true}:
 			cpu.Bus.WriteData(*lsb)
-		case edge{3, false}:
-		case edge{3, true}:
-		case edge{4, false}:
-			return true
-		case edge{4, true}:
+		case 3:
+		case 4:
 			return true
 		default:
 			panicv(e)
@@ -512,20 +478,18 @@ func (cpu *CPU) push(msb, lsb *Data8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) pop(msb, lsb *Data8) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) pop(msb, lsb *Data8) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
+		case 2:
 			cpu.writeAddressBus(cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
-		case edge{2, true}:
 			cpu.Regs.TempW = cpu.Bus.GetData()
-		case edge{3, false}:
+		case 3:
 			*msb = cpu.Regs.TempW
 			if lsb == &cpu.Regs.F {
 				*lsb = cpu.Regs.TempZ & 0xf0
@@ -533,8 +497,6 @@ func (cpu *CPU) pop(msb, lsb *Data8) func(e edge) bool {
 				*lsb = cpu.Regs.TempZ
 			}
 			return true
-		case edge{3, true}:
-			return true
 		default:
 			panicv(e)
 		}
@@ -542,34 +504,27 @@ func (cpu *CPU) pop(msb, lsb *Data8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) callnn(e edge) bool {
+func (cpu *CPU) callnn(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{2, true}:
 		cpu.Regs.TempW = cpu.Bus.GetData()
-	case edge{3, false}:
+	case 3:
 		cpu.SetSP(cpu.Regs.SP - 1)
-	case edge{3, true}:
-	case edge{4, false}:
+	case 4:
 		cpu.writeAddressBus(cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP - 1)
-	case edge{4, true}:
 		cpu.Bus.WriteData(cpu.Regs.PC.MSB())
-	case edge{5, false}:
+	case 5:
 		cpu.writeAddressBus(cpu.Regs.SP)
-	case edge{5, true}:
 		cpu.Bus.WriteData(cpu.Regs.PC.LSB())
-	case edge{6, false}:
+	case 6:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
-		return true
-	case edge{6, true}:
 		return true
 	default:
 		panicv(e)
@@ -577,20 +532,18 @@ func (cpu *CPU) callnn(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) callccnn(f func() bool) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) callccnn(f func() bool) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
+		case 2:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		case edge{2, true}:
 			cpu.Regs.TempW = cpu.Bus.GetData()
-		case edge{3, false}:
+		case 3:
 			if f() {
 				cpu.lastBranchResult = +1
 				cpu.SetSP(cpu.Regs.SP - 1)
@@ -598,45 +551,32 @@ func (cpu *CPU) callccnn(f func() bool) func(e edge) bool {
 				cpu.lastBranchResult = -1
 				return true
 			}
-		case edge{3, true}:
-			if cpu.lastBranchResult == +1 {
-			} else {
-				return true
-			}
-		case edge{4, false}:
+		case 4:
 			if cpu.lastBranchResult == +1 {
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP - 1)
 			} else {
 				panicv(e)
 			}
-		case edge{4, true}:
 			if cpu.lastBranchResult == +1 {
 				cpu.Bus.WriteData(cpu.Regs.PC.MSB())
 			} else {
 				panicv(e)
 			}
-		case edge{5, false}:
+		case 5:
 			if cpu.lastBranchResult == +1 {
 				cpu.writeAddressBus(cpu.Regs.SP)
 			} else {
 				panicv(e)
 			}
-		case edge{5, true}:
 			if cpu.lastBranchResult == +1 {
 				cpu.Bus.WriteData(cpu.Regs.PC.LSB())
 			} else {
 				panicv(e)
 			}
-		case edge{6, false}:
+		case 6:
 			if cpu.lastBranchResult == +1 {
 				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
-				return true
-			} else {
-				panicv(e)
-			}
-		case edge{6, true}:
-			if cpu.lastBranchResult == +1 {
 				return true
 			} else {
 				panicv(e)
@@ -648,22 +588,19 @@ func (cpu *CPU) callccnn(f func() bool) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ret(e edge) bool {
+func (cpu *CPU) ret(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-	case edge{2, true}:
 		cpu.Regs.TempW = cpu.Bus.GetData()
-	case edge{3, false}:
+	case 3:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
-	case edge{3, true}:
-	case edge{4, false}, edge{4, true}:
+	case 4:
 		return true
 	default:
 		panicv(e)
@@ -671,26 +608,23 @@ func (cpu *CPU) ret(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) reti(e edge) bool {
+func (cpu *CPU) reti(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-	case edge{2, true}:
 		cpu.Regs.TempW = cpu.Bus.GetData()
-	case edge{3, false}:
+	case 3:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
-	case edge{3, true}:
 		// TODO verify if this is the right cycle
 		if cpu.Interrupts != nil {
 			cpu.Interrupts.IME = true
 		}
-	case edge{4, false}, edge{4, true}:
+	case 4:
 		return true
 	default:
 		panicv(e)
@@ -698,57 +632,35 @@ func (cpu *CPU) reti(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) retcc(cond func() bool) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) retcc(cond func() bool) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
-		case edge{1, true}:
-		case edge{2, false}:
+		case 1:
+		case 2:
 			if cond() {
 				cpu.lastBranchResult = +1
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
+				cpu.Regs.TempZ = cpu.Bus.GetData()
 			} else {
 				cpu.lastBranchResult = -1
 				return true
 			}
-		case edge{2, true}:
-			if cpu.lastBranchResult == +1 {
-				cpu.Regs.TempZ = cpu.Bus.GetData()
-			} else {
-				return true
-			}
-		case edge{3, false}:
+		case 3:
 			if cpu.lastBranchResult == +1 {
 				cpu.writeAddressBus(cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
-			} else {
-				panicv(e)
-			}
-		case edge{3, true}:
-			if cpu.lastBranchResult == +1 {
 				cpu.Regs.TempW = cpu.Bus.GetData()
 			} else {
 				panicv(e)
 			}
-		case edge{4, false}:
+		case 4:
 			if cpu.lastBranchResult == +1 {
 				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 			} else {
 				panicv(e)
 			}
-		case edge{4, true}:
-			if cpu.lastBranchResult == +1 {
-			} else {
-				panicv(e)
-			}
-		case edge{5, false}:
-			if cpu.lastBranchResult == +1 {
-				return true
-			} else {
-				panicv(e)
-			}
-		case edge{5, true}:
+		case 5:
 			if cpu.lastBranchResult == +1 {
 				return true
 			} else {
@@ -761,49 +673,48 @@ func (cpu *CPU) retcc(cond func() bool) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ld(dst *Data8, src *Data8) func(e edge) bool {
+func (cpu *CPU) ld(dst *Data8, src *Data8) func(e int) bool {
 	return cpu.singleCycle("LD r, r", func() {
 		*dst = *src
 	})
 }
 
-func (cpu *CPU) andreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) andreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("AND r", func() {
 		cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) xorreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) xorreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("XOR r", func() {
 		cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) orreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) orreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("OR r", func() {
 		cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) addreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) addreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("ADD r", func() {
 		cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) adcreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) adcreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("ADC r", func() {
 		cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, *reg, cpu.Regs.GetFlagC()))
 	})
 }
 
-func (cpu *CPU) inchlind(e edge) bool {
+func (cpu *CPU) inchlind(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		res := ADD(cpu.Regs.TempZ, 1, false)
 		// apparently doesn't set C.
 		cpu.Regs.SetFlagH(res.H)
@@ -811,11 +722,8 @@ func (cpu *CPU) inchlind(e edge) bool {
 		cpu.Regs.SetFlagN(res.N)
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
 		cpu.Regs.TempZ = res.Value
-	case edge{2, true}:
 		cpu.Bus.WriteData(cpu.Regs.TempZ)
-	case edge{3, false}:
-		return true
-	case edge{3, true}:
+	case 3:
 		return true
 	default:
 		panicv(e)
@@ -823,13 +731,12 @@ func (cpu *CPU) inchlind(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) dechlind(e edge) bool {
+func (cpu *CPU) dechlind(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		res := SUB(cpu.Regs.TempZ, 1, false)
 		// apparently doesn't set C.
 		cpu.Regs.SetFlagH(res.H)
@@ -837,11 +744,8 @@ func (cpu *CPU) dechlind(e edge) bool {
 		cpu.Regs.SetFlagN(res.N)
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
 		cpu.Regs.TempZ = res.Value
-	case edge{2, true}:
 		cpu.Bus.WriteData(cpu.Regs.TempZ)
-	case edge{3, false}:
-		return true
-	case edge{3, true}:
+	case 3:
 		return true
 	default:
 		panicv(e)
@@ -849,17 +753,14 @@ func (cpu *CPU) dechlind(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) aluhl(f func(v Data8)) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) aluhl(f func(v Data8)) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(Addr(cpu.GetHL()))
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
+		case 2:
 			f(cpu.Regs.TempZ)
-			return true
-		case edge{2, true}:
 			return true
 		default:
 			panicv(e)
@@ -868,25 +769,25 @@ func (cpu *CPU) aluhl(f func(v Data8)) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) subreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) subreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("SUB r", func() {
 		cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) sbcreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) sbcreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("SBC r", func() {
 		cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, *reg, cpu.Regs.GetFlagC()))
 	})
 }
 
-func (cpu *CPU) cpreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) cpreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("CP r", func() {
 		cpu.Regs.SetFlags(SUB(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) decreg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) decreg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("DEC r", func() {
 		result := SUB(*reg, 1, false)
 		*reg = result.Value
@@ -896,7 +797,7 @@ func (cpu *CPU) decreg(reg *Data8) func(e edge) bool {
 	})
 }
 
-func (cpu *CPU) increg(reg *Data8) func(e edge) bool {
+func (cpu *CPU) increg(reg *Data8) func(e int) bool {
 	return cpu.singleCycle("INC r", func() {
 		result := ADD(*reg, 1, false)
 		*reg = result.Value
@@ -906,13 +807,12 @@ func (cpu *CPU) increg(reg *Data8) func(e edge) bool {
 	})
 }
 
-func (cpu *CPU) iduOp(f func()) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) iduOp(f func()) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			f()
-		case edge{1, true}:
-		case edge{2, false}, edge{2, true}:
+		case 2:
 			return true
 		default:
 			panicv(e)
@@ -921,17 +821,14 @@ func (cpu *CPU) iduOp(f func()) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) alun(f func(imm Data8)) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) alun(f func(imm Data8)) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
-			return true
-		case edge{2, true}:
+		case 2:
 			f(cpu.Regs.TempZ)
 			return true
 		default:
@@ -941,17 +838,14 @@ func (cpu *CPU) alun(f func(imm Data8)) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldrn(reg *Data8) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) ldrn(reg *Data8) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
+		case 2:
 			cpu.IncPC()
-			return true
-		case edge{2, true}:
 			*reg = cpu.Regs.TempZ
 			return true
 		default:
@@ -961,16 +855,13 @@ func (cpu *CPU) ldrn(reg *Data8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldrhl(reg *Data8) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) ldrhl(reg *Data8) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(Addr(cpu.GetHL()))
-		case edge{1, true}:
-		case edge{2, false}:
+		case 2:
 			*reg = cpu.Bus.GetData()
-			return true
-		case edge{2, true}:
 			return true
 		default:
 			panicv(e)
@@ -979,16 +870,13 @@ func (cpu *CPU) ldrhl(reg *Data8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldahlinc(e edge) bool {
+func (cpu *CPU) ldahlinc(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
 		cpu.SetHL(cpu.GetHL() + 1)
-	case edge{1, true}:
-	case edge{2, false}:
+	case 2:
 		cpu.Regs.A = cpu.Bus.GetData()
-		return true
-	case edge{2, true}:
 		return true
 	default:
 		panicv(e)
@@ -996,16 +884,13 @@ func (cpu *CPU) ldahlinc(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldahldec(e edge) bool {
+func (cpu *CPU) ldahldec(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
 		cpu.SetHL(cpu.GetHL() - 1)
-	case edge{1, true}:
-	case edge{2, false}:
+	case 2:
 		cpu.Regs.A = cpu.Bus.GetData()
-		return true
-	case edge{2, true}:
 		return true
 	default:
 		panicv(e)
@@ -1013,21 +898,18 @@ func (cpu *CPU) ldahldec(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldhlr(reg *Data8, inc int) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) ldhlr(reg *Data8, inc int) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(Addr(cpu.GetHL()))
 			if inc == +1 {
 				cpu.SetHL(cpu.GetHL() + 1)
 			} else if inc == -1 {
 				cpu.SetHL(cpu.GetHL() - 1)
 			}
-		case edge{1, true}:
 			cpu.Bus.WriteData(*reg)
-		case edge{2, false}:
-			return true
-		case edge{2, true}:
+		case 2:
 			return true
 		default:
 			panicv(e)
@@ -1036,16 +918,13 @@ func (cpu *CPU) ldhlr(reg *Data8, inc int) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldrra(msb, lsb *Data8) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) ldrra(msb, lsb *Data8) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(Addr(join16(*msb, *lsb)))
-		case edge{1, true}:
 			cpu.Bus.WriteData(cpu.Regs.A)
-		case edge{2, false}:
-			return true
-		case edge{2, true}:
+		case 2:
 			return true
 		default:
 			panicv(e)
@@ -1054,13 +933,12 @@ func (cpu *CPU) ldrra(msb, lsb *Data8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldhca(e edge) bool {
+func (cpu *CPU) ldhca(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.C)))
-	case edge{1, true}:
 		cpu.Bus.WriteData(cpu.Regs.A)
-	case edge{2, false}, edge{2, true}:
+	case 2:
 		return true
 	default:
 		panicv(e)
@@ -1068,13 +946,12 @@ func (cpu *CPU) ldhca(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldhac(e edge) bool {
+func (cpu *CPU) ldhac(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.C)))
-	case edge{1, true}:
 		cpu.Regs.A = cpu.Bus.GetData()
-	case edge{2, false}, edge{2, true}:
+	case 2:
 		return true
 	default:
 		panicv(e)
@@ -1082,28 +959,24 @@ func (cpu *CPU) ldhac(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldnnsp(e edge) bool {
+func (cpu *CPU) ldnnsp(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{2, true}:
 		cpu.Regs.TempW = cpu.Bus.GetData()
-	case edge{3, false}:
+	case 3:
 		cpu.writeAddressBus(Addr(cpu.Regs.GetWZ()))
-	case edge{3, true}:
 		cpu.Bus.WriteData(cpu.Regs.SP.LSB())
 		cpu.Regs.SetWZ(cpu.Regs.GetWZ() + 1)
-	case edge{4, false}:
+	case 4:
 		cpu.writeAddressBus(Addr(cpu.Regs.GetWZ()))
-	case edge{4, true}:
 		cpu.Bus.WriteData(cpu.Regs.SP.MSB())
-	case edge{5, false}, edge{5, true}:
+	case 5:
 		return true
 	default:
 		panicv(e)
@@ -1111,23 +984,20 @@ func (cpu *CPU) ldnnsp(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldnna(e edge) bool {
+func (cpu *CPU) ldnna(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{2, true}:
 		cpu.Regs.TempW = cpu.Bus.GetData()
-	case edge{3, false}:
+	case 3:
 		cpu.writeAddressBus(Addr(cpu.Regs.GetWZ()))
-	case edge{3, true}:
 		cpu.Bus.WriteData(cpu.Regs.A)
-	case edge{4, false}, edge{4, true}:
+	case 4:
 		return true
 	default:
 		panicv(e)
@@ -1135,23 +1005,20 @@ func (cpu *CPU) ldnna(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldann(e edge) bool {
+func (cpu *CPU) ldann(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{2, true}:
 		cpu.Regs.TempW = cpu.Bus.GetData()
-	case edge{3, false}:
+	case 3:
 		cpu.writeAddressBus(Addr(cpu.Regs.GetWZ()))
-	case edge{3, true}:
 		cpu.Regs.A = cpu.Bus.GetData()
-	case edge{4, false}, edge{4, true}:
+	case 4:
 		return true
 	default:
 		panicv(e)
@@ -1159,18 +1026,16 @@ func (cpu *CPU) ldann(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldhna(e edge) bool {
+func (cpu *CPU) ldhna(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.TempZ)))
 		cpu.IncPC()
-	case edge{2, true}:
 		cpu.Bus.WriteData(cpu.Regs.A)
-	case edge{3, false}, edge{3, true}:
+	case 3:
 		return true
 	default:
 		panicv(e)
@@ -1178,20 +1043,16 @@ func (cpu *CPU) ldhna(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldhan(e edge) bool {
+func (cpu *CPU) ldhan(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.TempZ)))
-	case edge{2, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{3, false}:
-		return true
-	case edge{3, true}:
+	case 3:
 		cpu.Regs.A = cpu.Regs.TempZ
 		return true
 	default:
@@ -1200,16 +1061,13 @@ func (cpu *CPU) ldhan(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldarr(msb, lsb *Data8) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) ldarr(msb, lsb *Data8) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(Addr(join16(*msb, *lsb)))
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
-			return true
-		case edge{2, true}:
+		case 2:
 			cpu.Regs.A = cpu.Regs.TempZ
 			return true
 		default:
@@ -1219,24 +1077,21 @@ func (cpu *CPU) ldarr(msb, lsb *Data8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) addhlrr(hi, lo *Data8) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) addhlrr(hi, lo *Data8) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			result := ADD(cpu.Regs.L, *lo, false)
 			cpu.Regs.L = result.Value
 			cpu.Regs.SetFlagC(result.C)
 			cpu.Regs.SetFlagH(result.H)
 			cpu.Regs.SetFlagN(result.N)
-		case edge{1, true}:
-		case edge{2, false}:
+		case 2:
 			result := ADD(cpu.Regs.H, *hi, cpu.Regs.GetFlagC())
 			cpu.Regs.H = result.Value
 			cpu.Regs.SetFlagC(result.C)
 			cpu.Regs.SetFlagH(result.H)
 			cpu.Regs.SetFlagN(result.N)
-			return true
-		case edge{2, true}:
 			return true
 		default:
 			panicv(e)
@@ -1245,23 +1100,20 @@ func (cpu *CPU) addhlrr(hi, lo *Data8) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) addhlsp(e edge) bool {
+func (cpu *CPU) addhlsp(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		result := ADD(cpu.Regs.L, cpu.Regs.SP.LSB(), false)
 		cpu.Regs.L = result.Value
 		cpu.Regs.SetFlagC(result.C)
 		cpu.Regs.SetFlagH(result.H)
 		cpu.Regs.SetFlagN(result.N)
-	case edge{1, true}:
-	case edge{2, false}:
+	case 2:
 		result := ADD(cpu.Regs.H, cpu.Regs.SP.MSB(), cpu.Regs.GetFlagC())
 		cpu.Regs.H = result.Value
 		cpu.Regs.SetFlagC(result.C)
 		cpu.Regs.SetFlagH(result.H)
 		cpu.Regs.SetFlagN(result.N)
-		return true
-	case edge{2, true}:
 		return true
 	default:
 		panicv(e)
@@ -1269,14 +1121,13 @@ func (cpu *CPU) addhlsp(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) addspe(e edge) bool {
+func (cpu *CPU) addspe(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		zSign := cpu.Regs.TempZ&Bit7 != 0
 		result := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
 		cpu.Regs.TempZ = result.Value
@@ -1288,8 +1139,7 @@ func (cpu *CPU) addspe(e edge) bool {
 		} else if !c && zSign {
 			cpu.Regs.TempW = 0xff
 		}
-	case edge{2, true}:
-	case edge{3, false}:
+	case 3:
 		res := cpu.Regs.SP.MSB()
 		if cpu.Regs.TempW == 1 {
 			res++
@@ -1297,11 +1147,8 @@ func (cpu *CPU) addspe(e edge) bool {
 			res--
 		}
 		cpu.Regs.TempW = res
-	case edge{3, true}:
-	case edge{4, false}:
+	case 4:
 		cpu.SetSP(Addr(cpu.Regs.GetWZ()))
-		return true
-	case edge{4, true}:
 		return true
 	default:
 		panicv(e)
@@ -1309,23 +1156,19 @@ func (cpu *CPU) addspe(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldxxnn(f func(wz Data16)) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) ldxxnn(f func(wz Data16)) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		case edge{1, true}:
 			cpu.Regs.TempZ = cpu.Bus.GetData()
-		case edge{2, false}:
+		case 2:
 			cpu.writeAddressBus(cpu.Regs.PC)
 			cpu.IncPC()
-		case edge{2, true}:
 			cpu.Regs.TempW = cpu.Bus.GetData()
-		case edge{3, false}:
+		case 3:
 			f(join16(cpu.Regs.TempW, cpu.Regs.TempZ))
-			return true
-		case edge{3, true}:
 			return true
 		default:
 			panicv(e)
@@ -1334,18 +1177,16 @@ func (cpu *CPU) ldxxnn(f func(wz Data16)) func(e edge) bool {
 	}
 }
 
-func (cpu *CPU) ldhln(e edge) bool {
+func (cpu *CPU) ldhln(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
-	case edge{2, true}:
 		cpu.Bus.WriteData(cpu.Regs.TempZ)
-	case edge{3, false}, edge{3, true}:
+	case 3:
 		return true
 	default:
 		panicv(e)
@@ -1353,13 +1194,10 @@ func (cpu *CPU) ldhln(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldsphl(e edge) bool {
+func (cpu *CPU) ldsphl(e int) bool {
 	switch e {
-	case edge{1, false}:
-	case edge{1, true}:
-	case edge{2, false}:
-		return true
-	case edge{2, true}:
+	case 1:
+	case 2:
 		cpu.Regs.SP = Addr(cpu.GetHL())
 		return true
 	default:
@@ -1368,20 +1206,18 @@ func (cpu *CPU) ldsphl(e edge) bool {
 	return false
 }
 
-func (cpu *CPU) ldhlspe(e edge) bool {
+func (cpu *CPU) ldhlspe(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.Regs.TempZ = cpu.Bus.GetData()
-	case edge{2, false}:
+	case 2:
 		res := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
 		cpu.Regs.L = res.Value
 		res.Z0 = true
 		cpu.Regs.SetFlags(res)
-	case edge{2, true}:
-	case edge{3, false}:
+	case 3:
 		adj := Data8(0x00)
 		if cpu.Regs.TempZ&Bit7 != 0 {
 			adj = 0xff
@@ -1389,33 +1225,26 @@ func (cpu *CPU) ldhlspe(e edge) bool {
 		res := ADD(cpu.Regs.SP.MSB(), adj, cpu.Regs.GetFlagC())
 		cpu.Regs.H = res.Value
 		return true
-	case edge{3, true}:
-		return true
 	default:
 		panicv(e)
 	}
 	return false
 }
 
-func (cpu *CPU) rst(vec Data8) func(e edge) bool {
-	return func(e edge) bool {
+func (cpu *CPU) rst(vec Data8) func(e int) bool {
+	return func(e int) bool {
 		switch e {
-		case edge{1, false}:
+		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(cpu.Regs.SP)
-		case edge{1, true}:
 			cpu.Bus.WriteData(cpu.Regs.PC.MSB())
-		case edge{2, false}:
+		case 2:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(cpu.Regs.SP)
-		case edge{2, true}:
 			cpu.Bus.WriteData(cpu.Regs.PC.LSB())
-		case edge{3, false}:
+		case 3:
 			cpu.SetPC(Addr(join16(0x00, vec)))
-		case edge{3, true}:
-		case edge{4, false}:
-			return true
-		case edge{4, true}:
+		case 4:
 			return true
 		default:
 			panicv(e)
@@ -1428,20 +1257,16 @@ func NewCBOp(v Data8) CBOp {
 	return CBOp{Op: cb((v & 0xf8) >> 3), Target: CBTarget(v & 0x7)}
 }
 
-func (cpu *CPU) cb(e edge) bool {
+func (cpu *CPU) cb(e int) bool {
 	switch e {
-	case edge{1, false}:
+	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
 		cpu.IncPC()
-	case edge{1, true}:
 		cpu.CBOp = NewCBOp(cpu.Bus.GetData())
-	case edge{2, false}:
+	case 2:
 		if cpu.CBOp.Target == CBTargetIndirectHL {
 			cpu.writeAddressBus(Addr(cpu.GetHL()))
-		} else {
-			return true
 		}
-	case edge{2, true}:
 		var val Data8
 		switch cpu.CBOp.Target {
 		case CBTargetB:
@@ -1486,7 +1311,7 @@ func (cpu *CPU) cb(e edge) bool {
 			panic("unknown CBOp target")
 		}
 		return true
-	case edge{3, false}:
+	case 3:
 		if cpu.CBOp.Target != CBTargetIndirectHL {
 			panicv(e)
 		}
@@ -1494,15 +1319,8 @@ func (cpu *CPU) cb(e edge) bool {
 			return true
 		}
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
-	case edge{3, true}:
-		if cpu.CBOp.Target != CBTargetIndirectHL {
-			panicv(e)
-		}
-		if cpu.CBOp.Op.Is3Cycles() {
-			return true
-		}
 		cpu.Bus.WriteData(cpu.Regs.TempZ)
-	case edge{4, false}, edge{4, true}:
+	case 4:
 		if cpu.CBOp.Target != CBTargetIndirectHL {
 			panicv(e)
 		}

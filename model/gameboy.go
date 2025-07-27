@@ -26,8 +26,7 @@ func (gb *Gameboy) Step() {
 
 func (gb *Gameboy) SoftReset() {
 	gb.CLK.Sync(func() {
-		gb.CLK.Cycle.C = 0
-		gb.CLK.Cycle.Falling = false
+		gb.CLK.Cycle = 0
 		gb.CPU.Reset()
 		gb.PPU.Reset()
 	})

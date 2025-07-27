@@ -34,7 +34,7 @@ type PPU struct {
 	// For other systems to hook in
 	MemoryRegion MemoryRegion
 	Debug        *Debug
-	FrameCount   uint64
+	FrameCount   uint
 	Config       *Config
 
 	// PPU overall state

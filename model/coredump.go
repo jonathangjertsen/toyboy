@@ -7,22 +7,22 @@ import (
 )
 
 type CoreDump struct {
-	Cycle        Cycle
+	Cycle        uint
 	Regs         RegisterFile
 	ProgramStart Addr
 	ProgramEnd   Addr
-	Program      MemDump
-	HRAM         MemDump
-	OAM          MemDump
-	VRAM         MemDump
-	APU          MemDump
+	Program      []Data8
+	HRAM         []Data8
+	OAM          []Data8
+	VRAM         []Data8
+	APU          []Data8
 	PPU          PPUDump
 	Rewind       *Rewind
 	Disassembly  *Disassembly
 }
 
 type PPUDump struct {
-	Registers                 MemDump
+	Registers                 []Data8
 	BGFIFO                    PixelFIFODump
 	SpriteFIFO                PixelFIFODump
 	LastShifted               Color
@@ -34,16 +34,6 @@ type PPUDump struct {
 	BackgroundFetcher         BackgroundFetcher
 	SpriteFetcher             SpriteFetcher
 	OAMBuffer                 OAMBuffer
-}
-
-type MemDump []MemInfo
-
-func (md MemDump) Bytes() []Data8 {
-	out := make([]Data8, len(md))
-	for i := range out {
-		out[i] = md[i].Value
-	}
-	return out
 }
 
 func (cd *CoreDump) PrintRegs(f io.Writer) {
@@ -93,7 +83,7 @@ func (cd *CoreDump) PrintOAM(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
-	oam := cd.OAM.Bytes()
+	oam := cd.OAM
 	for idx := range 40 {
 		obj := DecodeObject(oam[idx*4 : (idx+1)*4])
 		fmt.Fprintf(f, "%02d T=%03d X=%03d Y=%03d Attr=%x\n", idx, obj.TileIndex, obj.X, obj.Y, obj.Attributes.Hex())
@@ -171,17 +161,17 @@ func (cd *CoreDump) PrintAPU(f io.Writer) {
 	regdump(f, cd.APU, AddrAPUBegin, AddrAPUEnd)
 }
 
-func regdump(f io.Writer, mem []MemInfo, start, end Addr) {
+func regdump(f io.Writer, mem []Data8, start, end Addr) {
 	for addr := start; addr <= end; addr++ {
 		a := Addr(addr)
 		if !a.IsValid() {
 			continue
 		}
-		fmt.Fprintf(f, "%5s = %02x\n", Addr(addr), mem[addr-start].Value)
+		fmt.Fprintf(f, "%5s = %02x\n", Addr(addr), mem[addr-start])
 	}
 }
 
-func memdump(f io.Writer, mem []MemInfo, start, end, highlight Addr) {
+func memdump(f io.Writer, mem []Data8, start, end, highlight Addr) {
 	alignedStart := (start / 0x10) * 0x10
 	for addr := alignedStart; addr < start; addr++ {
 		if addr%0x10 == 0 {
@@ -195,9 +185,9 @@ func memdump(f io.Writer, mem []MemInfo, start, end, highlight Addr) {
 			fmt.Fprintf(f, "\n%s |", addr.Hex())
 		}
 		if highlight == addr {
-			fmt.Fprintf(f, "[%02x]", mem[addr-start].Value)
+			fmt.Fprintf(f, "[%02x]", mem[addr-start])
 		} else {
-			fmt.Fprintf(f, " %02x ", mem[addr-start].Value)
+			fmt.Fprintf(f, " %02x ", mem[addr-start])
 		}
 	}
 
@@ -209,6 +199,11 @@ func memdump(f io.Writer, mem []MemInfo, start, end, highlight Addr) {
 }
 
 func (cpu *CPU) GetCoreDump() CoreDump {
+	bus, ok := cpu.Bus.(*Bus)
+	if !ok {
+		return CoreDump{}
+	}
+
 	end := cpu.Bus.BeginCoreDump()
 	defer end()
 
@@ -225,15 +220,15 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 		cd.ProgramEnd = cpu.Regs.PC + 0x40
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
-	cd.Program = getmem(cpu.Bus, 0x0000, AddrCartridgeBank0End)
+	cd.Program = getmem(bus, 0x0000, AddrCartridgeBank0End)
 	cd.Disassembly = cpu.Debug.Disassembly()
-	cd.HRAM = getmem(cpu.Bus, AddrHRAMBegin, AddrHRAMEnd)
-	cd.OAM = getmem(cpu.Bus, AddrOAMBegin, AddrOAMEnd)
-	cd.VRAM = getmem(cpu.Bus, AddrVRAMBegin, AddrVRAMEnd)
-	cd.APU = getmem(cpu.Bus, AddrAPUBegin, AddrAPUEnd)
-	cd.PPU.Registers = getmem(cpu.Bus, AddrPPUBegin, AddrPPUEnd)
+	cd.HRAM = bus.HRAM.Data
+	cd.OAM = bus.OAM.Data
+	cd.VRAM = bus.VRAM.Data
+	cd.APU = bus.APU.Data
+	cd.PPU.Registers = getmem(bus, AddrPPUBegin, AddrPPUEnd)
 	var ppu *PPU
-	cpu.Bus.GetPeripheral(&ppu)
+	bus.GetPeripheral(&ppu)
 	cd.PPU.BGFIFO = ppu.BackgroundFIFO.Dump()
 	cd.PPU.SpriteFIFO = ppu.SpriteFIFO.Dump()
 	cd.PPU.LastShifted = ppu.Shifter.LastShifted
@@ -249,21 +244,11 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	return cd
 }
 
-type MemInfo struct {
-	Value Data8
-}
-
-func getmem(bus CPUBusIF, start, end Addr) []MemInfo {
-	addr, data := bus.PushState()
-
-	out := make([]MemInfo, end-start+1)
+func getmem(bus CPUBusIF, start, end Addr) []Data8 {
+	out := make([]Data8, end-start+1)
 	for addr := start; addr <= end; addr++ {
-		memInfo := &out[addr-start]
-		bus.WriteAddress(addr)
-		memInfo.Value = bus.GetData()
+		out[addr-start] = bus.ProbeAddress(addr)
 	}
-
-	bus.PopState(addr, data)
 
 	return out
 }

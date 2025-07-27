@@ -46,14 +46,6 @@ func (b *Bus) Reset() {
 	}
 }
 
-func (b *Bus) PushState() (Addr, Data8) {
-	return b.Address, b.Data
-}
-
-func (b *Bus) PopState(addr Addr, data Data8) {
-	b.Address, b.Data = addr, data
-}
-
 func (b *Bus) BeginCoreDump() func() {
 	b.inCoreDump = true
 	return func() {
@@ -75,49 +67,53 @@ func (b *Bus) GetData() Data8 {
 
 func (b *Bus) WriteAddress(addr Addr) {
 	b.Address = addr
+	b.Data = b.ProbeAddress(addr)
+}
 
+func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
-			b.Data = b.Cartridge.Read(addr)
+			return b.Cartridge.Read(addr)
 		} else {
-			b.Data = b.BootROM.Data[addr]
+			return b.BootROM.Data[addr]
 		}
 	} else if addr <= AddrCartridgeBankNEnd {
-		b.Data = b.Cartridge.Read(addr)
+		return b.Cartridge.Read(addr)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
-		b.Data = b.VRAM.Data[addr-AddrVRAMBegin]
+		return b.VRAM.Data[addr-AddrVRAMBegin]
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
-		b.Data = b.HRAM.Data[addr-AddrHRAMBegin]
+		return b.HRAM.Data[addr-AddrHRAMBegin]
 	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
-		b.Data = b.WRAM.Data[addr-AddrWRAMBegin]
+		return b.WRAM.Data[addr-AddrWRAMBegin]
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
-		b.Data = b.APU.Read(addr)
+		return b.APU.Read(addr)
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
-		b.Data = b.OAM.Data[addr-AddrOAMBegin]
+		return b.OAM.Data[addr-AddrOAMBegin]
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		b.Data = b.PPU.Read(addr)
+		return b.PPU.Read(addr)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
-		b.Data = b.Prohibited.Read(addr)
+		return b.Prohibited.Read(addr)
 	} else if (addr >= 0xff4c && addr <= 0xff4f) || (addr >= 0xff51 && addr <= 0xff70) {
 		// GBC stuff
-		b.Data = 0
+		return 0
 	} else if addr >= 0xff71 && addr <= 0xff7f {
-		b.Data = b.Prohibited.Read(addr)
+		return b.Prohibited.Read(addr)
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
-		b.Data = b.Timer.Read(addr)
+		return b.Timer.Read(addr)
 	} else if addr == AddrP1 {
-		b.Data = b.Joypad.Read(addr)
+		return b.Joypad.Read(addr)
 	} else if addr == AddrIF || addr == AddrIE {
-		b.Data = b.Interrupts.Read(addr)
+		return b.Interrupts.Read(addr)
 	} else if addr == AddrBootROMLock {
-		b.Data = b.BootROMLock.Read(addr)
+		return b.BootROMLock.Read(addr)
 	} else if addr == AddrSB || addr == AddrSC {
-		b.Data = b.Serial.Read(addr)
+		return b.Serial.Read(addr)
 	} else {
 		if !b.inCoreDump {
 			//panicf("Read from unmapped address %s", addr.Hex())
 		}
 	}
+	return b.Data
 }
 
 func (b *Bus) WriteData(v Data8) {

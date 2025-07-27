@@ -9,7 +9,7 @@ import (
 type ClockRT struct {
 	ticker          *time.Ticker
 	tickInterval    time.Duration
-	Cycle           Cycle
+	Cycle           uint
 	mCyclesPerTick  int
 	resume          chan struct{}
 	pause           chan struct{}
@@ -56,13 +56,6 @@ func NewRealtimeClock(config ConfigClock) *ClockRT {
 
 func (clockRT *ClockRT) AttachUIDevice(dev func()) {
 	clockRT.uiDevices = append(clockRT.uiDevices, dev)
-}
-
-type clockRTDivided struct {
-	clock   *Clock
-	top     uint64
-	counter uint64
-	cycle   uint64
 }
 
 func (clockRT *ClockRT) wait() {
@@ -164,36 +157,35 @@ func (clockRT *ClockRT) MCycle(n int) {
 			clockRT.pauseAfterCycle.Add(-1)
 		}
 
-		m := clockRT.Cycle.C >> 2
-		clockRT.Cycle.C += 4
+		m := clockRT.Cycle >> 2
+		clockRT.Cycle += 4
 
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
-		clockRT.cpu.fsm(Cycle{m, false})
-		clockRT.cpu.fsm(Cycle{m, true})
+		clockRT.cpu.fsm(m)
 
 		// Clock the peripherals.
 		// 99.99% of the time, both PPU and APU are on, so we clock everything
 		if clockRT.ppu.RegLCDC&clockRT.apu.MasterCtl&Bit7 != 0 {
 			// T0
-			clockRT.timer.tickDIVTimer()
+			clockRT.timer.tickDIV()
 			clockRT.apu.Wave.clock()
 			clockRT.apu.Pulse1.clock()
 			clockRT.apu.Pulse2.clock()
-			if clockRT.Cycle.C&0xf == 0 {
+			if clockRT.Cycle&0xf == 0 {
 				clockRT.apu.Noise.clock()
 			}
 			clockRT.ppu.fsm()
 
 			// T1
-			clockRT.timer.tickDIVTimer()
+			clockRT.timer.tickDIV()
 
 			// T2
-			clockRT.timer.tickDIVTimer()
+			clockRT.timer.tickDIV()
 			clockRT.apu.Wave.clock()
 			clockRT.ppu.fsm()
 
 			// T3
-			clockRT.timer.tickDIVTimer()
+			clockRT.timer.tickDIV()
 		} else {
 			clockRT.mCycleSlowPath(
 				clockRT.ppu.RegLCDC&Bit7 != 0,
@@ -205,7 +197,7 @@ func (clockRT *ClockRT) MCycle(n int) {
 
 func (clockRT *ClockRT) mCycleSlowPath(ppu, apu bool) {
 	// T0
-	clockRT.timer.tickDIVTimer()
+	clockRT.timer.tickDIV()
 	if ppu {
 		clockRT.ppu.fsm()
 	}
@@ -213,16 +205,16 @@ func (clockRT *ClockRT) mCycleSlowPath(ppu, apu bool) {
 		clockRT.apu.Wave.clock()
 		clockRT.apu.Pulse1.clock()
 		clockRT.apu.Pulse2.clock()
-		if clockRT.Cycle.C&0xf == 0 {
+		if clockRT.Cycle&0xf == 0 {
 			clockRT.apu.Noise.clock()
 		}
 	}
 
 	// T1
-	clockRT.timer.tickDIVTimer()
+	clockRT.timer.tickDIV()
 
 	// T2
-	clockRT.timer.tickDIVTimer()
+	clockRT.timer.tickDIV()
 	if ppu {
 		clockRT.ppu.fsm()
 	}
@@ -231,5 +223,5 @@ func (clockRT *ClockRT) mCycleSlowPath(ppu, apu bool) {
 	}
 
 	// T3
-	clockRT.timer.tickDIVTimer()
+	clockRT.timer.tickDIV()
 }

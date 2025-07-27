@@ -1352,22 +1352,8 @@ export namespace model {
 		    return a;
 		}
 	}
-	export class Cycle {
-	    C: number;
-	    Falling: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new Cycle(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.C = source["C"];
-	        this.Falling = source["Falling"];
-	    }
-	}
 	export class ClockRT {
-	    Cycle: Cycle;
+	    Cycle: number;
 	    // Go type: atomic
 	    Running: any;
 	
@@ -1377,7 +1363,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Cycle = this.convertValues(source["Cycle"], Cycle);
+	        this.Cycle = source["Cycle"];
 	        this.Running = this.convertValues(source["Running"], null);
 	    }
 	
@@ -2379,7 +2365,7 @@ export namespace model {
 		}
 	}
 	export class PPUDump {
-	    Registers: MemInfo[];
+	    Registers: number[];
 	    BGFIFO: PixelFIFODump;
 	    SpriteFIFO: PixelFIFODump;
 	    LastShifted: number;
@@ -2398,7 +2384,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Registers = this.convertValues(source["Registers"], MemInfo);
+	        this.Registers = source["Registers"];
 	        this.BGFIFO = this.convertValues(source["BGFIFO"], PixelFIFODump);
 	        this.SpriteFIFO = this.convertValues(source["SpriteFIFO"], PixelFIFODump);
 	        this.LastShifted = source["LastShifted"];
@@ -2429,18 +2415,6 @@ export namespace model {
 		    }
 		    return a;
 		}
-	}
-	export class MemInfo {
-	    Value: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new MemInfo(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Value = source["Value"];
-	    }
 	}
 	export class RegisterFile {
 	    A: number;
@@ -2479,15 +2453,15 @@ export namespace model {
 	    }
 	}
 	export class CoreDump {
-	    Cycle: Cycle;
+	    Cycle: number;
 	    Regs: RegisterFile;
 	    ProgramStart: number;
 	    ProgramEnd: number;
-	    Program: MemInfo[];
-	    HRAM: MemInfo[];
-	    OAM: MemInfo[];
-	    VRAM: MemInfo[];
-	    APU: MemInfo[];
+	    Program: number[];
+	    HRAM: number[];
+	    OAM: number[];
+	    VRAM: number[];
+	    APU: number[];
 	    PPU: PPUDump;
 	    Rewind?: Rewind;
 	    Disassembly?: Disassembly;
@@ -2498,15 +2472,15 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Cycle = this.convertValues(source["Cycle"], Cycle);
+	        this.Cycle = source["Cycle"];
 	        this.Regs = this.convertValues(source["Regs"], RegisterFile);
 	        this.ProgramStart = source["ProgramStart"];
 	        this.ProgramEnd = source["ProgramEnd"];
-	        this.Program = this.convertValues(source["Program"], MemInfo);
-	        this.HRAM = this.convertValues(source["HRAM"], MemInfo);
-	        this.OAM = this.convertValues(source["OAM"], MemInfo);
-	        this.VRAM = this.convertValues(source["VRAM"], MemInfo);
-	        this.APU = this.convertValues(source["APU"], MemInfo);
+	        this.Program = source["Program"];
+	        this.HRAM = source["HRAM"];
+	        this.OAM = source["OAM"];
+	        this.VRAM = source["VRAM"];
+	        this.APU = source["APU"];
 	        this.PPU = this.convertValues(source["PPU"], PPUDump);
 	        this.Rewind = this.convertValues(source["Rewind"], Rewind);
 	        this.Disassembly = this.convertValues(source["Disassembly"], Disassembly);
@@ -2530,8 +2504,6 @@ export namespace model {
 		    return a;
 		}
 	}
-	
-	
 	
 	
 	

@@ -157,17 +157,15 @@ func (bgf *BackgroundFetcher) pushFIFO() bool {
 	if bgf.PPU.BackgroundFIFO.Level > 0 {
 		return false
 	}
-	line := DecodeTileLine(bgf.TileMSB, bgf.TileLSB)
-	for i := range 8 {
-		line[i].Palette = bgf.PPU.BGPalette
-	}
-	if !bgf.PPU.BGWindowEnable() {
+	if bgf.PPU.BGWindowEnable() {
+		line := DecodeTileLine(bgf.TileMSB, bgf.TileLSB)
 		for i := range 8 {
-			line[i].ColorIDXBGPriority = 0
-			line[i].Palette = 0
+			line[i].Palette = bgf.PPU.BGPalette
 		}
+		bgf.PPU.BackgroundFIFO.Write8(line)
+	} else {
+		bgf.PPU.BackgroundFIFO.Write8(TileLine{})
 	}
-	bgf.PPU.BackgroundFIFO.Write8(line)
 	return true
 }
 

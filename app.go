@@ -62,14 +62,14 @@ func (app *App) StartGB() {
 
 	runtime.LogPrintf(app.ctx, "Started gameboy")
 
-	app.ClockMeasurement = plugin.NewClockMeasurement(&app.GB.CLK.Cycle.C)
+	app.ClockMeasurement = plugin.NewClockMeasurement(&app.GB.CLK.Cycle)
 
 	runtime.LogPrintf(app.ctx, "Started Clock Measurement")
 
 	app.GBFPSMeasurement = plugin.NewClockMeasurement(&app.GB.PPU.FrameCount)
 	runtime.LogPrintf(app.ctx, "Started Gameboy FPS Measurement")
 
-	f, err := os.ReadFile("assets/cartridges/unbricked.gb")
+	f, err := os.ReadFile("assets/cartridges/tetris.gb")
 	if err != nil {
 		panic(err)
 	}

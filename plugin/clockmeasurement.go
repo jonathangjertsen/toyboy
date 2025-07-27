@@ -5,12 +5,12 @@ import (
 )
 
 type ClockMeasurement struct {
-	initCount uint64
-	counter   *uint64
+	initCount uint
+	counter   *uint
 	t0        time.Time
 }
 
-func NewClockMeasurement(counter *uint64) *ClockMeasurement {
+func NewClockMeasurement(counter *uint) *ClockMeasurement {
 	return &ClockMeasurement{
 		counter: counter,
 	}
@@ -21,6 +21,6 @@ func (cm *ClockMeasurement) Start() {
 	cm.t0 = time.Now()
 }
 
-func (cm *ClockMeasurement) Stop() (uint64, time.Duration) {
+func (cm *ClockMeasurement) Stop() (uint, time.Duration) {
 	return *cm.counter - cm.initCount, time.Since(cm.t0)
 }
