@@ -13,8 +13,6 @@ type PulseChannel struct {
 
 	dacEnabled bool
 	activated  bool
-
-	test1 bool
 }
 
 type PulseChannelWithSweep struct {
@@ -86,7 +84,7 @@ func (pc *PulseChannel) clock() {
 	}
 }
 
-func (pc *PulseChannel) Sample() int8 {
+func (pc *PulseChannel) Sample() AudioSample {
 	if !pc.activated {
 		return 0
 	}

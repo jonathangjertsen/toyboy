@@ -59,7 +59,7 @@ func (wc *WaveChannel) trigger() {
 	}
 
 	// If length timer expired it is reset.
-	if wc.LengthTimer.lengthTimer == 64 {
+	if wc.LengthTimer.lengthTimer == 256 {
 		wc.LengthTimer.lengthTimer = Data16(wc.LengthTimer.lengthTimerReset)
 	}
 
@@ -78,7 +78,7 @@ func (wc *WaveChannel) clock() {
 	}
 }
 
-func (wc *WaveChannel) Sample() int8 {
+func (wc *WaveChannel) Sample() AudioSample {
 	if !wc.activated {
 		return 0
 	}

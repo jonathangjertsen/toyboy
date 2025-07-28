@@ -4,7 +4,7 @@ type WaveGenerator struct {
 	WaveRAM  [16]Data8
 	Index    int
 	OutLevel Data8
-	output   int8
+	output   AudioSample
 }
 
 func (wg *WaveGenerator) clock() {
@@ -25,7 +25,7 @@ func (wg *WaveGenerator) clock() {
 	case 3:
 		data >>= 2
 	}
-	wg.output = 8 - int8(data)
+	wg.output = AudioSample(data)
 	wg.Index++
 	wg.Index &= 0x1f
 }

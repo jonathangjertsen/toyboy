@@ -36,6 +36,7 @@ type App struct {
 	ctx     context.Context
 	config  *Config
 	reqChan chan MachineStateRequest
+	Audio   *Audio
 
 	needStateUpdate chan struct{}
 
@@ -62,6 +63,7 @@ func NewApp(config *Config) *App {
 		reqChan:         make(chan MachineStateRequest, 10),
 		needStateUpdate: make(chan struct{}, 1),
 		config:          config,
+		Audio:           NewAudio(),
 	}
 }
 
@@ -78,14 +80,13 @@ func (app *App) beforeClose(ctx context.Context) (prevent bool) {
 }
 
 func (app *App) shutdown(ctx context.Context) {
-	app.GB.CLK.Audio.Stop()
 }
 
 func (app *App) StartGB() {
 	audio := &model.Audio{
-		SampleInterval: time.Second / 44100,
+		SampleInterval: (time.Second / 44100) * 2, // TODO why x2
 		SampleBuffers:  model.NewSampleBuffers(1024),
-		Output:         model.NewAudioTestOutput("audio.bin"),
+		Out:            app.Audio.In,
 	}
 	app.GB = model.NewGameboy(&app.config.Model, audio)
 
@@ -105,7 +106,6 @@ func (app *App) StartGB() {
 	app.GB.Cartridge.LoadROM(f)
 
 	app.GB.Start()
-	audio.Start()
 }
 
 func (app *App) GetConfig() *Config {
@@ -148,7 +148,9 @@ func (ts *TimeoutState) Update() {
 }
 
 func (app *App) StartWebSocketServer() {
+	fmt.Printf("start ws\n")
 	http.HandleFunc("/data", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("connected\n")
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
@@ -297,6 +299,7 @@ func (app *App) StartWebSocketServer() {
 		conn.Close()
 	})
 
+	fmt.Printf("start ws pm 8081\n")
 	go http.ListenAndServe(":8081", nil)
 }
 

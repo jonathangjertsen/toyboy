@@ -1,11 +1,16 @@
 package model
 
 import (
-	"bytes"
-	"io"
-	"os"
-	"sync"
 	"time"
+)
+
+type AudioSample int16
+
+const (
+	FracBits = 8
+	Scale    = 1 << FracBits
+	HPFactor = int32(255) // most relaxed hp filter possible
+	LPFactor = int32(128) // most relaxed lp filter possible
 )
 
 type Audio struct {
@@ -14,83 +19,42 @@ type Audio struct {
 	SampleInterval time.Duration
 	SampleDivider  int
 	MCounter       int
-	Output         AudioOutput
-}
-
-type AudioOutput interface {
-	io.Writer
-	Start()
-	Stop()
+	Capacitor      AudioSample
+	Out            chan []AudioSample
 }
 
 type SampleBuffers struct {
-	Pulse1 []uint8
-	Pulse2 []uint8
-	Wave   []uint8
+	Pulse1 []AudioSample
+	Pulse2 []AudioSample
+	Wave   []AudioSample
+	Noise  []AudioSample
 	Size   int
 	Idx    int
 }
 
-func (sb *SampleBuffers) Mix() []uint8 {
-	mixed := make([]uint8, len(sb.Pulse1))
+func (sb *SampleBuffers) Mix() []AudioSample {
+	mixed := make([]AudioSample, len(sb.Pulse1))
 	for i := range len(mixed) {
-		mixed[i] = sb.Pulse1[i] + sb.Pulse2[i] + sb.Wave[i]
+		mixed[i] = sb.Pulse1[i] + sb.Pulse2[i] + sb.Wave[i] + sb.Noise[i]
 	}
 	return mixed
 }
 
-type AudioTestOutput struct {
-	File string
-	buf  bytes.Buffer
-	mu   sync.Mutex
-	w    io.WriteCloser
-}
-
-func NewAudioTestOutput(file string) *AudioTestOutput {
-	return &AudioTestOutput{
-		File: file,
-	}
-}
-
-func (ato *AudioTestOutput) Start() {
-	w, err := os.Create(ato.File)
-	if err != nil {
-		return
-	}
-	ato.w = w
-}
-
-func (ato *AudioTestOutput) Stop() {
-	ato.mu.Lock()
-	ato.w.Write(ato.buf.Bytes())
-	ato.w = nil
-	ato.buf = bytes.Buffer{}
-	ato.mu.Unlock()
-}
-
-func (ato *AudioTestOutput) Write(p []uint8) (int, error) {
-	ato.mu.Lock()
-	defer ato.mu.Unlock()
-
-	if ato.w != nil {
-		return ato.buf.Write(p)
-	}
-	return 0, nil
-}
-
 func NewSampleBuffers(size int) SampleBuffers {
 	return SampleBuffers{
-		Pulse1: make([]uint8, size),
-		Pulse2: make([]uint8, size),
-		Wave:   make([]uint8, size),
+		Pulse1: make([]AudioSample, size),
+		Pulse2: make([]AudioSample, size),
+		Wave:   make([]AudioSample, size),
+		Noise:  make([]AudioSample, size),
 		Size:   size,
 	}
 }
 
-func (ab *SampleBuffers) Add(pulse1, pulse2, wave int8) bool {
-	ab.Pulse1[ab.Idx] = uint8(pulse1)
-	ab.Pulse2[ab.Idx] = uint8(pulse2)
-	ab.Wave[ab.Idx] = uint8(wave)
+func (ab *SampleBuffers) Add(pulse1, pulse2, wave, noise AudioSample) bool {
+	ab.Pulse1[ab.Idx] = pulse1
+	ab.Pulse2[ab.Idx] = pulse2
+	ab.Wave[ab.Idx] = wave
+	ab.Noise[ab.Idx] = noise
 
 	ab.Idx++
 	if ab.Idx == ab.Size {
@@ -105,7 +69,7 @@ func (audio *Audio) Enabled() bool {
 }
 
 func (audio *Audio) SetMPeriod(mPeriod time.Duration) {
-	if audio.SampleInterval > 0 {
+	if mPeriod > 0 {
 		audio.SampleDivider = int(audio.SampleInterval / mPeriod)
 		audio.MCounter = audio.SampleDivider
 	} else {
@@ -126,16 +90,26 @@ func (audio *Audio) Clock() {
 		audio.APU.Pulse1.Sample(),
 		audio.APU.Pulse2.Sample(),
 		audio.APU.Wave.Sample(),
+		audio.APU.Noise.Sample(),
 	) {
 		return
 	}
-	audio.Output.Write(audio.SampleBuffers.Mix())
+
+	mix := audio.SampleBuffers.Mix()
+	highpass(mix, &audio.Capacitor)
+	/*select {
+	case audio.Out <- mix:
+	default:
+		fmt.Printf("MISSED AUDIO BUFFER\n")
+	}
+	*/
 }
 
-func (audio *Audio) Start() {
-	audio.Output.Start()
-}
-
-func (audio *Audio) Stop() {
-	audio.Output.Stop()
+func highpass(audio []AudioSample, capacitor *AudioSample) {
+	for i := range audio {
+		in := audio[i] << FracBits
+		out := in - *capacitor
+		*capacitor = in - AudioSample((int32(out)*HPFactor)>>FracBits)
+		audio[i] = out >> FracBits
+	}
 }

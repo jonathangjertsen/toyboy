@@ -4,6 +4,7 @@ go 1.23.2
 
 require (
 	gioui.org v0.8.0
+	github.com/ebitengine/oto/v3 v3.3.3
 	github.com/gorilla/websocket v1.5.3
 	github.com/wailsapp/wails/v2 v2.10.2
 	golang.org/x/image v0.18.0
@@ -12,6 +13,7 @@ require (
 require (
 	gioui.org/shader v1.0.8 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
+	github.com/ebitengine/purego v0.8.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-text/typesetting v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect

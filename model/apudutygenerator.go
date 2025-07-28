@@ -2,7 +2,7 @@ package model
 
 type DutyGenerator struct {
 	waveform Data8
-	output   int8
+	output   AudioSample
 }
 
 func NewDutyGenerator() DutyGenerator {
@@ -28,7 +28,7 @@ func (dg *DutyGenerator) clock() {
 		dg.output = 1
 		dg.waveform = (dg.waveform >> 1) | 0x80
 	} else {
-		dg.output = -1
+		dg.output = 0
 		dg.waveform >>= 1
 	}
 }

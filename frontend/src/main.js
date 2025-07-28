@@ -31,12 +31,14 @@ async function run() {
 
     await window.go.main.App.StartGB();
     await window.go.main.App.StartWebSocketServer();
+
     const ws = new WebSocket('ws://localhost:8081/data');
     ws.binaryType = 'arraybuffer';
 
     let dataID = "";
     const decoder = new TextDecoder();
     ws.onmessage = function(event) {
+        console.log(dataID);
         if (typeof event.data === "string") {
             dataID = event.data;
             return;

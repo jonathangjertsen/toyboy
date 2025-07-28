@@ -192,8 +192,6 @@ func (clockRT *ClockRT) MCycle(n int) {
 			if m&0x1 == 0 {
 				clockRT.apu.Pulse1.clock()
 				clockRT.apu.Pulse2.clock()
-			}
-			if clockRT.Cycle&0xf == 0 {
 				clockRT.apu.Noise.clock()
 			}
 			clockRT.ppu.fsm()
@@ -216,9 +214,6 @@ func (clockRT *ClockRT) MCycle(n int) {
 
 func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool) {
 	// T0
-	if ppu {
-		clockRT.ppu.fsm()
-	}
 	if apu {
 		clockRT.apu.Wave.clock()
 
@@ -226,9 +221,12 @@ func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool) {
 			clockRT.apu.Pulse1.clock()
 			clockRT.apu.Pulse2.clock()
 		}
-		if clockRT.Cycle&0xf == 0 {
+		if m&0x3 == 0 {
 			clockRT.apu.Noise.clock()
 		}
+	}
+	if ppu {
+		clockRT.ppu.fsm()
 	}
 
 	// T1

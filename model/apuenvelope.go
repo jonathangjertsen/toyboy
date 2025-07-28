@@ -33,6 +33,6 @@ func (env *Envelope) clock(envtick Data8) {
 	}
 }
 
-func (env *Envelope) scale(sample int8) int8 {
-	return sample * int8(env.volume)
+func (env *Envelope) scale(sample AudioSample) AudioSample {
+	return sample * AudioSample(env.volume)
 }
