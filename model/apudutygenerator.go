@@ -2,7 +2,13 @@ package model
 
 type DutyGenerator struct {
 	waveform Data8
-	output   Data8
+	output   int8
+}
+
+func NewDutyGenerator() DutyGenerator {
+	dg := DutyGenerator{}
+	dg.SetDuty(0)
+	return dg
 }
 
 func (dg *DutyGenerator) SetDuty(v Data8) {
@@ -23,7 +29,7 @@ func (dg *DutyGenerator) clock() {
 		dg.output = 1
 		dg.waveform = (dg.waveform >> 1) | 0x80
 	} else {
-		dg.output = 0
+		dg.output = -1
 		dg.waveform >>= 1
 	}
 }

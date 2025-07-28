@@ -32,3 +32,7 @@ func (env *Envelope) clock(envtick Data8) {
 		}
 	}
 }
+
+func (env *Envelope) scale(sample int8) int8 {
+	return sample * int8(env.volume)
+}

@@ -1,10 +1,14 @@
 function numberUpdated(id, value) {
     MachineReq.Numbers[id] = value;
+    MachineReq.ClickedNumber = id;
+    console.log("Set ClickedNumber", id, MachineReq)
     doMachineReq();
 }
 
 function rangeUpdated(id, lower, upper) {
     MachineReq.Ranges[id] = { Begin: lower, End: upper }
+    MachineReq.ClickedRange = id;
+    console.log("Set ClickedRange", id, MachineReq)
     doMachineReq();
 }
 
@@ -15,30 +19,43 @@ class InputFields {
 
     initInput(inputElement) {
         const id = inputElement.getAttribute('data-input-id');
+        const inputType = inputElement.getAttribute('data-input-type') ?? 'int';
         const min = parseInt(inputElement.getAttribute('data-min')) || -Infinity;
         const max = parseInt(inputElement.getAttribute('data-max')) || Infinity;
         const field = inputElement.querySelector('.numeric-field');
         const hexToggle = inputElement.querySelector('.hex-toggle');
         const confirmBtn = inputElement.querySelector('.confirm-btn');
 
-        const initHex = hexToggle.textContent === 'HEX'
+        let fmt = '';
+        if (inputType === 'float') {
+            fmt = 'FLOAT';
+        } else if ((hexToggle !== null) && (hexToggle.textContent === 'HEX')) {
+            fmt = 'HEX';
+        } else {
+            fmt = 'DEC';
+        }
         const state = {
             id: id,
             min: min,
             max: max,
-            isHex: initHex,
-            lastConfirmedValue: parseInt(field.value, initHex ? 16 : 10),
+            fmt: fmt,
+            lastConfirmedValue: 0,
             element: inputElement,
             field: field,
             hexToggle: hexToggle
         };
+        state.lastConfirmedValue = this.getCurrentValue(state);
 
         this.inputs[id] = state;
 
         // Toggle hex/dec
-        hexToggle.addEventListener('click', () => {
-            state.isHex = !state.isHex;
-            hexToggle.textContent = state.isHex ? 'HEX' : 'DEC';
+        hexToggle?.addEventListener('click', () => {
+            if (state.fmt == 'HEX') {
+                state.fmt = 'DEC';
+            } else {
+                state.fmt = 'HEX';
+            }
+            hexToggle.textContent = state.fmt;
             this.setHexButtonColor(hexToggle, state);
             this.updateFieldDisplay(state);
         });
@@ -68,10 +85,13 @@ class InputFields {
             const text = state.field.value.trim();
             if (text === '') return null;
             
-            if (state.isHex) {
-                return parseInt(text, 16);
-            } else {
-                return parseInt(text, 10);
+            switch (state.fmt) {
+                case 'HEX':
+                    return parseInt(text, 16);
+                case 'DEC':
+                    return parseInt(text, 10);
+                case 'FLOAT':
+                    return parseFloat(text);
             }
         } catch (e) {
             return null;
@@ -83,7 +103,10 @@ class InputFields {
     }
 
     setHexButtonColor(hexToggle, state) {
-        if (state.isHex) {
+        if (hexToggle === null) {
+            return;
+        }
+        if (state.fmt === 'HEX') {
             hexToggle.classList.add('hex');
             hexToggle.classList.remove('dec');
         } else {
@@ -94,7 +117,7 @@ class InputFields {
     updateFieldDisplay(state) {
         const currentValue = this.getCurrentValue(state);
         if (currentValue !== null) {
-            if (state.isHex) {
+            if (state.fmt === 'HEX') {
                 state.field.value = currentValue.toString(16).toUpperCase();
             } else {
                 state.field.value = currentValue.toString(10);
@@ -129,6 +152,7 @@ class RangeFields {
 
     initRange(rangeElement) {
         const id = rangeElement.getAttribute('data-range-id');
+        const inputType = rangeElement.getAttribute('data-input-type');
         const min = parseInt(rangeElement.getAttribute('data-min')) || -Infinity;
         const max = parseInt(rangeElement.getAttribute('data-max')) || Infinity;
         const lowerField = rangeElement.querySelector('.lower-field');
@@ -136,14 +160,21 @@ class RangeFields {
         const hexToggle = rangeElement.querySelector('.hex-toggle');
         const confirmBtn = rangeElement.querySelector('.confirm-btn');
 
-        const initHex = hexToggle.textContent === 'HEX';
+        let fmt = '';
+        if (inputType === 'float') {
+            fmt = 'FLOAT';
+        } else if ((hexToggle !== null) && (hexToggle.textContent === 'HEX')) {
+            fmt = 'HEX';
+        } else {
+            fmt = 'DEC';
+        }
         const state = {
             id: id,
             min: min,
             max: max,
-            isHex: initHex,
-            lastConfirmedLower: parseInt(lowerField.value, initHex ? 16 : 10),
-            lastConfirmedUpper: parseInt(upperField.value, initHex ? 16 : 10),
+            fmt: fmt,
+            lastConfirmedLower: this.getCurrentValue(lowerField.value, fmt),
+            lastConfirmedUpper: this.getCurrentValue(upperField.value, fmt),
             element: rangeElement,
             lowerField: lowerField,
             upperField: upperField,
@@ -153,9 +184,13 @@ class RangeFields {
         this.ranges[id] = state;
 
         // Toggle hex/dec
-        hexToggle.addEventListener('click', () => {
-            state.isHex = !state.isHex;
-            hexToggle.textContent = state.isHex ? 'HEX' : 'DEC';
+        hexToggle?.addEventListener('click', () => {
+            if (state.fmt == 'HEX') {
+                state.fmt = 'DEC';
+            } else {
+                state.fmt = 'HEX';
+            }
+            hexToggle.textContent = state.fmt
             this.setHexButtonColor(hexToggle, state);
             this.updateFieldsDisplay(state);
         });
@@ -170,8 +205,8 @@ class RangeFields {
 
         // Confirm button
         confirmBtn.addEventListener('click', () => {
-            const lower = this.getCurrentValue(state.lowerField, state.isHex);
-            const upper = this.getCurrentValue(state.upperField, state.isHex);
+            const lower = this.getCurrentValue(state.lowerField, state.fmt);
+            const upper = this.getCurrentValue(state.upperField, state.fmt);
             
             if (lower !== null && upper !== null && 
                 this.isInRange(lower, state) && this.isInRange(upper, state) &&
@@ -189,7 +224,10 @@ class RangeFields {
     }
 
     setHexButtonColor(hexToggle, state) {
-        if (state.isHex) {
+        if (hexToggle === null) {
+            return;
+        }
+        if (state.fmt == 'HEX') {
             hexToggle.classList.add('hex');
             hexToggle.classList.remove('dec');
         } else {
@@ -198,15 +236,21 @@ class RangeFields {
         }
     }
 
-    getCurrentValue(field, isHex) {
+    getCurrentValue(field, fmt) {
         try {
             const text = field.value.trim();
             if (text === '') return null;
             
-            if (isHex) {
-                return parseInt(text, 16);
-            } else {
-                return parseInt(text, 10);
+            switch (fmt) {
+                case 'HEX': {
+                    return parseInt(text, 16);
+                }
+                case 'DEC': {
+                    return parseInt(text, 10);
+                }
+                case 'FLOAT': {
+                    return parseFloat(text);
+                }
             }
         } catch (e) {
             return null;
@@ -218,11 +262,11 @@ class RangeFields {
     }
 
     updateFieldsDisplay(state) {
-        const lowerValue = this.getCurrentValue(state.lowerField, !state.isHex);
-        const upperValue = this.getCurrentValue(state.upperField, !state.isHex);
+        const lowerValue = this.getCurrentValue(state.lowerField, state.fmt);
+        const upperValue = this.getCurrentValue(state.upperField, state.fmt);
         
         if (lowerValue !== null) {
-            if (state.isHex) {
+            if (state.fmt === 'HEX') {
                 state.lowerField.value = lowerValue.toString(16).toUpperCase();
             } else {
                 state.lowerField.value = lowerValue.toString(10);
@@ -230,7 +274,7 @@ class RangeFields {
         }
         
         if (upperValue !== null) {
-            if (state.isHex) {
+            if (state.fmt === 'HEX') {
                 state.upperField.value = upperValue.toString(16).toUpperCase();
             } else {
                 state.upperField.value = upperValue.toString(10);
@@ -241,8 +285,8 @@ class RangeFields {
     }
 
     validateRange(state) {
-        const lowerValue = this.getCurrentValue(state.lowerField, state.isHex);
-        const upperValue = this.getCurrentValue(state.upperField, state.isHex);
+        const lowerValue = this.getCurrentValue(state.lowerField, state.fmt);
+        const upperValue = this.getCurrentValue(state.upperField, state.fmt);
         
         // Clear all classes
         state.lowerField.classList.remove('changed', 'invalid');

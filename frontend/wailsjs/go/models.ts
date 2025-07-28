@@ -836,6 +836,8 @@ export namespace main {
 	    OpenBoxes: Record<string, boolean>;
 	    Numbers: Record<string, number>;
 	    Ranges: Record<string, Range>;
+	    ClickedNumber: string;
+	    ClickedRange: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new MachineStateRequest(source);
@@ -846,6 +848,8 @@ export namespace main {
 	        this.OpenBoxes = source["OpenBoxes"];
 	        this.Numbers = source["Numbers"];
 	        this.Ranges = this.convertValues(source["Ranges"], Range, true);
+	        this.ClickedNumber = source["ClickedNumber"];
+	        this.ClickedRange = source["ClickedRange"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

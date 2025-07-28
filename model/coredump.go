@@ -98,11 +98,50 @@ func (cd *CoreDump) PrintWRAM(f io.Writer) {
 	MemDump(f, cd.VRAM, AddrWRAMBegin, AddrWRAMEnd, cd.Regs.SP)
 }
 
-func bool2int(b bool) int {
+func b2i(b bool) int {
 	if b {
 		return 1
 	}
 	return 0
+}
+
+func PrintAPU(f io.Writer, apu *APU) {
+	RegDump(f, apu.MemoryRegion.Data, AddrAPUBegin, AddrAPUEnd)
+	fmt.Fprintf(f, "DivAPU:    %d\n", apu.DIVAPU)
+	fmt.Fprintf(f, "Pulse1 on=%d dac=%d\n", b2i(apu.Pulse1.activated), b2i(apu.Pulse1.dacEnabled))
+	printPeriodCounter(f, &apu.Pulse1.PeriodCounter)
+	printLengthTimer(f, &apu.Pulse1.LengthTimer)
+	printDutyGenerator(f, &apu.Pulse1.DutyGenerator)
+	printEnvelope(f, &apu.Pulse1.Envelope)
+	fmt.Fprintf(f, "Pulse2 on=%d dac=%d\n", b2i(apu.Pulse2.activated), b2i(apu.Pulse1.dacEnabled))
+	printPeriodCounter(f, &apu.Pulse2.PeriodCounter)
+	printLengthTimer(f, &apu.Pulse2.LengthTimer)
+	printDutyGenerator(f, &apu.Pulse2.DutyGenerator)
+	printEnvelope(f, &apu.Pulse2.Envelope)
+	fmt.Fprintf(f, "Wave on=%d dac=%d\n", b2i(apu.Wave.activated), b2i(apu.Wave.dacEnabled))
+	printPeriodCounter(f, &apu.Wave.PeriodCounter)
+	printLengthTimer(f, &apu.Wave.LengthTimer)
+	fmt.Fprintf(f, "Noise on=%d dac=%d\n", b2i(apu.Noise.activated), b2i(apu.Noise.dacEnabled))
+	printPeriodCounter(f, &apu.Noise.PeriodCounter)
+	printLengthTimer(f, &apu.Noise.LengthTimer)
+	printEnvelope(f, &apu.Noise.Envelope)
+	fmt.Fprintf(f, "                       ")
+}
+
+func printPeriodCounter(f io.Writer, pc *PeriodCounter) {
+	fmt.Fprintf(f, "  PC RST=%d V=%d\n", pc.periodDividerReset, pc.periodDivider)
+}
+
+func printLengthTimer(f io.Writer, lt *LengthTimer) {
+	fmt.Fprintf(f, "  LT EN=%d RST=%d V=%d\n", b2i(lt.lengthEnable), lt.lengthTimerReset, lt.lengthTimer)
+}
+
+func printDutyGenerator(f io.Writer, dg *DutyGenerator) {
+	fmt.Fprintf(f, "  DG WF=%d V=%d\n", dg.waveform, dg.output)
+}
+
+func printEnvelope(f io.Writer, env *Envelope) {
+	fmt.Fprintf(f, "  ENV SP=%d T=%d D=%d R=%d V=%d\n", env.envSweepPace, env.envTimer, b2i(env.envDir), env.volumeReset, env.volume)
 }
 
 func PrintPPU(f io.Writer, ppu PPUDump) {
@@ -120,9 +159,9 @@ func PrintPPU(f io.Writer, ppu PPUDump) {
 	fmt.Fprintf(f, "BFetch.TIdx:   %d\n", ppu.BackgroundFetcher.TileIndex)
 	fmt.Fprintf(f, "BFetch.TAddr:  %s\n", ppu.BackgroundFetcher.TileLSBAddr.Hex())
 	fmt.Fprintf(f, "BFetch.Tile:   %s\n", join16(ppu.BackgroundFetcher.TileMSB, ppu.BackgroundFetcher.TileLSB).Hex())
-	fmt.Fprintf(f, "BFetch.Susp:   %d\n", bool2int(ppu.BackgroundFetcher.Suspended))
-	fmt.Fprintf(f, "BFetch.WYRch:  %d\n", bool2int(ppu.BackgroundFetcher.WindowYReached))
-	fmt.Fprintf(f, "BFetch.WFetch: %d\n", bool2int(ppu.BackgroundFetcher.WindowFetching))
+	fmt.Fprintf(f, "BFetch.Susp:   %d\n", b2i(ppu.BackgroundFetcher.Suspended))
+	fmt.Fprintf(f, "BFetch.WYRch:  %d\n", b2i(ppu.BackgroundFetcher.WindowYReached))
+	fmt.Fprintf(f, "BFetch.WFetch: %d\n", b2i(ppu.BackgroundFetcher.WindowFetching))
 	fmt.Fprintf(f, "BFetch.WLC:    %d\n", ppu.BackgroundFetcher.WindowLineCounter)
 	fmt.Fprintf(f, "\n")
 	fmt.Fprintf(f, "BGFIFO: /[")
@@ -149,10 +188,10 @@ func PrintPPU(f io.Writer, ppu PPUDump) {
 	fmt.Fprintf(f, "SFetch.TIdx:   %d\n", ppu.SpriteFetcher.TileIndex)
 	fmt.Fprintf(f, "SFetch.TAddr:  %s\n", ppu.SpriteFetcher.TileLSBAddr.Hex())
 	fmt.Fprintf(f, "SFetch.Tile:   %s\n", join16(ppu.SpriteFetcher.TileMSB, ppu.SpriteFetcher.TileLSB).Hex())
-	fmt.Fprintf(f, "SFetch.Susp:   %d\n", bool2int(ppu.SpriteFetcher.Suspended))
+	fmt.Fprintf(f, "SFetch.Susp:   %d\n", b2i(ppu.SpriteFetcher.Suspended))
 	fmt.Fprintf(f, "Shift.Discard: %d\n", ppu.PixelShifter.Discard)
 	fmt.Fprintf(f, "Shift.X:       %d\n", ppu.PixelShifter.X)
-	fmt.Fprintf(f, "Shift.Susp:    %d\n", bool2int(ppu.PixelShifter.Suspended))
+	fmt.Fprintf(f, "Shift.Susp:    %d\n", b2i(ppu.PixelShifter.Suspended))
 	fmt.Fprintf(f, "OAMBuffer.LV:  %d\n", ppu.OAMBuffer.Level)
 }
 

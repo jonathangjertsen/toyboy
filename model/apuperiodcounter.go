@@ -16,3 +16,12 @@ func (pc *PeriodCounter) SetPeriodHigh(v Data8) {
 	pc.periodDividerReset &= 0x00ff
 	pc.periodDividerReset |= join16(v&0x7, 0x00)
 }
+
+func (pc *PeriodCounter) clock() bool {
+	pc.periodDivider++
+	if pc.periodDivider == 0x800 {
+		pc.periodDivider = pc.periodDividerReset
+		return true
+	}
+	return false
+}

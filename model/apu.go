@@ -20,11 +20,17 @@ func NewAPU(clock *ClockRT, config *Config) *APU {
 	apu := &APU{
 		MemoryRegion:                   NewMemoryRegion(clock, AddrAPUBegin, SizeAPU),
 		canWriteLengthTimersWithAPUOff: true, // on monochrome models
+		Pulse1: PulseChannelWithSweep{
+			PulseChannel: PulseChannel{
+				DutyGenerator: NewDutyGenerator(),
+			},
+		},
 	}
 	if config.BootROM.Skip {
 		apu.Reset()
 	}
 	clock.apu = apu
+	clock.audio.APU = apu
 	return apu
 }
 

@@ -13,6 +13,8 @@ type PulseChannel struct {
 
 	dacEnabled bool
 	activated  bool
+
+	test1 bool
 }
 
 type PulseChannelWithSweep struct {
@@ -79,5 +81,17 @@ func (pc *PulseChannel) clock() {
 	if !pc.activated {
 		return
 	}
-	pc.DutyGenerator.clock()
+	if pc.PeriodCounter.clock() {
+		pc.DutyGenerator.clock()
+	}
+}
+
+func (pc *PulseChannel) Sample() int8 {
+	if !pc.activated {
+		return 0
+	}
+
+	out := pc.DutyGenerator.output
+	out = pc.Envelope.scale(out)
+	return out
 }

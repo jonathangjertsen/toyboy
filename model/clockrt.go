@@ -19,6 +19,7 @@ type ClockRT struct {
 	Onpanic         func()
 	pauseAfterCycle atomic.Int32
 	Running         atomic.Bool
+	audio           *Audio
 
 	cpu   *CPU
 	ppu   *PPU
@@ -42,13 +43,14 @@ func (r *ClockRT) SetSpeedPercent(pct float64) {
 	})
 }
 
-func NewRealtimeClock(config ConfigClock) *ClockRT {
+func NewRealtimeClock(config ConfigClock, audio *Audio) *ClockRT {
 	clockRT := ClockRT{
 		resume:  make(chan struct{}),
 		pause:   make(chan struct{}),
 		stop:    make(chan struct{}),
 		jobs:    make(chan func()),
 		Onpanic: func() {},
+		audio:   audio,
 	}
 	go clockRT.run(config.SpeedPercent)
 	return &clockRT
@@ -78,13 +80,26 @@ func (clockRT *ClockRT) wait() {
 }
 
 func (clockRT *ClockRT) setSpeedPercent(pct float64) {
-	f := 4194304.0 * pct / 100
-	cycleInterval := time.Duration(float64(time.Second) / f)
-	clockRT.tickInterval = time.Millisecond * 2
-	if clockRT.tickInterval < cycleInterval {
-		clockRT.tickInterval = cycleInterval
+	// Target frequency
+	tFreq := 4194304.0 * pct / 100
+	mFreq := tFreq / 4
+
+	// Convert to interval
+	mCycleInterval := time.Duration(float64(time.Second) / mFreq)
+
+	// Update audio
+	clockRT.audio.SetMPeriod(mCycleInterval)
+
+	// How often we run the real ticker
+	minTickInterval := time.Millisecond * 2
+	if mCycleInterval > minTickInterval {
+		clockRT.tickInterval = mCycleInterval
+		clockRT.mCyclesPerTick = 1
+	} else {
+		clockRT.tickInterval = minTickInterval
+		clockRT.mCyclesPerTick = int(clockRT.tickInterval / mCycleInterval)
 	}
-	clockRT.mCyclesPerTick = int(clockRT.tickInterval / (4 * cycleInterval))
+
 	if clockRT.ticker != nil {
 		clockRT.ticker.Reset(clockRT.tickInterval)
 	}
@@ -157,6 +172,8 @@ func (clockRT *ClockRT) MCycle(n int) {
 			clockRT.pauseAfterCycle.Add(-1)
 		}
 
+		clockRT.audio.Clock()
+
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
 
@@ -166,8 +183,11 @@ func (clockRT *ClockRT) MCycle(n int) {
 		// Clock the peripherals.
 		// 99.99% of the time, both PPU and APU are on, so we clock everything
 		if clockRT.ppu.RegLCDC&clockRT.apu.MasterCtl&Bit7 != 0 {
+			if m&0x3f == 0 {
+				clockRT.timer.tickDIV()
+			}
+
 			// T0
-			clockRT.timer.tickDIV()
 			clockRT.apu.Wave.clock()
 			clockRT.apu.Pulse1.clock()
 			clockRT.apu.Pulse2.clock()
@@ -177,15 +197,12 @@ func (clockRT *ClockRT) MCycle(n int) {
 			clockRT.ppu.fsm()
 
 			// T1
-			clockRT.timer.tickDIV()
 
 			// T2
-			clockRT.timer.tickDIV()
 			clockRT.apu.Wave.clock()
 			clockRT.ppu.fsm()
 
 			// T3
-			clockRT.timer.tickDIV()
 		} else {
 			clockRT.mCycleSlowPath(
 				clockRT.ppu.RegLCDC&Bit7 != 0,
@@ -197,7 +214,6 @@ func (clockRT *ClockRT) MCycle(n int) {
 
 func (clockRT *ClockRT) mCycleSlowPath(ppu, apu bool) {
 	// T0
-	clockRT.timer.tickDIV()
 	if ppu {
 		clockRT.ppu.fsm()
 	}
@@ -211,10 +227,8 @@ func (clockRT *ClockRT) mCycleSlowPath(ppu, apu bool) {
 	}
 
 	// T1
-	clockRT.timer.tickDIV()
 
 	// T2
-	clockRT.timer.tickDIV()
 	if ppu {
 		clockRT.ppu.fsm()
 	}
@@ -223,5 +237,4 @@ func (clockRT *ClockRT) mCycleSlowPath(ppu, apu bool) {
 	}
 
 	// T3
-	clockRT.timer.tickDIV()
 }

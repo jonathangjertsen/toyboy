@@ -1,6 +1,8 @@
 package model
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 type Gameboy struct {
 	Config *Config
@@ -52,16 +54,17 @@ func (gb *Gameboy) GetCoreDump() CoreDump {
 
 func NewGameboy(
 	config *Config,
+	audio *Audio,
 ) *Gameboy {
 	gameboy := &Gameboy{
 		Config: config,
 	}
-	gameboy.Init()
+	gameboy.Init(audio)
 	return gameboy
 }
 
-func (gb *Gameboy) Init() {
-	clk := NewRealtimeClock(gb.Config.Clock)
+func (gb *Gameboy) Init(audio *Audio) {
+	clk := NewRealtimeClock(gb.Config.Clock, audio)
 
 	debug := NewDebug(clk, &gb.Config.Debug)
 

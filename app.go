@@ -81,7 +81,12 @@ func (app *App) shutdown(ctx context.Context) {
 }
 
 func (app *App) StartGB() {
-	app.GB = model.NewGameboy(&app.config.Model)
+	audio := &model.Audio{
+		SampleInterval: time.Second / 44100,
+		SampleBuffers:  model.NewSampleBuffers(1024),
+		Output:         model.NewAudioTestOutput("audio.bin"),
+	}
+	app.GB = model.NewGameboy(&app.config.Model, audio)
 
 	runtime.LogPrintf(app.ctx, "Started gameboy")
 
@@ -99,6 +104,10 @@ func (app *App) StartGB() {
 	app.GB.Cartridge.LoadROM(f)
 
 	app.GB.Start()
+	go func() {
+		<-time.After(time.Millisecond * 4200)
+		audio.Start(time.Millisecond * 10000)
+	}()
 }
 
 func (app *App) GetConfig() *Config {
@@ -121,7 +130,10 @@ var upgrader = websocket.Upgrader{
 }
 
 func (app *App) MachineStateRequest(req MachineStateRequest) {
-	fmt.Printf("req: %v\n", req)
+	if req.ClickedNumber == "TargetSpeed" {
+		app.GB.CLK.SetSpeedPercent(req.Numbers["TargetSpeed"])
+		fmt.Printf("Updated speed to %f\n", req.Numbers["TargetSpeed"])
+	}
 	app.reqChan <- req
 }
 
@@ -143,7 +155,9 @@ func (app *App) StartWebSocketServer() {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+
+		nGoroutines := 2
+		exit := make(chan struct{}, nGoroutines)
 
 		prevDisRange := Range{0, 0}
 		timeouts := map[DataID]TimeoutState{
@@ -158,6 +172,21 @@ func (app *App) StartWebSocketServer() {
 		}
 		var req MachineStateRequest
 		mu := &sync.Mutex{}
+
+		// Hammer the websocket with frames from the PPU
+		go func() {
+			for {
+				app.GB.PPU.Sync(func(vp *model.ViewPort) {
+					grayscale := vp.Grayscale()
+					if !sendData(conn, mu, DataIDViewport, grayscale[:]) {
+						exit <- struct{}{}
+						return
+					}
+				})
+			}
+		}()
+
+		// Send other stuff at a leisurely pace
 		go func() {
 			ticker := time.NewTicker(time.Millisecond * 10)
 			for {
@@ -168,7 +197,6 @@ func (app *App) StartWebSocketServer() {
 					force = true
 				}
 
-				// Maybe get new request
 				select {
 				case req = <-app.reqChan:
 				default:
@@ -198,7 +226,7 @@ func (app *App) StartWebSocketServer() {
 						model.PrintPPU(buf, app.GB.PPU.GetDump())
 					}
 					if buf := buffers[DataIDAPURegisters]; buf != nil {
-						model.RegDump(buf, app.GB.APU.Data, model.AddrAPUBegin, model.AddrAPUEnd)
+						model.PrintAPU(buf, app.GB.APU)
 					}
 					if buf := buffers[DataIDHRAM]; buf != nil {
 						model.MemDump(
@@ -258,23 +286,17 @@ func (app *App) StartWebSocketServer() {
 				})
 				for id, buf := range buffers {
 					if buf.Len() > 0 {
-						sendData(conn, mu, id, buf.Bytes())
+						if !sendData(conn, mu, id, buf.Bytes()) {
+							exit <- struct{}{}
+							return
+						}
 					}
 				}
 			}
 		}()
 
-		for i := 0; ; i++ {
-			app.GB.PPU.Sync(func(vp *model.ViewPort) {
-				// Clock measurement
-				if i%64 == 0 {
-
-				}
-
-				grayscale := vp.Grayscale()
-				sendData(conn, mu, DataIDViewport, grayscale[:])
-			})
-		}
+		<-exit
+		conn.Close()
 	})
 
 	go http.ListenAndServe(":8081", nil)
@@ -293,22 +315,30 @@ func rateLimit(id DataID, req *MachineStateRequest, timeouts map[DataID]TimeoutS
 	return true
 }
 
-func sendData(conn *websocket.Conn, mu *sync.Mutex, id DataID, content []uint8) {
+func sendData(conn *websocket.Conn, mu *sync.Mutex, id DataID, content []uint8) bool {
+	ok := true
 	mu.Lock()
-	conn.WriteMessage(websocket.TextMessage, []uint8(id.String()))
-	conn.WriteMessage(websocket.BinaryMessage, content)
+	if conn.WriteMessage(websocket.TextMessage, []uint8(id.String())) != nil {
+		ok = false
+	}
+	if conn.WriteMessage(websocket.BinaryMessage, content) != nil {
+		ok = false
+	}
 	mu.Unlock()
+	return ok
 }
 
 type MachineStateRequest struct {
-	OpenBoxes map[string]bool
-	Numbers   map[string]uint
-	Ranges    map[string]Range
+	OpenBoxes     map[string]bool
+	Numbers       map[string]float64
+	Ranges        map[string]Range
+	ClickedNumber string
+	ClickedRange  string
 }
 
 type Range struct {
-	Begin uint
-	End   uint
+	Begin float64
+	End   float64
 }
 
 func (r Range) Valid() bool {
@@ -319,11 +349,12 @@ func (r Range) Constrain(begin, end uint) Range {
 	if r.Begin == 0 && r.End == 0 {
 		return Range{}
 	}
-	if r.Begin < begin {
-		r.Begin = begin
+	fbegin, fend := float64(begin), float64(end)
+	if r.Begin < fbegin {
+		r.Begin = fbegin
 	}
-	if r.End > end {
-		r.End = end
+	if r.End > fend {
+		r.End = fend
 	}
 	if r.Begin > r.End {
 		return Range{}

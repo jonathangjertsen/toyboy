@@ -99,7 +99,6 @@ async function run() {
 run();
 
 async function updateSpeed() {
-    FPS.innerHTML = await window.go.main.App.GetSpeedPct();
     requestAnimationFrame(updateSpeed);
 }
 updateSpeed();
@@ -151,5 +150,8 @@ let MachineReq = {
 }
 
 async function doMachineReq() {
+    console.log("Sending machine request", MachineReq);
     await window.go.main.App.MachineStateRequest(MachineReq);
+    MachineReq.ClickedNumber = "";
+    MachineReq.ClickedRange = "";
 }
