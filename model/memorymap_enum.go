@@ -91,6 +91,8 @@ const (
 	AddrNR50                 Addr = 65316
 	AddrNR51                 Addr = 65317
 	AddrNR52                 Addr = 65318
+	AddrWaveRAMBegin         Addr = 65328
+	AddrWaveRAMEnd           Addr = 65343
 	AddrBootROMLock          Addr = 65360
 	AddrHRAMBegin            Addr = 65408
 	AddrHRAMEnd              Addr = 65534
@@ -99,7 +101,7 @@ const (
 
 var ErrInvalidAddr = errors.New("not a valid Addr")
 
-const _AddrName = "ZeroBootROMEndCartridgeEntryPointNintendoLogoBeginNintendoLogoEndTitleBeginTitleEndNewLicenseeCodeBeginNewLicenseeCodeEndSGBFlagCartridgeTypeROMSizeRAMSizeDestCodeOldLicenseeCodeMaskROMVersionNoHeaderChecksumGlobalChecksumBeginGlobalChecksumEndCartridgeBank0EndCartridgeBankNBeginCartridgeBankNEndTileDataBeginTileDataEndTileMap0BeginTileMap0EndTileMap1BeginTileMap1EndCartridgeRAMBeginCartridgeRAMEndWRAMBeginWRAMEndEchoRAMBeginEchoRAMEndOAMBeginOAMEndProhibitedBeginProhibitedEndP1SBSCDIVTIMATMATACIFLCDCSTATSCYSCXLYLYCDMABGPOBP0OBP1WYWXNR10NR11NR12NR13NR14NR21NR22NR23NR24NR30NR31NR32NR33NR34NR41NR42NR43NR44NR50NR51NR52BootROMLockHRAMBeginHRAMEndIE"
+const _AddrName = "ZeroBootROMEndCartridgeEntryPointNintendoLogoBeginNintendoLogoEndTitleBeginTitleEndNewLicenseeCodeBeginNewLicenseeCodeEndSGBFlagCartridgeTypeROMSizeRAMSizeDestCodeOldLicenseeCodeMaskROMVersionNoHeaderChecksumGlobalChecksumBeginGlobalChecksumEndCartridgeBank0EndCartridgeBankNBeginCartridgeBankNEndTileDataBeginTileDataEndTileMap0BeginTileMap0EndTileMap1BeginTileMap1EndCartridgeRAMBeginCartridgeRAMEndWRAMBeginWRAMEndEchoRAMBeginEchoRAMEndOAMBeginOAMEndProhibitedBeginProhibitedEndP1SBSCDIVTIMATMATACIFLCDCSTATSCYSCXLYLYCDMABGPOBP0OBP1WYWXNR10NR11NR12NR13NR14NR21NR22NR23NR24NR30NR31NR32NR33NR34NR41NR42NR43NR44NR50NR51NR52WaveRAMBeginWaveRAMEndBootROMLockHRAMBeginHRAMEndIE"
 
 var _AddrMap = map[Addr]string{
 	AddrZero:                 _AddrName[0:4],
@@ -181,10 +183,12 @@ var _AddrMap = map[Addr]string{
 	AddrNR50:                 _AddrName[611:615],
 	AddrNR51:                 _AddrName[615:619],
 	AddrNR52:                 _AddrName[619:623],
-	AddrBootROMLock:          _AddrName[623:634],
-	AddrHRAMBegin:            _AddrName[634:643],
-	AddrHRAMEnd:              _AddrName[643:650],
-	AddrIE:                   _AddrName[650:652],
+	AddrWaveRAMBegin:         _AddrName[623:635],
+	AddrWaveRAMEnd:           _AddrName[635:645],
+	AddrBootROMLock:          _AddrName[645:656],
+	AddrHRAMBegin:            _AddrName[656:665],
+	AddrHRAMEnd:              _AddrName[665:672],
+	AddrIE:                   _AddrName[672:674],
 }
 
 // String implements the Stringer interface.
@@ -282,10 +286,12 @@ var _AddrValue = map[string]Addr{
 	_AddrName[611:615]: AddrNR50,
 	_AddrName[615:619]: AddrNR51,
 	_AddrName[619:623]: AddrNR52,
-	_AddrName[623:634]: AddrBootROMLock,
-	_AddrName[634:643]: AddrHRAMBegin,
-	_AddrName[643:650]: AddrHRAMEnd,
-	_AddrName[650:652]: AddrIE,
+	_AddrName[623:635]: AddrWaveRAMBegin,
+	_AddrName[635:645]: AddrWaveRAMEnd,
+	_AddrName[645:656]: AddrBootROMLock,
+	_AddrName[656:665]: AddrHRAMBegin,
+	_AddrName[665:672]: AddrHRAMEnd,
+	_AddrName[672:674]: AddrIE,
 }
 
 // ParseAddr attempts to convert a string to a Addr.

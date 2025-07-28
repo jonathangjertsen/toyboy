@@ -82,6 +82,8 @@ package model
 // NR50                 = 0xff24
 // NR51                 = 0xff25
 // NR52                 = 0xff26
+// WaveRAMBegin         = 0xff30
+// WaveRAMEnd           = 0xff3f
 // BootROMLock          = 0xff50
 // HRAMBegin            = 0xff80
 // HRAMEnd              = 0xfffe
@@ -95,7 +97,7 @@ const (
 	AddrVRAMBegin            = AddrTileDataBegin
 	AddrVRAMEnd              = AddrTileMap1End
 	AddrAPUBegin             = AddrNR10
-	AddrAPUEnd               = AddrNR52
+	AddrAPUEnd               = AddrWaveRAMEnd
 	AddrPPUBegin             = AddrLCDC
 	AddrPPUEnd               = AddrWX
 	AddrTimerBegin           = AddrDIV
@@ -157,12 +159,13 @@ const (
 	SizeCartridgeRAM    Size16 = 0x2000
 	SizeWRAM            Size16 = 0x2000
 	SizeEchoRAM         Size16 = 0x1f00
-	SizeAPU             Size16 = 0x0017
+	SizeAPU             Size16 = 0x0030
 	SizePPU             Size16 = 0x000c
 	SizeHRAM            Size16 = 0x007f
 	SizeOAM             Size16 = 0x00a0
 	SizeProhibited      Size16 = 0x0060
 	SizeTimer           Size16 = 0x0004
+	SizeWaveRAM         Size16 = 0x0010
 )
 
 type Offset8 int8

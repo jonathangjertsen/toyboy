@@ -7,12 +7,11 @@ type DutyGenerator struct {
 
 func NewDutyGenerator() DutyGenerator {
 	dg := DutyGenerator{}
-	dg.SetDuty(0)
 	return dg
 }
 
 func (dg *DutyGenerator) SetDuty(v Data8) {
-	switch (v >> 5) & 0x3 {
+	switch (v >> 6) & 0x3 {
 	case 0:
 		dg.waveform = 0b1111_1110 // 12.5%
 	case 1:

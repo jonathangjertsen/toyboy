@@ -19,7 +19,7 @@ type ClockRT struct {
 	Onpanic         func()
 	pauseAfterCycle atomic.Int32
 	Running         atomic.Bool
-	audio           *Audio
+	Audio           *Audio
 
 	cpu   *CPU
 	ppu   *PPU
@@ -50,7 +50,7 @@ func NewRealtimeClock(config ConfigClock, audio *Audio) *ClockRT {
 		stop:    make(chan struct{}),
 		jobs:    make(chan func()),
 		Onpanic: func() {},
-		audio:   audio,
+		Audio:   audio,
 	}
 	go clockRT.run(config.SpeedPercent)
 	return &clockRT
@@ -88,7 +88,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64) {
 	mCycleInterval := time.Duration(float64(time.Second) / mFreq)
 
 	// Update audio
-	clockRT.audio.SetMPeriod(mCycleInterval)
+	clockRT.Audio.SetMPeriod(mCycleInterval)
 
 	// How often we run the real ticker
 	minTickInterval := time.Millisecond * 2
@@ -172,7 +172,7 @@ func (clockRT *ClockRT) MCycle(n int) {
 			clockRT.pauseAfterCycle.Add(-1)
 		}
 
-		clockRT.audio.Clock()
+		clockRT.Audio.Clock()
 
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
@@ -189,8 +189,10 @@ func (clockRT *ClockRT) MCycle(n int) {
 
 			// T0
 			clockRT.apu.Wave.clock()
-			clockRT.apu.Pulse1.clock()
-			clockRT.apu.Pulse2.clock()
+			if m&0x1 == 0 {
+				clockRT.apu.Pulse1.clock()
+				clockRT.apu.Pulse2.clock()
+			}
 			if clockRT.Cycle&0xf == 0 {
 				clockRT.apu.Noise.clock()
 			}
@@ -199,12 +201,12 @@ func (clockRT *ClockRT) MCycle(n int) {
 			// T1
 
 			// T2
-			clockRT.apu.Wave.clock()
 			clockRT.ppu.fsm()
 
 			// T3
 		} else {
 			clockRT.mCycleSlowPath(
+				m,
 				clockRT.ppu.RegLCDC&Bit7 != 0,
 				clockRT.apu.MasterCtl&Bit7 != 0,
 			)
@@ -212,15 +214,18 @@ func (clockRT *ClockRT) MCycle(n int) {
 	}
 }
 
-func (clockRT *ClockRT) mCycleSlowPath(ppu, apu bool) {
+func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool) {
 	// T0
 	if ppu {
 		clockRT.ppu.fsm()
 	}
 	if apu {
 		clockRT.apu.Wave.clock()
-		clockRT.apu.Pulse1.clock()
-		clockRT.apu.Pulse2.clock()
+
+		if m&0x1 == 0 {
+			clockRT.apu.Pulse1.clock()
+			clockRT.apu.Pulse2.clock()
+		}
 		if clockRT.Cycle&0xf == 0 {
 			clockRT.apu.Noise.clock()
 		}

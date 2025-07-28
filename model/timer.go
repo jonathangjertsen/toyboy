@@ -30,7 +30,6 @@ func NewTimer(clock *ClockRT, apu *APU, interrupts *Interrupts) *Timer {
 }
 
 // Tick the DIV timer
-// Runs every cycle, so this code path is extremely hot
 func (t *Timer) tickDIV() {
 	// https://gbdev.io/pandocs/Audio_details.html#div-apu
 	// A “DIV-APU” counter is increased every time DIV’s bit 4 (5 in double-speed mode) goes from 1 to 0

@@ -19,12 +19,14 @@ type Audio struct {
 
 type AudioOutput interface {
 	io.Writer
-	Start(duration time.Duration)
+	Start()
+	Stop()
 }
 
 type SampleBuffers struct {
 	Pulse1 []uint8
 	Pulse2 []uint8
+	Wave   []uint8
 	Size   int
 	Idx    int
 }
@@ -32,7 +34,7 @@ type SampleBuffers struct {
 func (sb *SampleBuffers) Mix() []uint8 {
 	mixed := make([]uint8, len(sb.Pulse1))
 	for i := range len(mixed) {
-		mixed[i] = sb.Pulse1[i] + sb.Pulse2[i]
+		mixed[i] = sb.Pulse1[i] + sb.Pulse2[i] + sb.Wave[i]
 	}
 	return mixed
 }
@@ -50,21 +52,20 @@ func NewAudioTestOutput(file string) *AudioTestOutput {
 	}
 }
 
-func (ato *AudioTestOutput) Start(duration time.Duration) {
+func (ato *AudioTestOutput) Start() {
 	w, err := os.Create(ato.File)
 	if err != nil {
 		return
 	}
-
 	ato.w = w
-	go func() {
-		<-time.After(duration)
-		ato.mu.Lock()
-		ato.w.Write(ato.buf.Bytes())
-		ato.w = nil
-		ato.buf = bytes.Buffer{}
-		ato.mu.Unlock()
-	}()
+}
+
+func (ato *AudioTestOutput) Stop() {
+	ato.mu.Lock()
+	ato.w.Write(ato.buf.Bytes())
+	ato.w = nil
+	ato.buf = bytes.Buffer{}
+	ato.mu.Unlock()
 }
 
 func (ato *AudioTestOutput) Write(p []uint8) (int, error) {
@@ -81,13 +82,15 @@ func NewSampleBuffers(size int) SampleBuffers {
 	return SampleBuffers{
 		Pulse1: make([]uint8, size),
 		Pulse2: make([]uint8, size),
+		Wave:   make([]uint8, size),
 		Size:   size,
 	}
 }
 
-func (ab *SampleBuffers) Add(pulse1, pulse2 int8) bool {
+func (ab *SampleBuffers) Add(pulse1, pulse2, wave int8) bool {
 	ab.Pulse1[ab.Idx] = uint8(pulse1)
 	ab.Pulse2[ab.Idx] = uint8(pulse2)
+	ab.Wave[ab.Idx] = uint8(wave)
 
 	ab.Idx++
 	if ab.Idx == ab.Size {
@@ -99,13 +102,6 @@ func (ab *SampleBuffers) Add(pulse1, pulse2 int8) bool {
 
 func (audio *Audio) Enabled() bool {
 	return audio.APU != nil && audio.SampleDivider > 0
-}
-
-func (audio *Audio) SampleRate() float64 {
-	if audio.SampleInterval == 0 {
-		return 0
-	}
-	return float64(time.Second + (audio.SampleInterval/2)/audio.SampleInterval)
 }
 
 func (audio *Audio) SetMPeriod(mPeriod time.Duration) {
@@ -129,12 +125,17 @@ func (audio *Audio) Clock() {
 	if !audio.SampleBuffers.Add(
 		audio.APU.Pulse1.Sample(),
 		audio.APU.Pulse2.Sample(),
+		audio.APU.Wave.Sample(),
 	) {
 		return
 	}
 	audio.Output.Write(audio.SampleBuffers.Mix())
 }
 
-func (audio *Audio) Start(timeout time.Duration) {
-	audio.Output.Start(timeout)
+func (audio *Audio) Start() {
+	audio.Output.Start()
+}
+
+func (audio *Audio) Stop() {
+	audio.Output.Stop()
 }

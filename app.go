@@ -78,6 +78,7 @@ func (app *App) beforeClose(ctx context.Context) (prevent bool) {
 }
 
 func (app *App) shutdown(ctx context.Context) {
+	app.GB.CLK.Audio.Stop()
 }
 
 func (app *App) StartGB() {
@@ -104,10 +105,7 @@ func (app *App) StartGB() {
 	app.GB.Cartridge.LoadROM(f)
 
 	app.GB.Start()
-	go func() {
-		<-time.After(time.Millisecond * 4200)
-		audio.Start(time.Millisecond * 10000)
-	}()
+	audio.Start()
 }
 
 func (app *App) GetConfig() *Config {
