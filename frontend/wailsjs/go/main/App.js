@@ -6,16 +6,24 @@ export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }
 
-export function GetCoreDump() {
-  return window['go']['main']['App']['GetCoreDump']();
+export function MachineStateRequest(arg1) {
+  return window['go']['main']['App']['MachineStateRequest'](arg1);
 }
 
-export function GetSpeedPct() {
-  return window['go']['main']['App']['GetSpeedPct']();
+export function Pause() {
+  return window['go']['main']['App']['Pause']();
 }
 
 export function SetKeyState(arg1) {
   return window['go']['main']['App']['SetKeyState'](arg1);
+}
+
+export function SoftReset() {
+  return window['go']['main']['App']['SoftReset']();
+}
+
+export function Start() {
+  return window['go']['main']['App']['Start']();
 }
 
 export function StartGB() {
@@ -24,4 +32,8 @@ export function StartGB() {
 
 export function StartWebSocketServer() {
   return window['go']['main']['App']['StartWebSocketServer']();
+}
+
+export function Step() {
+  return window['go']['main']['App']['Step']();
 }

@@ -2,10 +2,6 @@ package model
 
 //go:generate go-enum --marshal --flag --values --nocomments
 
-import (
-	"fmt"
-)
-
 // ENUM(HBlank, VBlank, OAMScan, PixelDraw)
 type PPUMode uint8
 
@@ -92,6 +88,26 @@ func NewPPU(rtClock *ClockRT, interrupts *Interrupts, bus *Bus, config *Config, 
 	ppu.beginFrame()
 	rtClock.ppu = ppu
 	return ppu
+}
+
+func (ppu *PPU) GetDump() PPUDump {
+	var dump PPUDump
+	dump.BGFIFO = ppu.BackgroundFIFO.Dump()
+	dump.SpriteFIFO = ppu.SpriteFIFO.Dump()
+	dump.LastShifted = ppu.Shifter.LastShifted
+	dump.OAMScanCycle = ppu.OAMScanCycle
+	dump.PixelDrawCycle = ppu.PixelDrawCycle
+	dump.HBlankRemainingCycles = ppu.HBlankRemainingCycles
+	dump.VBlankLineRemainingCycles = ppu.VBlankLineRemainingCycles
+	dump.PixelShifter = ppu.Shifter
+	dump.BackgroundFetcher = ppu.BackgroundFetcher
+	dump.SpriteFetcher = ppu.SpriteFetcher
+	dump.OAMBuffer = ppu.OAMBuffer
+	dump.Registers = ppu.Bus.ProbeRange(AddrPPUBegin, AddrPPUEnd)
+	if len(dump.Registers) == 0 {
+		panicf("hey %s %s", AddrPPUBegin.Hex(), AddrPPUEnd.Hex())
+	}
+	return dump
 }
 
 func (ppu *PPU) Sync(f func(*ViewPort)) {
@@ -185,14 +201,6 @@ func (ppu *PPU) SetOBP0(v Data8) {
 func (ppu *PPU) SetOBP1(v Data8) {
 	ppu.RegOBP1 = v
 	ppu.OBJPalette1 = v
-}
-
-func (ppu *PPU) Dump() {
-	fmt.Printf("\n--------\nPPU dump:\n")
-	fmt.Printf("Mode: %v\n", ppu.Mode)
-	fmt.Printf("OAMScanCycle: %d\n", ppu.OAMScanCycle)
-	fmt.Printf("OAMBuffer: %v\n", ppu.OAMBuffer)
-	fmt.Printf("\n--------\n")
 }
 
 func (ppu *PPU) fsm() {

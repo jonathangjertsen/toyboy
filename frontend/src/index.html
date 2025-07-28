@@ -15,10 +15,233 @@
         <!--  -->
     </header>
     <main>
-        <div class="play-area">
-            <p>Speed: <span id="fps"></span>%</p>
-            <canvas id="lcd" width="160" height="144" style="image-rendering: pixelated; width:640px; height: 576px;"></canvas>
+        <div class="box-container">
+            <div class="box" data-box-id="ram">
+                <div class="box-header">
+                    <div class="box-title">RAM</div>
+                </div>
+    
+                <div class="box" data-box-id="OAM">
+                    <div class="box-header">
+                        <div class="collapse-button"></div>
+                        <div class="box-title">OAM</div>
+                    </div>
+                    <div class="box-content">
+                        <pre id="oam-text">OAM</p>
+                    </div>
+                </div>
+                
+                <div class="box" data-box-id="HRAM">
+                    <div class="box-header">
+                        <div class="collapse-button"></div>
+                        <div class="box-title">HRAM</div>
+                    </div>
+                    <div class="box-content">
+                        <pre id="hram-text">HRAM</p>
+                    </div>
+                </div>
+    
+                <div class="box" data-box-id="WRAM">
+                    <div class="box-header">
+                        <div class="collapse-button"></div>
+                        <div class="box-title">WRAM</div>
+                    </div>
+
+                    <div class="box-content">
+                        <div class="input-label">Range</div>
+                        <div class="range-input" data-range-id="WRAM" data-min="C000" data-max="DFFF">
+                            <div class="input-button hex-toggle">HEX</div>
+                            <input type="text" class="numeric-field lower-field" value="C000">
+                            <div class="range-separator">-</div>
+                            <input type="text" class="numeric-field upper-field" value="C040">
+                            <div class="input-button confirm-btn">✓</div>
+                        </div>
+
+                        <pre id="wram-text">WRAM</p>
+                    </div>
+                </div>
+            </div>
+    
+            <div class="box" data-box-id="Program">
+                <div class="box-header">
+                    <div class="collapse-button"></div>
+                    <div class="box-title">ROM</div>
+                </div>
+                <div class="box-content">
+                    <p>ROM</p>
+                </div>
+            </div>
+        
+            <div class="play-area">
+                <div class="gameboy-hat"></div>
+                <canvas id="lcd" width="160" height="144" style="image-rendering: pixelated; width:640px; height: 576px;"></canvas>
+                <div class="gameboy-controller">
+                    <div class="dpad">
+                        <div id="btn-up" class="dpad-button dpad-up">▲</div>
+                        <div id="btn-down" class="dpad-button dpad-down">▼</div>
+                        <div id="btn-left" class="dpad-button dpad-left">◀</div>
+                        <div id="btn-right" class="dpad-button dpad-right">▶</div>
+                    </div>
+                    <div class="action-buttons">
+                        <div class="ab-buttons">
+                            <div id="btn-b" class="action-btn btn-b">
+                                <div class="button-label label-b">B</div>
+                            </div>
+                            <div id="btn-a" class="action-btn btn-a">
+                                <div class="button-label label-a">A</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-buttons">
+                        <div id="btn-select" class="control-btn">SELECT</div>
+                        <div id="btn-start" class="control-btn">START</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box" data-box-id="Disassembly">
+                <div class="box-header">
+                    <div class="collapse-button"></div>
+                    <div class="box-title">Disassembly</div>
+                </div>
+
+                <div class="box-content">
+
+                    <div class="input-label">Range</div>
+                    <div class="range-input" data-range-id="Disassembly" data-min="0000" data-max="32767">
+                        <div class="input-button hex-toggle">HEX</div>
+                        <input type="text" class="numeric-field lower-field" value="0000">
+                        <div class="range-separator">-</div>
+                        <input type="text" class="numeric-field upper-field" value="0100">
+                        <div class="input-button confirm-btn">✓</div>
+                    </div>
+
+                    <pre id="disassembly-text">Disassembly</pre>
+                </div>
+            </div>
+
+            <div class="box" data-box-id="ExecutionLog">
+                <div class="box-header">
+                    <div class="collapse-button"></div>
+                    <div class="box-title">Execution log</div>
+                </div>
+                <div class="box-content">
+                    <p>Execution log</p>
+                </div>
+            </div>
+
+            <div class="box" data-box-id="MachineState">
+                <div class="box-header">
+                    <div class="box-title">Machine state</div>
+                </div>
+                <div class="box-content">
+                    <div class="box-container">
+                        <div class="box" data-box-id="Clock">
+                            <div class="box-header">
+                                <div class="collapse-button"></div>
+                                <div class="box-title">Clock</div>
+                            </div>
+                            <div class="box-content">
+                                <pre id="clock-text">Clock</pre>
+                            </div>
+                        </div>
+                        <div class="box" data-box-id="CPURegisters">
+                            <div class="box-header">
+                                <div class="collapse-button"></div>
+                                <div class="box-title">CPU</div>
+                            </div>
+                            <div class="box-content">
+                                <pre id="cpu-registers-text">CPU</pre>
+                            </div>
+                        </div>
+                        <div class="box" data-box-id="PPURegisters">
+                            <div class="box-header">
+                                <div class="collapse-button"></div>
+                                <div class="box-title">PPU</div>
+                            </div>
+                            <div class="box-content">
+                                <pre id="ppu-registers-text">PPU</pre>
+                            </div>
+                        </div>
+                        <div class="box" data-box-id="APURegisters">
+                            <div class="box-header">
+                                <div class="collapse-button"></div>
+                                <div class="box-title">APU</div>
+                            </div>
+                            <div class="box-content">
+                                <pre id="apu-registers-text">APU</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box" data-box-id="debugger">
+                <div class="box-header">
+                    <div class="collapse-button"></div>
+                    <div class="box-title">Debugger</div>
+                </div>
+                <div class="box-content">
+                    <div class="debugger">
+                        <div class="control-container">
+                            <button class="debug-button" id="run-btn">Run</button>
+                            <button class="debug-button" id="pause-btn">Pause</button>
+                            <button class="debug-button" id="step-btn">Single Step</button>
+                            <div class="breakpoint-container">
+                                <span>Multi Step:</span>
+                                <div class="numeric-input" data-input-id="multi-step-n" data-min="1" data-max="10000">
+                                    <div class="input-button hex-toggle">DEC</div>
+                                    <input type="text" class="numeric-field" value="2">
+                                    <div class="input-button confirm-btn">Go</div>
+                                </div>
+                            </div>
+                            <button class="debug-button" id="restart-btn">Restart</button>
+                        </div>
+
+                        <div class="breakpoints">
+                            <div class="breakpoint-container">
+                                <span class="breakpoint-label">Break on PC:</span>
+                                <div class="numeric-input" data-input-id="pc-breakpoint" data-min="0" data-max="65535">
+                                    <div class="input-button hex-toggle">HEX</div>
+                                    <input type="text" class="numeric-field" value="" >
+                                    <div class="input-button confirm-btn">✓</div>
+                                </div>
+                                <button class="debug-button-small" id="pc-clear">Clear</button>
+                            </div>
+                            <div class="breakpoint-container">
+                                <span class="breakpoint-label">Break on IR:</span>
+                                <div class="numeric-input" data-input-id="ir-breakpoint" data-min="0" data-max="255">
+                                    <div class="input-button hex-toggle">HEX</div>
+                                    <input type="text" class="numeric-field" value="" >
+                                    <div class="input-button confirm-btn">✓</div>
+                                </div>
+                                <button class="debug-button-small" id="ir-clear">Clear</button>
+                            </div>
+                            <div class="breakpoint-container">
+                                <span class="breakpoint-label">Break on PPU (X)</span>
+                                <div class="numeric-input" data-input-id="ppu-x" data-min="0" data-max="160">
+                                    <div class="input-button hex-toggle">DEC</div>
+                                    <input type="text" class="numeric-field" value="">
+                                    <div class="input-button confirm-btn">✓</div>
+                                </div>
+                                <button class="debug-button-small" id="ppu-x-clear">Clear</button>
+                            </div>
+                            <div class="breakpoint-container">
+                                <span class="breakpoint-label">Break on PPU (Y)</span>
+                                <div class="numeric-input" data-input-id="ppu-y" data-min="0" data-max="144">
+                                    <div class="input-button hex-toggle">DEC</div>
+                                    <input type="text" class="numeric-field" value="" >
+                                    <div class="input-button confirm-btn">✓</div>
+                                </div>
+                                <button class="debug-button-small" id="ppu-y-clear">Clear</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <br/>
 
 		<h1>Select ROM</h1>
         <input type="file" id="romInput" multiple style="display: none;">
@@ -32,6 +255,9 @@
         <script src="localstorage.js"></script>
         <script src="config.js"></script>
         <script src="roms.js"></script>
+        <script src="box.js"></script>
+        <script src="numinput.js"></script>
+        <script src="debugger.js"></script>
         <script src="ui.js"></script>
         <script src="main.js"></script>
     </main>

@@ -36,6 +36,10 @@ type CPUBusIF interface {
 	GetPeripheral(any)
 }
 
+func (cpu *CPU) CurrInstruction() (DisInstruction, int) {
+	return cpu.rewind.Curr().Instruction, cpu.machineCycle
+}
+
 func (cpu *CPU) Reset() {
 	cpu.Regs = RegisterFile{}
 	cpu.Regs.SP = 0xfffe

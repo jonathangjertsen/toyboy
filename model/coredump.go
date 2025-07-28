@@ -36,31 +36,31 @@ type PPUDump struct {
 	OAMBuffer                 OAMBuffer
 }
 
-func (cd *CoreDump) PrintRegs(f io.Writer) {
-	fmt.Fprintf(f, "PC = %s\n", cd.Regs.PC.Hex())
-	fmt.Fprintf(f, "SP = %s\n", cd.Regs.SP.Hex())
-	fmt.Fprintf(f, "A  = 0x%02x\n", cd.Regs.A)
-	fmt.Fprintf(f, "F  = 0x%02x\n", cd.Regs.F)
-	fmt.Fprintf(f, "B  = 0x%02x\n", cd.Regs.B)
-	fmt.Fprintf(f, "C  = 0x%02x\n", cd.Regs.C)
-	fmt.Fprintf(f, "D  = 0x%02x\n", cd.Regs.D)
-	fmt.Fprintf(f, "E  = 0x%02x\n", cd.Regs.E)
-	fmt.Fprintf(f, "H  = 0x%02x\n", cd.Regs.H)
-	fmt.Fprintf(f, "L  = 0x%02x\n", cd.Regs.L)
-	fmt.Fprintf(f, "W  = 0x%02x\n", cd.Regs.TempW)
-	fmt.Fprintf(f, "Z  = 0x%02x\n", cd.Regs.TempZ)
-	fmt.Fprintf(f, "IR = 0x%02x\n", uint8(cd.Regs.IR))
+func PrintRegs(f io.Writer, regs RegisterFile) {
+	fmt.Fprintf(f, "PC = %s\n", regs.PC.Hex())
+	fmt.Fprintf(f, "SP = %s\n", regs.SP.Hex())
+	fmt.Fprintf(f, "A  = 0x%02x\n", regs.A)
+	fmt.Fprintf(f, "F  = 0x%02x\n", regs.F)
+	fmt.Fprintf(f, "B  = 0x%02x\n", regs.B)
+	fmt.Fprintf(f, "C  = 0x%02x\n", regs.C)
+	fmt.Fprintf(f, "D  = 0x%02x\n", regs.D)
+	fmt.Fprintf(f, "E  = 0x%02x\n", regs.E)
+	fmt.Fprintf(f, "H  = 0x%02x\n", regs.H)
+	fmt.Fprintf(f, "L  = 0x%02x\n", regs.L)
+	fmt.Fprintf(f, "W  = 0x%02x\n", regs.TempW)
+	fmt.Fprintf(f, "Z  = 0x%02x\n", regs.TempZ)
+	fmt.Fprintf(f, "IR = 0x%02x\n", uint8(regs.IR))
 	z, h, n, c := 0, 0, 0, 0
-	if cd.Regs.GetFlagZ() {
+	if regs.GetFlagZ() {
 		z = 1
 	}
-	if cd.Regs.GetFlagH() {
+	if regs.GetFlagH() {
 		h = 1
 	}
-	if cd.Regs.GetFlagN() {
+	if regs.GetFlagN() {
 		n = 1
 	}
-	if cd.Regs.GetFlagC() {
+	if regs.GetFlagC() {
 		c = 1
 	}
 	fmt.Fprintf(f, "Z=%v C=%v\n", z, c)
@@ -71,15 +71,15 @@ func (cd *CoreDump) PrintProgram(f io.Writer) {
 	if cd.ProgramEnd >= min(Addr(len(cd.Program)), 0x8000) {
 		return
 	}
-	memdump(f, cd.Program[cd.ProgramStart:cd.ProgramEnd+1], cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
+	MemDump(f, cd.Program[cd.ProgramStart:cd.ProgramEnd+1], cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
 }
 
 func (cd *CoreDump) PrintHRAM(f io.Writer) {
-	memdump(f, cd.HRAM, AddrHRAMBegin, AddrHRAMEnd, cd.Regs.SP)
+	MemDump(f, cd.HRAM, AddrHRAMBegin, AddrHRAMEnd, cd.Regs.SP)
 }
 
 func (cd *CoreDump) PrintOAM(f io.Writer) {
-	memdump(f, cd.OAM, AddrOAMBegin, AddrOAMEnd, 0)
+	MemDump(f, cd.OAM, AddrOAMBegin, AddrOAMEnd, 0)
 }
 
 func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
@@ -91,11 +91,11 @@ func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintVRAM(f io.Writer) {
-	memdump(f, cd.VRAM, AddrVRAMBegin, AddrVRAMEnd, 0)
+	MemDump(f, cd.VRAM, AddrVRAMBegin, AddrVRAMEnd, 0)
 }
 
 func (cd *CoreDump) PrintWRAM(f io.Writer) {
-	memdump(f, cd.VRAM, AddrWRAMBegin, AddrWRAMEnd, cd.Regs.SP)
+	MemDump(f, cd.VRAM, AddrWRAMBegin, AddrWRAMEnd, cd.Regs.SP)
 }
 
 func bool2int(b bool) int {
@@ -105,9 +105,8 @@ func bool2int(b bool) int {
 	return 0
 }
 
-func (cd *CoreDump) PrintPPU(f io.Writer) {
-	ppu := cd.PPU
-	regdump(f, ppu.Registers, AddrPPUBegin, AddrPPUEnd)
+func PrintPPU(f io.Writer, ppu PPUDump) {
+	RegDump(f, ppu.Registers, AddrPPUBegin, AddrPPUEnd)
 	fmt.Fprintf(f, "OAMCt:         %d\n", ppu.OAMScanCycle)
 	fmt.Fprintf(f, " PDCt:         %d\n", ppu.PixelDrawCycle)
 	fmt.Fprintf(f, " HBCt:         %d\n", ppu.HBlankRemainingCycles)
@@ -158,10 +157,10 @@ func (cd *CoreDump) PrintPPU(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintAPU(f io.Writer) {
-	regdump(f, cd.APU, AddrAPUBegin, AddrAPUEnd)
+	RegDump(f, cd.APU, AddrAPUBegin, AddrAPUEnd)
 }
 
-func regdump(f io.Writer, mem []Data8, start, end Addr) {
+func RegDump(f io.Writer, mem []Data8, start, end Addr) {
 	for addr := start; addr <= end; addr++ {
 		a := Addr(addr)
 		if !a.IsValid() {
@@ -171,7 +170,7 @@ func regdump(f io.Writer, mem []Data8, start, end Addr) {
 	}
 }
 
-func memdump(f io.Writer, mem []Data8, start, end, highlight Addr) {
+func MemDump(f io.Writer, mem []Data8, start, end, highlight Addr) {
 	alignedStart := (start / 0x10) * 0x10
 	for addr := alignedStart; addr < start; addr++ {
 		if addr%0x10 == 0 {
@@ -220,44 +219,24 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 		cd.ProgramEnd = cpu.Regs.PC + 0x40
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
-	cd.Program = getmem(bus, 0x0000, AddrCartridgeBank0End)
-	cd.Disassembly = cpu.Debug.Disassembly()
+	cd.Program = bus.ProbeRange(0x0000, AddrCartridgeBank0End)
+	cd.Disassembly = cpu.Debug.Disassembly(0, 0xffff)
 	cd.HRAM = bus.HRAM.Data
 	cd.OAM = bus.OAM.Data
 	cd.VRAM = bus.VRAM.Data
 	cd.APU = bus.APU.Data
-	cd.PPU.Registers = getmem(bus, AddrPPUBegin, AddrPPUEnd)
 	var ppu *PPU
 	bus.GetPeripheral(&ppu)
-	cd.PPU.BGFIFO = ppu.BackgroundFIFO.Dump()
-	cd.PPU.SpriteFIFO = ppu.SpriteFIFO.Dump()
-	cd.PPU.LastShifted = ppu.Shifter.LastShifted
-	cd.PPU.OAMScanCycle = ppu.OAMScanCycle
-	cd.PPU.PixelDrawCycle = ppu.PixelDrawCycle
-	cd.PPU.HBlankRemainingCycles = ppu.HBlankRemainingCycles
-	cd.PPU.VBlankLineRemainingCycles = ppu.VBlankLineRemainingCycles
-	cd.PPU.PixelShifter = ppu.Shifter
-	cd.PPU.BackgroundFetcher = ppu.BackgroundFetcher
-	cd.PPU.SpriteFetcher = ppu.SpriteFetcher
-	cd.PPU.OAMBuffer = ppu.OAMBuffer
+	cd.PPU = ppu.GetDump()
 	cd.Rewind = cpu.rewind
 	return cd
-}
-
-func getmem(bus CPUBusIF, start, end Addr) []Data8 {
-	out := make([]Data8, end-start+1)
-	for addr := start; addr <= end; addr++ {
-		out[addr-start] = bus.ProbeAddress(addr)
-	}
-
-	return out
 }
 
 func (cpu *CPU) Dump() {
 	cd := cpu.GetCoreDump()
 	f := os.Stdout
 	fmt.Fprintf(f, "\n--------\nCore dump:\n")
-	cd.PrintRegs(f)
+	PrintRegs(f, cd.Regs)
 	fmt.Fprintf(f, "--------\n")
 	fmt.Fprintf(f, "Code (PC highlighted)\n")
 	cd.PrintProgram(f)

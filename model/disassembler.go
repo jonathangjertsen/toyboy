@@ -14,13 +14,13 @@ type Disassembler struct {
 
 	PC Addr
 
-	stack             []Addr
-	stackIdx          int
-	cachedDisassembly *Disassembly
+	stack    []Addr
+	stackIdx int
 }
 
 type Block struct {
 	CanExplore bool
+	Name       string
 	Begin      Addr
 	Source     []Data8
 	Decoded    []DisInstruction
@@ -72,7 +72,7 @@ func (di *DisInstruction) Asm() string {
 	case OpcodeRST0x00, OpcodeRST0x08, OpcodeRST0x10, OpcodeRST0x18, OpcodeRST0x20, OpcodeRST0x28, OpcodeRST0x30, OpcodeRST0x38:
 		return fmt.Sprintf("RST $00%sh", str[ln-2:])
 	case OpcodeUndefD3, OpcodeUndefDB, OpcodeUndefDD, OpcodeUndefE3, OpcodeUndefE4, OpcodeUndefEB, OpcodeUndefEC, OpcodeUndefED, OpcodeUndefF4, OpcodeUndefFC, OpcodeUndefFD:
-		return fmt.Sprintf("Undefined instruction %s", di.Raw[0].Hex())
+		return fmt.Sprintf("UNDEF %s", di.Raw[0].Hex())
 	case OpcodeLDBCA, OpcodeLDDEA:
 		return fmt.Sprintf("LD (%s), A", str[ln-3:ln-1])
 	case OpcodeLDHLn:
@@ -144,13 +144,13 @@ func (di *DisInstruction) Asm() string {
 	case OpcodeADDHLHL, OpcodeADDHLDE, OpcodeADDHLBC, OpcodeADDHLSP:
 		return fmt.Sprintf("ADD %s, %s", str[ln-4:ln-2], str[ln-2:])
 	case OpcodeLDHnA:
-		return fmt.Sprintf("LDH ($%s),A; eff. LD $%s, A", di.Raw[1].Hex(), join16(0xff, di.Raw[1]).Hex())
+		return fmt.Sprintf("LDH ($ff00+%s)", di.Raw[1].Hex())
 	case OpcodeLDHAn:
-		return fmt.Sprintf("LDH A,($%s); eff. LD A,$%s", di.Raw[1].Hex(), join16(0xff, di.Raw[1]).Hex())
+		return fmt.Sprintf("LDH A,($ff00+%s)", di.Raw[1].Hex())
 	case OpcodeLDHAC:
-		return "LDH A,(C); eff. LD A, [C+$0xff00]"
+		return "LDH A,($ff00+C)"
 	case OpcodeLDHCA:
-		return "LDH (C), A; eff. LD [C+$0xff00], a"
+		return "LDH (C+$ff00), A"
 	case OpcodeLDHLSPe:
 		return fmt.Sprintf("LD HL,SP%s", fmtSignedOffset(di.Raw[1]))
 	case OpcodeCB:
@@ -190,50 +190,84 @@ type Disassembly struct {
 }
 
 func (d *Disassembly) Print(w io.Writer) {
-	for _, section := range d.Code {
-		fmt.Fprintf(w, "\nCode section at %s\n", section.Address().Hex())
-		for _, inst := range section.Instructions {
-			if inst.Address == d.PC {
-				fmt.Fprintf(w, "[%s]->%s\n", inst.Address.Hex(), inst.Asm())
-			} else {
-				fmt.Fprintf(w, "%sh | %s\n", inst.Address.Hex(), inst.Asm())
-			}
-		}
-	}
 	data := splitSections(d.Data)
-	prevEndAddr := Addr(0xffff)
-	for _, section := range data {
-		if prevEndAddr != section.Address {
-			fmt.Fprintf(w, "\nData section at %s\n", section.Address.Hex())
-		}
-		prevEndAddr = section.Address + Addr(len(section.Raw))
-		allEqual := true
-		testByte := section.Raw[0]
-		for _, b := range section.Raw {
-			if b != testByte {
-				allEqual = false
-				break
-			}
-		}
-		if allEqual {
-			fmt.Fprintf(w, "%0x bytes of %s\n", len(section.Raw), testByte.Hex())
-			continue
-		}
 
-		i := 0
-		for line := range (len(section.Raw) + 15) / 16 {
-			fmt.Fprintf(w, "%s | ", (section.Address + Addr(line*16)).Hex())
-			for range 16 {
-				if i >= len(section.Raw) {
-					break
-				}
-				fmt.Fprintf(w, "%s ", section.Raw[i].Hex())
-				i++
+	nCodeSections := len(d.Code)
+	nDataSections := len(data)
+	iData := 0
+	iCode := 0
+
+	prevDataEndAddr := Addr(0xffff)
+	for iData < nDataSections && iCode < nCodeSections {
+		var codeSection *CodeSection
+		var dataSection *DataSection
+		var selectCode = false
+		if iCode < nCodeSections {
+			codeSection = &d.Code[iCode]
+		}
+		if iData < nDataSections {
+			dataSection = &data[iData]
+		}
+		if codeSection != nil && dataSection != nil {
+			selectCode = codeSection.Address() < dataSection.Address
+		} else if codeSection != nil {
+			selectCode = true
+		} else {
+			selectCode = false
+		}
+		if selectCode {
+			printCodeSection(w, codeSection, d.PC)
+			iCode++
+		} else {
+			if prevDataEndAddr != dataSection.Address {
+				fmt.Fprintf(w, "\nData section at %s\n", dataSection.Address.Hex())
 			}
-			fmt.Fprintf(w, "\n")
+			prevDataEndAddr = dataSection.Address + Addr(len(dataSection.Raw))
+			printDataSection(w, dataSection)
+			iData++
 		}
 	}
 }
+
+func printCodeSection(w io.Writer, section *CodeSection, pc Addr) {
+	fmt.Fprintf(w, "\nCode section at %s\n", section.Address().Hex())
+	for _, inst := range section.Instructions {
+		if inst.Address == pc {
+			fmt.Fprintf(w, "[%s]->%s\n", inst.Address.Hex(), inst.Asm())
+		} else {
+			fmt.Fprintf(w, "%sh | %s\n", inst.Address.Hex(), inst.Asm())
+		}
+	}
+}
+
+func printDataSection(w io.Writer, section *DataSection) {
+	allEqual := true
+	testByte := section.Raw[0]
+	for _, b := range section.Raw {
+		if b != testByte {
+			allEqual = false
+			break
+		}
+	}
+	if allEqual {
+		fmt.Fprintf(w, "%0x bytes of %s\n", len(section.Raw), testByte.Hex())
+		return
+	}
+
+	i := 0
+	for line := range (len(section.Raw) + 15) / 16 {
+		fmt.Fprintf(w, "%s | ", (section.Address + Addr(line*16)).Hex())
+		for range 16 {
+			if i >= len(section.Raw) {
+				break
+			}
+			fmt.Fprintf(w, "%s ", section.Raw[i].Hex())
+			i++
+		}
+		fmt.Fprintf(w, "\n")
+	}
+}
+
 func splitSections(sections []DataSection) []DataSection {
 	var result []DataSection
 	for _, section := range sections {
@@ -286,9 +320,9 @@ func splitSections(sections []DataSection) []DataSection {
 func NewDisassembler(config *ConfigDisassembler) Disassembler {
 	dis := Disassembler{
 		Config:  config,
-		Program: Block{Begin: 0},
-		HRAM:    Block{Begin: AddrHRAMBegin, Decoded: make([]DisInstruction, SizeHRAM)},
-		WRAM:    Block{Begin: AddrWRAMBegin, Decoded: make([]DisInstruction, SizeWRAM)},
+		Program: Block{Name: "Program", Begin: 0},
+		HRAM:    Block{Name: "HRAM", Begin: AddrHRAMBegin, Decoded: make([]DisInstruction, SizeHRAM)},
+		WRAM:    Block{Name: "WRAM", Begin: AddrWRAMBegin, Decoded: make([]DisInstruction, SizeWRAM)},
 	}
 	return dis
 }
@@ -297,7 +331,6 @@ func (dis *Disassembler) SetProgram(program []byte) {
 	dis.Program.CanExplore = true
 	dis.Program.Source = Data8Slice(program)
 	dis.Program.Decoded = make([]DisInstruction, len(program))
-	dis.cachedDisassembly = nil
 }
 
 func (dis *Disassembler) print(msg string) {
@@ -320,6 +353,7 @@ func (dis *Disassembler) SetPC(address Addr) {
 	if address >= AddrWRAMBegin && address <= AddrWRAMEnd {
 		dis.WRAM.CanExplore = true
 	}
+	dis.PC = address
 	dis.ExploreFrom(address)
 }
 
@@ -331,7 +365,6 @@ func (dis *Disassembler) ExploreFrom(address Addr) {
 
 	dis.stackIdx--
 	dis.stack = dis.stack[:dis.stackIdx]
-	dis.PC = address
 }
 
 func (dis *Disassembler) exploreFromInner(address Addr) {
@@ -399,26 +432,51 @@ func (dis *Disassembler) exploreFromInner(address Addr) {
 	}
 }
 
-func (dis *Disassembler) Disassembly() *Disassembly {
-	if dis.cachedDisassembly != nil && len(dis.cachedDisassembly.Code) > 0 {
-		return dis.cachedDisassembly
-	}
-
+func (dis *Disassembler) Disassembly(start, end Addr) *Disassembly {
 	var out Disassembly
 	for _, block := range []*Block{&dis.Program, &dis.HRAM, &dis.WRAM} {
 		if block.Source == nil {
+			fmt.Printf("%s source is nil\n", block.Name)
 			continue
 		}
+		if block.Begin > end {
+			fmt.Printf("%s block.Begin=%s > end=%s\n", block.Name, block.Begin.Hex(), end.Hex())
+			continue
+		}
+		if block.Begin > start {
+			start = block.Begin
+		}
+		blockEnd := block.Begin + Addr(len(block.Source))
+		if blockEnd < start {
+			fmt.Printf("%s blockEnd=%s < start=%s\n", block.Name, blockEnd.Hex(), start.Hex())
+			continue
+		}
+		if blockEnd < end {
+			end = blockEnd
+		}
+
+		if start >= end {
+			fmt.Printf("%s start=%s >= end=%s\n", block.Name, start.Hex(), end.Hex())
+			continue
+		}
+
+		beginOffs := start - block.Begin
+		// align to instruction
+		beginOffs -= start - block.Decoded[beginOffs].Address
+
+		endOffs := end - block.Begin
+
 		currCodeSection := CodeSection{}
 		currDataSection := DataSection{}
-		for offs := 0; offs < len(block.Decoded); {
+		fmt.Printf("%s slurp start=%s end=%s\n", block.Name, start.Hex(), end.Hex())
+		for offs := beginOffs; offs < endOffs; {
 			di := block.Decoded[offs]
 			if di.Size() > 0 {
 				if currDataSection.Raw != nil {
 					out.Data = append(out.Data, currDataSection)
 				}
 				currCodeSection.Instructions = append(currCodeSection.Instructions, di)
-				offs += int(di.Size())
+				offs += Addr(di.Size())
 
 				currDataSection.Raw = nil
 			} else {
@@ -443,7 +501,6 @@ func (dis *Disassembler) Disassembly() *Disassembly {
 	}
 
 	out.PC = dis.PC
-	dis.cachedDisassembly = &out
 	return &out
 }
 
@@ -457,7 +514,6 @@ func (dis *Disassembler) insert(di DisInstruction, block *Block) {
 	for addr := di.Address; addr != di.Address+Addr(di.Size()); addr++ {
 		block.Decoded[addr-block.Begin] = di
 	}
-	dis.cachedDisassembly = nil
 }
 
 // returns true if unconditional branch, i.e. can never fall through

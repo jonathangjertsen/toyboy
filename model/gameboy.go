@@ -1,22 +1,30 @@
 package model
 
+import "sync/atomic"
+
 type Gameboy struct {
 	Config *Config
 
+	Running atomic.Bool
+
 	CLK       *ClockRT
+	Bus       *Bus
 	Debug     *Debug
 	CPU       *CPU
 	PPU       *PPU
+	APU       *APU
 	Cartridge *Cartridge
 	Joypad    *Joypad
 }
 
 func (gb *Gameboy) Start() {
 	gb.CLK.Start()
+	gb.Running.Store(true)
 }
 
 func (gb *Gameboy) Pause() {
 	gb.CLK.Pause()
+	gb.Running.Store(false)
 }
 
 func (gb *Gameboy) Step() {
@@ -29,6 +37,7 @@ func (gb *Gameboy) SoftReset() {
 		gb.CLK.Cycle = 0
 		gb.CPU.Reset()
 		gb.PPU.Reset()
+		gb.APU.Reset()
 	})
 }
 
@@ -76,7 +85,14 @@ func (gb *Gameboy) Init() {
 
 	bootROMLock.OnLock = func() {
 		debug.SetProgram(ByteSlice(cartridge.CurrROMBank0.Data))
+
+		// Explore from known entry points (Cartridge entrypoint and interrupt vector)
 		debug.SetPC(0x100)
+		debug.SetPC(0x40)
+		debug.SetPC(0x48)
+		debug.SetPC(0x50)
+		debug.SetPC(0x58)
+		debug.SetPC(0x60)
 	}
 
 	bus := &Bus{}
@@ -104,8 +120,10 @@ func (gb *Gameboy) Init() {
 	debug.HRAM.Source = hram.Data
 	debug.WRAM.Source = wram.Data
 
+	gb.Bus = bus
 	gb.CLK = clk
 	gb.CPU = cpu
+	gb.APU = apu
 	gb.Cartridge = cartridge
 	gb.PPU = ppu
 	gb.Debug = debug

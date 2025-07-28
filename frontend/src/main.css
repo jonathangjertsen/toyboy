@@ -31,7 +31,7 @@ body {
     background-position: center;
     background-repeat: no-repeat;
     background-image: url("./assets/images/logo-universal.png");
-    background-size: 100% 100%;
+    backgrou-size: 100% 100%;
     background-origin: content-box;
 }
 .result {
@@ -73,4 +73,386 @@ body {
 .input-box .input:focus {
     border: none;
     background-color: rgba(255, 255, 255, 1);
+}
+
+.play-area {
+    margin: auto;
+    width: 640px;
+}
+
+.gameboy-hat, .gameboy-controller {
+    background: #9ca676;
+    padding: 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    margin-top: -5px; /* not great */
+}
+
+.gameboy-hat {
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+}
+
+.gameboy-controller {
+    border-bottom-left-radius: 20px;
+    border-bottom-right-radius: 20px;
+    gap: 80px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.2), 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.dpad {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.dpad-button {
+    position: absolute;
+    background: #2d2d2d;
+    border: 3px solid #1a1a1a;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.dpad-up, .dpad-down {
+    width: 40px;
+    height: 50px;
+    left: 40px;
+    border-radius: 8px;
+}
+
+.dpad-up {
+    top: 0;
+}
+
+.dpad-down {
+    bottom: 0;
+}
+
+.dpad-left, .dpad-right {
+    width: 50px;
+    height: 40px;
+    top: 40px;
+    border-radius: 8px;
+}
+
+.dpad-left {
+    left: 0;
+}
+
+.dpad-right {
+    right: 0;
+}
+
+.dpad-center {
+    width: 40px;
+    height: 40px;
+    top: 40px;
+    left: 40px;
+    border-radius: 6px;
+    background: #404040;
+    border: 2px solid #2d2d2d;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
+.ab-buttons {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.action-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 4px solid #1a1a1a;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 18px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.btn-a {
+    background: linear-gradient(145deg, #dc2626, #991b1b);
+    color: white;
+    margin-left: 20px;
+}
+.btn-b {
+    background: linear-gradient(145deg, #dc2626, #991b1b);
+    color: white;
+}
+
+.control-buttons {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 30px;
+}
+
+.control-btn {
+    width: 50px;
+    height: 20px;
+    background: #2d2d2d;
+    border: 2px solid #1a1a1a;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #ccc;
+    font-weight: bold;
+}
+
+.pressed {
+    filter: brightness(70%);
+    transform: translateY(2px);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.box {
+    flex-grow: 1;
+    margin: 10px;
+    background: #c0c0c0;
+    border: 2px outset #c0c0c0;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    max-height: 900px;
+    overflow-y: scroll;
+}
+
+.box-header {
+    background: linear-gradient(90deg, #0078d4 0%, #106ebe 100%);
+    color: white;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid #003d6b;
+}
+
+.box-header:hover {
+    background: linear-gradient(90deg, #106ebe 0%, #005a9e 100%);
+}
+
+.collapse-button {
+    width: 16px;
+    height: 16px;
+    background: #c0c0c0;
+    border: 1px outset #c0c0c0;
+    margin-right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: #000;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.collapse-button:hover {
+    background: #d4d4d4;
+}
+
+.collapse-button:active {
+    border: 1px inset #c0c0c0;
+}
+
+.box-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.box-content {
+    padding: 12px;
+    background: #f7f7f7;
+    border: 1px inset #c0c0c0;
+    margin: 2px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #000;
+    max-height: 800px;
+    overflow-y: scroll;
+}
+
+pre {
+    text-align: left;
+}
+
+.box.collapsed > .box-content {
+    display: none;
+}
+
+.box.collapsed {
+    height: auto;
+}
+
+.box.collapsed > .box-header > .collapse-button::before {
+    content: '+';
+}
+
+.box:not(.collapsed) > .box-header > .collapse-button::before {
+    content: '-';
+}
+
+.box-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.numeric-input {
+    display: inline-flex;
+    align-items: center;
+    margin: 10px;
+    background: #c0c0c0;
+    border: 2px inset #c0c0c0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.input-button {
+    width: 24px;
+    height: 22px;
+    background: #c0c0c0;
+    border: 1px outset #c0c0c0;
+    font-size: 10px;
+    font-weight: bold;
+    color: #000;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.input-button:hover {
+    background: #d4d4d4;
+}
+
+.input-button:active {
+    border: 1px inset #c0c0c0;
+}
+
+.numeric-field {
+    border: none;
+    padding: 3px 6px;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    background: white;
+    color: black;
+    outline: none;
+    min-width: 80px;
+}
+
+.numeric-field.changed {
+    background: #ffff99;
+}
+
+.numeric-field.invalid {
+    background: #ffcccc;
+}
+
+.range-input {
+    display: inline-flex;
+    align-items: center;
+    margin: 10px;
+    background: #c0c0c0;
+    border: 2px inset #c0c0c0;
+    font-family: 'monospace';
+}
+
+.range-separator {
+    padding: 0 4px;
+    font-size: 11px;
+    color: #000;
+    font-weight: bold;
+}
+
+.input-label {
+    display: inline;
+    color: #000;
+    font-family: 'monospace';
+}
+
+.hex-toggle {
+    font-family: 'monospace';
+}
+
+.hex-toggle.hex {
+    background-color: #ffccff;
+}
+
+.hex-toggle.dec {
+    background-color: #ffffcc;
+}
+
+.breakpoint-container {
+    display: flex;
+    align-items: center;
+    margin: auto;
+    gap: 4px;
+}
+
+.breakpoints {
+    padding-top: 8px;
+    margin: auto;
+}
+
+.breakpoint {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+}
+
+.breakpoint-label {
+    font-size: 10px;
+    width: 100px;
+    text-align: right;
+    padding-right: 4px;
+}
+
+.breakpoint-container > .numeric-input > .numeric-field.empty {
+    background: #cccccc;
+}
+
+.control-container {
+    display: flex;
+    gap: 8px;
+    align-items: center; 
+    flex-wrap: wrap;
+    border-bottom: 1px solid #808080;
+    padding-bottom: 8px;
+}
+
+.debugger {
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px;
 }

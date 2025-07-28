@@ -22,14 +22,18 @@ func NewAPU(clock *ClockRT, config *Config) *APU {
 		canWriteLengthTimersWithAPUOff: true, // on monochrome models
 	}
 	if config.BootROM.Skip {
-		apu.SetMasterCtl(0x80)
-		apu.Pulse1.SetLengthDuty(0x80)
-		apu.Pulse1.SetVolumeEnvelope(0xf3)
-		apu.SetChannelPan(0xf3)
-		apu.SetMasterVolumePan(0x77)
+		apu.Reset()
 	}
 	clock.apu = apu
 	return apu
+}
+
+func (apu *APU) Reset() {
+	apu.SetMasterCtl(0x80)
+	apu.Pulse1.SetLengthDuty(0x80)
+	apu.Pulse1.SetVolumeEnvelope(0xf3)
+	apu.SetChannelPan(0xf3)
+	apu.SetMasterVolumePan(0x77)
 }
 
 func (apu *APU) incDIVAPU() {

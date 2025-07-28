@@ -39,12 +39,10 @@ func main() {
 	// Create application with options
 	err = wails.Run(&options.App{
 		Title:             "toyboy",
-		Width:             1024,
-		Height:            768,
-		MinWidth:          1024,
-		MinHeight:         768,
+		MinWidth:          2000,
+		MinHeight:         2000,
 		DisableResize:     false,
-		Fullscreen:        false,
+		Fullscreen:        true,
 		Frameless:         false,
 		StartHidden:       false,
 		HideWindowOnClose: false,

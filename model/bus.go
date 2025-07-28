@@ -116,6 +116,64 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	return b.Data
 }
 
+func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
+	if begin > end {
+		return nil
+	}
+	len := end - begin + 1
+	if end <= AddrBootROMEnd {
+		if b.BootROMLock.BootOff {
+			return b.Cartridge.ReadRange(begin, end)
+		} else {
+			return b.BootROM.Data[begin : end+1]
+		}
+	} else if end <= AddrCartridgeBankNEnd {
+		return b.Cartridge.ReadRange(begin, end)
+	} else if begin >= AddrVRAMBegin && end <= AddrVRAMEnd {
+		return b.VRAM.Data[begin-AddrVRAMBegin : end-AddrVRAMBegin+1]
+	} else if begin >= AddrHRAMBegin && end <= AddrHRAMEnd {
+		return b.HRAM.Data[begin-AddrHRAMBegin : end-AddrHRAMBegin+1]
+	} else if begin >= AddrWRAMBegin && end <= AddrWRAMEnd {
+		return b.WRAM.Data[begin-AddrWRAMBegin : end-AddrHRAMBegin+1]
+	} else if begin >= AddrAPUBegin && end <= AddrAPUEnd {
+		return readRange(b.APU, begin, end)
+	} else if begin >= AddrOAMBegin && end <= AddrOAMEnd {
+		return b.OAM.Data[begin-AddrOAMBegin : end-AddrOAMBegin+1]
+	} else if begin >= AddrPPUBegin && end <= AddrPPUEnd {
+		return readRange(b.PPU, begin, end)
+	} else if begin >= AddrProhibitedBegin && end <= AddrProhibitedEnd {
+		return b.Prohibited.FEA0toFEFF.Data[begin-AddrProhibitedBegin : end-AddrProhibitedBegin+1]
+	} else if (begin >= 0xff4c && end <= 0xff4f) || (begin >= 0xff51 && end <= 0xff70) {
+		// GBC stuff
+		return nil
+	} else if begin >= 0xff71 && end <= 0xff7f {
+		return b.Prohibited.FF71toFF7F.Data[begin-0xff71 : end-0xff7f+1]
+	} else if begin >= AddrTimerBegin && end <= AddrTimerEnd {
+		return readRange(b.Timer, begin, end)
+	} else if len == 1 && begin == AddrP1 {
+		return readRange(b.Joypad, begin, end)
+	} else if len == 1 && (begin == AddrIF || begin == AddrIE) {
+		return readRange(b.Interrupts, begin, end)
+	} else if len == 1 && begin == AddrBootROMLock {
+		return readRange(b.BootROMLock, begin, end)
+	} else if len == 1 && (begin == AddrSB || begin == AddrSC) {
+		return readRange(b.Serial, begin, end)
+	} else {
+		if !b.inCoreDump {
+			//panicf("Read from unmapped address %s", addr.Hex())
+		}
+	}
+	return nil
+}
+
+func readRange(device interface{ Read(Addr) Data8 }, begin, end Addr) []Data8 {
+	out := make([]Data8, 0, end-begin+1)
+	for addr := begin; addr <= end; addr++ {
+		out = append(out, device.Read(addr))
+	}
+	return out
+}
+
 func (b *Bus) WriteData(v Data8) {
 	b.Data = v
 	addr := b.Address

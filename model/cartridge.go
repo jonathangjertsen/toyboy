@@ -1,6 +1,8 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Cartridge struct {
 	ROM             [512][ROMBankSize]uint8
@@ -63,6 +65,22 @@ func (cart *Cartridge) Read(addr Addr) Data8 {
 		return cart.CurrROMBank0.Data[addr]
 	}
 	return cart.CurrROMBankN.Data[addr-AddrCartridgeBankNBegin]
+}
+
+func (cart *Cartridge) ReadRange(begin, end Addr) []Data8 {
+	if end <= AddrCartridgeBank0End {
+		// Wholly in bank 0
+		return cart.CurrROMBank0.Data[begin : end+1]
+	} else if begin >= AddrCartridgeBankNBegin {
+		// Wholly in bank N
+		return cart.CurrROMBankN.Data[begin-AddrCartridgeBankNBegin : end-AddrCartridgeBankNBegin+1]
+	} else {
+		// Straddles bank boundary
+		return append(
+			cart.CurrROMBank0.Data[begin:],
+			cart.CurrROMBankN.Data[:end-AddrCartridgeBankNBegin+1]...,
+		)
+	}
 }
 
 func (cart *Cartridge) Write(addr Addr, v Data8) {
