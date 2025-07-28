@@ -319,42 +319,40 @@ func (cpu *CPU) notImplemented(e int) bool {
 	return false
 }
 
+func checkCycleNamed(name string, e, max int) {
+	if e == 0 || e > max {
+		panicf("%s: %v", name, e)
+	}
+}
+
+func checkCycle(e, max int) {
+	if e == 0 || e > max {
+		panicf("%v", e)
+	}
+}
+
 func (cpu *CPU) singleCycle(name string, f func()) func(e int) bool {
 	return func(e int) bool {
-		switch e {
-		case 1:
-			f()
-			return true
-		default:
-			panicf("%s: %v", name, e)
-		}
-		return false
+		checkCycleNamed(name, e, 1)
+		f()
+		return true
 	}
 }
 
 func (cpu *CPU) jphl(e int) bool {
-	switch e {
-	case 1:
-		cpu.SetPC(Addr(cpu.GetHL()))
-		return true
-	default:
-		panicv(e)
-	}
-	return false
+	checkCycle(e, 1)
+	cpu.SetPC(Addr(cpu.GetHL()))
+	return true
 }
 
 func (cpu *CPU) halt(e int) bool {
-	switch e {
-	case 1:
-		cpu.halted = true
-		return true
-	default:
-		panicv(e)
-	}
-	return false
+	checkCycle(e, 1)
+	cpu.halted = true
+	return true
 }
 
 func (cpu *CPU) jre(e int) bool {
+	checkCycle(e, 3)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -369,13 +367,12 @@ func (cpu *CPU) jre(e int) bool {
 			cpu.SetPC(cpu.Regs.PC + Addr(cpu.Regs.TempZ))
 		}
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) jpnn(e int) bool {
+	checkCycle(e, 4)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -389,14 +386,13 @@ func (cpu *CPU) jpnn(e int) bool {
 	case 4:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) jrcce(f func() bool) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 3)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -418,8 +414,6 @@ func (cpu *CPU) jrcce(f func() bool) func(e int) bool {
 			} else {
 				panicv(e)
 			}
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -427,6 +421,7 @@ func (cpu *CPU) jrcce(f func() bool) func(e int) bool {
 
 func (cpu *CPU) jpccnn(f func() bool) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 4)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -450,8 +445,6 @@ func (cpu *CPU) jpccnn(f func() bool) func(e int) bool {
 			} else {
 				panicv(e)
 			}
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -459,6 +452,7 @@ func (cpu *CPU) jpccnn(f func() bool) func(e int) bool {
 
 func (cpu *CPU) push(msb, lsb *Data8) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 4)
 		switch e {
 		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
@@ -471,8 +465,6 @@ func (cpu *CPU) push(msb, lsb *Data8) func(e int) bool {
 		case 3:
 		case 4:
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -480,6 +472,7 @@ func (cpu *CPU) push(msb, lsb *Data8) func(e int) bool {
 
 func (cpu *CPU) pop(msb, lsb *Data8) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 3)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(cpu.Regs.SP)
@@ -497,14 +490,13 @@ func (cpu *CPU) pop(msb, lsb *Data8) func(e int) bool {
 				*lsb = cpu.Regs.TempZ
 			}
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
 }
 
 func (cpu *CPU) callnn(e int) bool {
+	checkCycle(e, 6)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -526,14 +518,13 @@ func (cpu *CPU) callnn(e int) bool {
 	case 6:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) callccnn(f func() bool) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 6)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -581,14 +572,13 @@ func (cpu *CPU) callccnn(f func() bool) func(e int) bool {
 			} else {
 				panicv(e)
 			}
-		default:
-			panicv(e)
 		}
 		return false
 	}
 }
 
 func (cpu *CPU) ret(e int) bool {
+	checkCycle(e, 4)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.SP)
@@ -602,13 +592,12 @@ func (cpu *CPU) ret(e int) bool {
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 	case 4:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) reti(e int) bool {
+	checkCycle(e, 4)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.SP)
@@ -626,14 +615,13 @@ func (cpu *CPU) reti(e int) bool {
 		}
 	case 4:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) retcc(cond func() bool) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 5)
 		switch e {
 		case 1:
 		case 2:
@@ -666,8 +654,6 @@ func (cpu *CPU) retcc(cond func() bool) func(e int) bool {
 			} else {
 				panicv(e)
 			}
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -710,6 +696,7 @@ func (cpu *CPU) adcreg(reg *Data8) func(e int) bool {
 }
 
 func (cpu *CPU) inchlind(e int) bool {
+	checkCycle(e, 3)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
@@ -725,13 +712,12 @@ func (cpu *CPU) inchlind(e int) bool {
 		cpu.Bus.WriteData(cpu.Regs.TempZ)
 	case 3:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) dechlind(e int) bool {
+	checkCycle(e, 3)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
@@ -747,14 +733,13 @@ func (cpu *CPU) dechlind(e int) bool {
 		cpu.Bus.WriteData(cpu.Regs.TempZ)
 	case 3:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) aluhl(f func(v Data8)) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(Addr(cpu.GetHL()))
@@ -762,8 +747,6 @@ func (cpu *CPU) aluhl(f func(v Data8)) func(e int) bool {
 		case 2:
 			f(cpu.Regs.TempZ)
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -809,13 +792,12 @@ func (cpu *CPU) increg(reg *Data8) func(e int) bool {
 
 func (cpu *CPU) iduOp(f func()) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			f()
 		case 2:
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -823,6 +805,7 @@ func (cpu *CPU) iduOp(f func()) func(e int) bool {
 
 func (cpu *CPU) alun(f func(imm Data8)) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -831,8 +814,6 @@ func (cpu *CPU) alun(f func(imm Data8)) func(e int) bool {
 		case 2:
 			f(cpu.Regs.TempZ)
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -840,6 +821,7 @@ func (cpu *CPU) alun(f func(imm Data8)) func(e int) bool {
 
 func (cpu *CPU) ldrn(reg *Data8) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -848,8 +830,6 @@ func (cpu *CPU) ldrn(reg *Data8) func(e int) bool {
 			cpu.IncPC()
 			*reg = cpu.Regs.TempZ
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -857,20 +837,20 @@ func (cpu *CPU) ldrn(reg *Data8) func(e int) bool {
 
 func (cpu *CPU) ldrhl(reg *Data8) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(Addr(cpu.GetHL()))
 		case 2:
 			*reg = cpu.Bus.GetData()
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
 }
 
 func (cpu *CPU) ldahlinc(e int) bool {
+	checkCycle(e, 2)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
@@ -878,13 +858,12 @@ func (cpu *CPU) ldahlinc(e int) bool {
 	case 2:
 		cpu.Regs.A = cpu.Bus.GetData()
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldahldec(e int) bool {
+	checkCycle(e, 2)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(Addr(cpu.GetHL()))
@@ -892,14 +871,13 @@ func (cpu *CPU) ldahldec(e int) bool {
 	case 2:
 		cpu.Regs.A = cpu.Bus.GetData()
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldhlr(reg *Data8, inc int) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(Addr(cpu.GetHL()))
@@ -911,8 +889,6 @@ func (cpu *CPU) ldhlr(reg *Data8, inc int) func(e int) bool {
 			cpu.Bus.WriteData(*reg)
 		case 2:
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -920,46 +896,44 @@ func (cpu *CPU) ldhlr(reg *Data8, inc int) func(e int) bool {
 
 func (cpu *CPU) ldrra(msb, lsb *Data8) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(Addr(join16(*msb, *lsb)))
 			cpu.Bus.WriteData(cpu.Regs.A)
 		case 2:
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
 }
 
 func (cpu *CPU) ldhca(e int) bool {
+	checkCycle(e, 2)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.C)))
 		cpu.Bus.WriteData(cpu.Regs.A)
 	case 2:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldhac(e int) bool {
+	checkCycle(e, 2)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(Addr(join16(0xff, cpu.Regs.C)))
 		cpu.Regs.A = cpu.Bus.GetData()
 	case 2:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldnnsp(e int) bool {
+	checkCycle(e, 5)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -978,13 +952,12 @@ func (cpu *CPU) ldnnsp(e int) bool {
 		cpu.Bus.WriteData(cpu.Regs.SP.MSB())
 	case 5:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldnna(e int) bool {
+	checkCycle(e, 4)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -999,13 +972,12 @@ func (cpu *CPU) ldnna(e int) bool {
 		cpu.Bus.WriteData(cpu.Regs.A)
 	case 4:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldann(e int) bool {
+	checkCycle(e, 4)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -1020,13 +992,12 @@ func (cpu *CPU) ldann(e int) bool {
 		cpu.Regs.A = cpu.Bus.GetData()
 	case 4:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldhna(e int) bool {
+	checkCycle(e, 3)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -1037,13 +1008,12 @@ func (cpu *CPU) ldhna(e int) bool {
 		cpu.Bus.WriteData(cpu.Regs.A)
 	case 3:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldhan(e int) bool {
+	checkCycle(e, 3)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -1055,14 +1025,13 @@ func (cpu *CPU) ldhan(e int) bool {
 	case 3:
 		cpu.Regs.A = cpu.Regs.TempZ
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldarr(msb, lsb *Data8) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(Addr(join16(*msb, *lsb)))
@@ -1070,8 +1039,6 @@ func (cpu *CPU) ldarr(msb, lsb *Data8) func(e int) bool {
 		case 2:
 			cpu.Regs.A = cpu.Regs.TempZ
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -1079,6 +1046,7 @@ func (cpu *CPU) ldarr(msb, lsb *Data8) func(e int) bool {
 
 func (cpu *CPU) addhlrr(hi, lo *Data8) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 2)
 		switch e {
 		case 1:
 			result := ADD(cpu.Regs.L, *lo, false)
@@ -1093,14 +1061,13 @@ func (cpu *CPU) addhlrr(hi, lo *Data8) func(e int) bool {
 			cpu.Regs.SetFlagH(result.H)
 			cpu.Regs.SetFlagN(result.N)
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
 }
 
 func (cpu *CPU) addhlsp(e int) bool {
+	checkCycle(e, 2)
 	switch e {
 	case 1:
 		result := ADD(cpu.Regs.L, cpu.Regs.SP.LSB(), false)
@@ -1115,13 +1082,12 @@ func (cpu *CPU) addhlsp(e int) bool {
 		cpu.Regs.SetFlagH(result.H)
 		cpu.Regs.SetFlagN(result.N)
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) addspe(e int) bool {
+	checkCycle(e, 4)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -1150,14 +1116,13 @@ func (cpu *CPU) addspe(e int) bool {
 	case 4:
 		cpu.SetSP(Addr(cpu.Regs.GetWZ()))
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldxxnn(f func(wz Data16)) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 3)
 		switch e {
 		case 1:
 			cpu.writeAddressBus(cpu.Regs.PC)
@@ -1170,14 +1135,13 @@ func (cpu *CPU) ldxxnn(f func(wz Data16)) func(e int) bool {
 		case 3:
 			f(join16(cpu.Regs.TempW, cpu.Regs.TempZ))
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
 }
 
 func (cpu *CPU) ldhln(e int) bool {
+	checkCycle(e, 3)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -1188,25 +1152,23 @@ func (cpu *CPU) ldhln(e int) bool {
 		cpu.Bus.WriteData(cpu.Regs.TempZ)
 	case 3:
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldsphl(e int) bool {
+	checkCycle(e, 2)
 	switch e {
 	case 1:
 	case 2:
 		cpu.Regs.SP = Addr(cpu.GetHL())
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) ldhlspe(e int) bool {
+	checkCycle(e, 3)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -1225,14 +1187,13 @@ func (cpu *CPU) ldhlspe(e int) bool {
 		res := ADD(cpu.Regs.SP.MSB(), adj, cpu.Regs.GetFlagC())
 		cpu.Regs.H = res.Value
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
 
 func (cpu *CPU) rst(vec Data8) func(e int) bool {
 	return func(e int) bool {
+		checkCycle(e, 4)
 		switch e {
 		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
@@ -1246,8 +1207,6 @@ func (cpu *CPU) rst(vec Data8) func(e int) bool {
 			cpu.SetPC(Addr(join16(0x00, vec)))
 		case 4:
 			return true
-		default:
-			panicv(e)
 		}
 		return false
 	}
@@ -1258,6 +1217,7 @@ func NewCBOp(v Data8) CBOp {
 }
 
 func (cpu *CPU) cb(e int) bool {
+	checkCycle(e, 4)
 	switch e {
 	case 1:
 		cpu.writeAddressBus(cpu.Regs.PC)
@@ -1325,8 +1285,6 @@ func (cpu *CPU) cb(e int) bool {
 			panicv(e)
 		}
 		return true
-	default:
-		panicv(e)
 	}
 	return false
 }
