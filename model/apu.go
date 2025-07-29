@@ -28,7 +28,8 @@ func NewAPU(clock *ClockRT, config *Config) *APU {
 		Pulse2: PulseChannel{
 			DutyGenerator: NewDutyGenerator(),
 		},
-		Wave: WaveChannel{},
+		Wave:  WaveChannel{},
+		Mixer: Mixer{},
 	}
 	if config.BootROM.Skip {
 		apu.Reset()
