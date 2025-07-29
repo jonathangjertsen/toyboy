@@ -36,7 +36,7 @@ type App struct {
 	ctx     context.Context
 	config  *Config
 	reqChan chan MachineStateRequest
-	Audio   *Audio
+	Audio   *AudioInterface
 
 	needStateUpdate chan struct{}
 
@@ -48,7 +48,7 @@ type App struct {
 }
 
 func NewApp(config *Config) *App {
-	return &App{
+	app := &App{
 		ButtonMapping: ButtonMapping{
 			A:              "l",
 			B:              "k",
@@ -65,10 +65,13 @@ func NewApp(config *Config) *App {
 		config:          config,
 		Audio:           NewAudio(),
 	}
+	return app
 }
 
 func (app *App) startup(ctx context.Context) {
 	app.ctx = ctx
+	app.startGB()
+	app.startWebSocketServer()
 }
 
 func (app App) domReady(ctx context.Context) {
@@ -82,10 +85,11 @@ func (app *App) beforeClose(ctx context.Context) (prevent bool) {
 func (app *App) shutdown(ctx context.Context) {
 }
 
-func (app *App) StartGB() {
+func (app *App) startGB() {
 	audio := &model.Audio{
-		SampleInterval: (time.Second / 44100) * 2, // TODO why x2
-		SampleBuffers:  model.NewSampleBuffers(1024),
+		SampleInterval: time.Second / 44100,
+		SampleBuffers:  model.NewSampleBuffers(512),
+		SubSampling:    1024,
 		Out:            app.Audio.In,
 	}
 	app.GB = model.NewGameboy(&app.config.Model, audio)
@@ -147,10 +151,8 @@ func (ts *TimeoutState) Update() {
 	ts.Next = time.Now().Add(ts.Interval)
 }
 
-func (app *App) StartWebSocketServer() {
-	fmt.Printf("start ws\n")
+func (app *App) startWebSocketServer() {
 	http.HandleFunc("/data", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("connected\n")
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
@@ -299,8 +301,10 @@ func (app *App) StartWebSocketServer() {
 		conn.Close()
 	})
 
-	fmt.Printf("start ws pm 8081\n")
-	go http.ListenAndServe(":8081", nil)
+	go func() {
+		err := http.ListenAndServe(":8081", nil)
+		panic(err)
+	}()
 }
 
 func rateLimit(id DataID, req *MachineStateRequest, timeouts map[DataID]TimeoutState) bool {

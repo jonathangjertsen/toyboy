@@ -14,8 +14,4 @@ export function SoftReset():Promise<void>;
 
 export function Start():Promise<void>;
 
-export function StartGB():Promise<void>;
-
-export function StartWebSocketServer():Promise<void>;
-
 export function Step():Promise<void>;

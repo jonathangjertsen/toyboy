@@ -86,6 +86,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64) {
 
 	// Convert to interval
 	mCycleInterval := time.Duration(float64(time.Second) / mFreq)
+	mCycleInterval /= 2
 
 	// Update audio
 	clockRT.Audio.SetMPeriod(mCycleInterval)
@@ -180,18 +181,20 @@ func (clockRT *ClockRT) MCycle(n int) {
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
 		clockRT.cpu.fsm(m)
 
+		if m&0x3f == 0 {
+			clockRT.timer.tickDIV()
+		}
+
 		// Clock the peripherals.
 		// 99.99% of the time, both PPU and APU are on, so we clock everything
 		if clockRT.ppu.RegLCDC&clockRT.apu.MasterCtl&Bit7 != 0 {
-			if m&0x3f == 0 {
-				clockRT.timer.tickDIV()
-			}
-
 			// T0
 			clockRT.apu.Wave.clock()
 			if m&0x1 == 0 {
 				clockRT.apu.Pulse1.clock()
 				clockRT.apu.Pulse2.clock()
+			}
+			if clockRT.Cycle&0xf == 0 {
 				clockRT.apu.Noise.clock()
 			}
 			clockRT.ppu.fsm()
@@ -214,19 +217,18 @@ func (clockRT *ClockRT) MCycle(n int) {
 
 func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool) {
 	// T0
+	if ppu {
+		clockRT.ppu.fsm()
+	}
 	if apu {
 		clockRT.apu.Wave.clock()
-
 		if m&0x1 == 0 {
 			clockRT.apu.Pulse1.clock()
 			clockRT.apu.Pulse2.clock()
 		}
-		if m&0x3 == 0 {
+		if clockRT.Cycle&0xf == 0 {
 			clockRT.apu.Noise.clock()
 		}
-	}
-	if ppu {
-		clockRT.ppu.fsm()
 	}
 
 	// T1
@@ -234,9 +236,6 @@ func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool) {
 	// T2
 	if ppu {
 		clockRT.ppu.fsm()
-	}
-	if apu {
-		clockRT.apu.Wave.clock()
 	}
 
 	// T3

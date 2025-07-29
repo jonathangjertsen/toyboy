@@ -40,19 +40,31 @@ func (di *DisInstruction) Size() Size16 {
 	return instSize[di.Opcode]
 }
 
+func comment(d Data16) string {
+	addr := Addr(d)
+	if addr.IsValid() {
+		return fmt.Sprintf("; %s", addr.String())
+	}
+	return ""
+}
+
 func (di *DisInstruction) Asm() string {
 	str := di.Opcode.String()
 	ln := len(str)
 	switch di.Opcode {
 	default:
 	case OpcodeLDAnn:
-		return fmt.Sprintf("LD A, [$%s]", join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("LD A, [$%s]%s", nn.Hex(), comment(nn))
 	case OpcodeLDBCnn, OpcodeLDDEnn, OpcodeLDHLnn, OpcodeLDSPnn:
-		return fmt.Sprintf("LD %s, [$%s]", str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("LD %s, [$%s]%s", str[ln-4:ln-2], nn.Hex(), comment(nn))
 	case OpcodeLDnnA:
-		return fmt.Sprintf("LD [$%s], A", join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("LD [$%s], A%s", nn.Hex(), comment(nn))
 	case OpcodeLDnnSP:
-		return fmt.Sprintf("LD [$%s], SP", join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("LD [$%s], SP%s", nn.Hex(), comment(nn))
 	case OpcodeLDHLAInc:
 		return "LD (HL+), A"
 	case OpcodeLDHLADec:
@@ -64,7 +76,7 @@ func (di *DisInstruction) Asm() string {
 	case OpcodeLDSPHL:
 		return "LD SP, HL"
 	case OpcodeADDSPe:
-		return fmt.Sprintf("ADD SP, PC$%s", fmtSignedOffset(di.Raw[1]))
+		return fmt.Sprintf("ADD SP, $%s", fmtSignedOffset(di.Raw[1]))
 	case OpcodeDECHLInd:
 		return "DEC (HL)"
 	case OpcodeINCHLInd:
@@ -124,15 +136,20 @@ func (di *DisInstruction) Asm() string {
 	case OpcodeDECBC, OpcodeDECDE, OpcodeDECHL, OpcodeDECSP:
 		return fmt.Sprintf("DEC %s", str[ln-2:])
 	case OpcodeJPnn, OpcodeCALLnn:
-		return fmt.Sprintf("%s $%s", str[:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("%s $%s%s", str[:ln-2], nn.Hex(), comment(nn))
 	case OpcodeJPCnn, OpcodeJPZnn:
-		return fmt.Sprintf("JP %s, $%s", str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("JP %s, $%s%s", str[ln-3:ln-2], nn.Hex(), comment(nn))
 	case OpcodeJPNZnn, OpcodeJPNCnn:
-		return fmt.Sprintf("JP %s, $%s", str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("JP %s, $%s%s", str[ln-4:ln-2], nn.Hex(), comment(nn))
 	case OpcodeCALLZnn, OpcodeCALLCnn:
-		return fmt.Sprintf("CALL %s, $%s", str[ln-3:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("CALL %s, $%s%s", str[ln-3:ln-2], nn.Hex(), comment(nn))
 	case OpcodeCALLNZnn, OpcodeCALLNCnn:
-		return fmt.Sprintf("CALL %s, $%s", str[ln-4:ln-2], join16(di.Raw[2], di.Raw[1]).Hex())
+		nn := join16(di.Raw[2], di.Raw[1])
+		return fmt.Sprintf("CALL %s, $%s%s", str[ln-4:ln-2], nn.Hex(), comment(nn))
 	case OpcodeJRNZe, OpcodeJRNCe:
 		return fmt.Sprintf("JR %s, PC%s", str[ln-3:ln-1], fmtSignedOffset(di.Raw[1]))
 	case OpcodeJRZe, OpcodeJRCe:
@@ -144,9 +161,11 @@ func (di *DisInstruction) Asm() string {
 	case OpcodeADDHLHL, OpcodeADDHLDE, OpcodeADDHLBC, OpcodeADDHLSP:
 		return fmt.Sprintf("ADD %s, %s", str[ln-4:ln-2], str[ln-2:])
 	case OpcodeLDHnA:
-		return fmt.Sprintf("LDH ($ff00+%s)", di.Raw[1].Hex())
+		loc := join16(0xff, di.Raw[1])
+		return fmt.Sprintf("LDH ($ff00+$%s)%s", di.Raw[1].Hex(), comment(loc))
 	case OpcodeLDHAn:
-		return fmt.Sprintf("LDH A,($ff00+%s)", di.Raw[1].Hex())
+		loc := join16(0xff, di.Raw[1])
+		return fmt.Sprintf("LDH A,($ff00+$%s)%s", di.Raw[1].Hex(), comment(loc))
 	case OpcodeLDHAC:
 		return "LDH A,($ff00+C)"
 	case OpcodeLDHCA:
@@ -614,7 +633,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 		OpcodeINCDE, OpcodeINCBC, OpcodeINCSP, OpcodeINCHLInd,
 		OpcodeDECDE, OpcodeDECBC, OpcodeDECSP, OpcodeDECHLInd,
 		OpcodeDAA, OpcodeCCF, OpcodeSCF,
-		OpcodeCPLaka2f,
+		OpcodeCPLaka2f, OpcodeADDSPe,
 		OpcodeNop, OpcodeDI:
 		// non-branching
 		return false

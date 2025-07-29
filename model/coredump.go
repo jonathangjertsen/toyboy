@@ -125,7 +125,7 @@ func PrintAPU(f io.Writer, apu *APU) {
 	printPeriodCounter(f, &apu.Noise.PeriodCounter)
 	printLengthTimer(f, &apu.Noise.LengthTimer)
 	printEnvelope(f, &apu.Noise.Envelope)
-	fmt.Fprintf(f, "                       ")
+	fmt.Fprintf(f, "                               ")
 }
 
 func printPeriodCounter(f io.Writer, pc *PeriodCounter) {

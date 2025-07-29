@@ -26,14 +26,6 @@ export function Start() {
   return window['go']['main']['App']['Start']();
 }
 
-export function StartGB() {
-  return window['go']['main']['App']['StartGB']();
-}
-
-export function StartWebSocketServer() {
-  return window['go']['main']['App']['StartWebSocketServer']();
-}
-
 export function Step() {
   return window['go']['main']['App']['Step']();
 }

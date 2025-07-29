@@ -18,43 +18,30 @@ type Audio struct {
 	SampleBuffers  SampleBuffers
 	SampleInterval time.Duration
 	SampleDivider  int
+	SubSampling    int
 	MCounter       int
 	Capacitor      AudioSample
 	Out            chan []AudioSample
 }
 
 type SampleBuffers struct {
-	Pulse1 []AudioSample
-	Pulse2 []AudioSample
-	Wave   []AudioSample
-	Noise  []AudioSample
-	Size   int
-	Idx    int
-}
-
-func (sb *SampleBuffers) Mix() []AudioSample {
-	mixed := make([]AudioSample, len(sb.Pulse1))
-	for i := range len(mixed) {
-		mixed[i] = sb.Pulse1[i] + sb.Pulse2[i] + sb.Wave[i] + sb.Noise[i]
-	}
-	return mixed
+	Left  []AudioSample
+	Right []AudioSample
+	Size  int
+	Idx   int
 }
 
 func NewSampleBuffers(size int) SampleBuffers {
 	return SampleBuffers{
-		Pulse1: make([]AudioSample, size),
-		Pulse2: make([]AudioSample, size),
-		Wave:   make([]AudioSample, size),
-		Noise:  make([]AudioSample, size),
-		Size:   size,
+		Left:  make([]AudioSample, size),
+		Right: make([]AudioSample, size),
+		Size:  size,
 	}
 }
 
-func (ab *SampleBuffers) Add(pulse1, pulse2, wave, noise AudioSample) bool {
-	ab.Pulse1[ab.Idx] = pulse1
-	ab.Pulse2[ab.Idx] = pulse2
-	ab.Wave[ab.Idx] = wave
-	ab.Noise[ab.Idx] = noise
+func (ab *SampleBuffers) Add(l, r AudioSample) bool {
+	ab.Left[ab.Idx] = l
+	ab.Right[ab.Idx] = r
 
 	ab.Idx++
 	if ab.Idx == ab.Size {
@@ -71,7 +58,7 @@ func (audio *Audio) Enabled() bool {
 func (audio *Audio) SetMPeriod(mPeriod time.Duration) {
 	if mPeriod > 0 {
 		audio.SampleDivider = int(audio.SampleInterval / mPeriod)
-		audio.MCounter = audio.SampleDivider
+		audio.MCounter = audio.SampleDivider * audio.SubSampling
 	} else {
 		audio.SampleDivider = 0
 	}
@@ -81,28 +68,28 @@ func (audio *Audio) Clock() {
 	if !audio.Enabled() {
 		return
 	}
-	audio.MCounter--
+	audio.MCounter -= audio.SubSampling
 	if audio.MCounter > 0 {
 		return
 	}
-	audio.MCounter = audio.SampleDivider
+	audio.MCounter = audio.SampleDivider*audio.SubSampling - audio.MCounter
 	if !audio.SampleBuffers.Add(
-		audio.APU.Pulse1.Sample(),
-		audio.APU.Pulse2.Sample(),
-		audio.APU.Wave.Sample(),
-		audio.APU.Noise.Sample(),
+		audio.APU.Mixer.MixStereoSimple(
+			audio.APU.Pulse1.Sample(),
+			audio.APU.Pulse2.Sample(),
+			audio.APU.Noise.Sample(),
+			audio.APU.Wave.Sample(),
+		),
 	) {
 		return
 	}
 
-	mix := audio.SampleBuffers.Mix()
-	highpass(mix, &audio.Capacitor)
-	/*select {
-	case audio.Out <- mix:
-	default:
-		fmt.Printf("MISSED AUDIO BUFFER\n")
+	mono := make([]AudioSample, len(audio.SampleBuffers.Left))
+	for i := range mono {
+		mono[i] = (audio.SampleBuffers.Left[i] + audio.SampleBuffers.Right[i]) / 2
 	}
-	*/
+	highpass(mono, &audio.Capacitor)
+	audio.Out <- mono
 }
 
 func highpass(audio []AudioSample, capacitor *AudioSample) {

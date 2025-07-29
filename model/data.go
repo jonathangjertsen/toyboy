@@ -111,13 +111,13 @@ func (a Data8) Hex() string {
 }
 
 func (a Data8) Dec() string {
-	return fmt.Sprintf("%dd", a)
+	return fmt.Sprintf("%d", a)
 }
 
 func Hex16(x uint16) string {
-	return fmt.Sprintf("%04xh", x)
+	return fmt.Sprintf("%04x", x)
 }
 
 func Hex8(x uint8) string {
-	return fmt.Sprintf("%02xh", x)
+	return fmt.Sprintf("%02x", x)
 }

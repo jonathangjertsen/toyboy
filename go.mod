@@ -11,7 +11,6 @@ require (
 )
 
 require (
-	gioui.org/shader v1.0.8 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/ebitengine/purego v0.8.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
