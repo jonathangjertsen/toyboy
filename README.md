@@ -7,16 +7,14 @@ Contrary to the name, it is written by a fully grown man.
 
 ## Architecture / goals
 
-toyboy is written in go.
+toyboy is written in go, and uses Wails to provide a desktop application.
 
 It tries to be cycle-accurate, everything is triggered from the clock.
 
 ## Status
 
-- Runs the bootrom
-- Runs the Hello world ROM from GB ASM tutorial, working on the Unbricked ROM
-- Handles most instructions
-- PPU mostly works
+- Emulates all of Tetris correctly (except 2-player)
+- On my machine, can run smoothly at about 200%
 
 Currently looks like this
 
