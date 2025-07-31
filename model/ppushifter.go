@@ -5,37 +5,35 @@ type Shifter struct {
 	Suspended   bool
 	X           Data8
 	LastShifted Color
-
-	PPU *PPU
 }
 
-func (ps *Shifter) fsm() {
+func (ps *Shifter) fsm(ppu *PPU, debug *Debug, clk *ClockRT) {
 	if ps.Suspended {
 		return
 	}
 
 	if ps.Discard > 0 {
-		if _, shifted := ps.PPU.BackgroundFIFO.ShiftOut(); shifted {
+		if _, shifted := ppu.BackgroundFIFO.ShiftOut(); shifted {
 			ps.Discard--
 		}
 	}
 
-	pixel, havePixel := ps.pixelMixer()
+	pixel, havePixel := ps.pixelMixer(ppu)
 	if !havePixel {
 		return
 	}
 
 	// Write pixel to LCD
-	ps.PPU.FBViewport[ps.PPU.RegLY][ps.X] = pixel.Color()
+	ppu.FBViewport[ppu.RegLY][ps.X] = pixel.Color()
 	ps.LastShifted = pixel.Color()
 	ps.X++
 
-	ps.PPU.debug.SetX(ps.X)
+	debug.SetX(ps.X, clk)
 }
 
-func (ps *Shifter) pixelMixer() (Pixel, bool) {
-	spritePixel, haveSpritePixel := ps.PPU.SpriteFIFO.ShiftOut()
-	bgPixel, haveBGPixel := ps.PPU.BackgroundFIFO.ShiftOut()
+func (ps *Shifter) pixelMixer(ppu *PPU) (Pixel, bool) {
+	spritePixel, haveSpritePixel := ppu.SpriteFIFO.ShiftOut()
+	bgPixel, haveBGPixel := ppu.BackgroundFIFO.ShiftOut()
 	if haveSpritePixel && haveBGPixel {
 		if spritePixel.ColorIDX() == 0 {
 			return bgPixel, true

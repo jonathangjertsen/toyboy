@@ -154,9 +154,9 @@ func NewCPU(
 	return cpu
 }
 
-func (cpu *CPU) fsm(c uint) {
+func (cpu *CPU) fsm(clk *ClockRT) {
 	cpu.wroteToAddressBusThisCycle = false
-	cpu.clockCycle = c
+	cpu.clockCycle = clk.Cycle
 	cpu.applyPendingIME()
 
 	if cpu.halted {
@@ -170,16 +170,16 @@ func (cpu *CPU) fsm(c uint) {
 	}
 
 	var fetch bool
-	if c > 0 {
+	if cpu.clockCycle > 0 {
 		if cpu.Interrupts != nil && cpu.Interrupts.PendingInterrupt != 0 {
-			fetch = cpu.execTransferToISR()
+			fetch = cpu.execTransferToISR(clk)
 		} else {
 			fetch = cpu.handlers[cpu.Regs.IR](cpu.machineCycle)
 		}
 		if fetch {
 			cpu.writeAddressBus(cpu.Regs.PC)
 			if cpu.Interrupts == nil || cpu.Interrupts.PendingInterrupt == 0 {
-				cpu.instructionFetch()
+				cpu.instructionFetch(clk)
 			}
 			cpu.IncPC()
 			cpu.machineCycle = 0
@@ -188,21 +188,21 @@ func (cpu *CPU) fsm(c uint) {
 		// initial instruction
 		fetch = true
 		cpu.writeAddressBus(cpu.Regs.PC)
-		cpu.instructionFetch()
+		cpu.instructionFetch(clk)
 		cpu.IncPC()
 	}
 
 	cpu.machineCycle++
 }
 
-func (cpu *CPU) instructionFetch() {
+func (cpu *CPU) instructionFetch(clk *ClockRT) {
 	// Reset inter-instruction state
 	cpu.Regs.SetWZ(0)
 
 	// Read next instruction opcode
 	rawOp := cpu.Bus.ProbeAddress(cpu.Bus.GetAddress())
 	cpu.Regs.IR = Opcode(rawOp)
-	cpu.Debug.SetIR(cpu.Regs.IR)
+	cpu.Debug.SetIR(cpu.Regs.IR, clk)
 
 	di := DisInstruction{
 		Address: cpu.Regs.PC,
@@ -224,10 +224,10 @@ func (cpu *CPU) instructionFetch() {
 	entry.Instruction = di
 
 	// Set PC
-	cpu.Debug.SetPC(cpu.Regs.PC)
+	cpu.Debug.SetPC(cpu.Regs.PC, clk)
 }
 
-func (cpu *CPU) execTransferToISR() bool {
+func (cpu *CPU) execTransferToISR(clk *ClockRT) bool {
 	switch cpu.machineCycle {
 	// wait states
 	case 1, 2:
@@ -244,7 +244,7 @@ func (cpu *CPU) execTransferToISR() bool {
 	case 5:
 		isr := cpu.Interrupts.PendingInterrupt.ISR()
 		cpu.SetPC(isr)
-		cpu.Debug.SetPC(isr)
+		cpu.Debug.SetPC(isr, clk)
 		cpu.Interrupts.PendingInterrupt = 0
 		return true
 	default:

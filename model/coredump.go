@@ -18,7 +18,6 @@ type CoreDump struct {
 }
 
 type PPUDump struct {
-	Registers                 []Data8
 	BGFIFO                    PixelFIFODump
 	SpriteFIFO                PixelFIFODump
 	LastShifted               Color
@@ -140,8 +139,8 @@ func printEnvelope(f io.Writer, env *Envelope) {
 	fmt.Fprintf(f, "  ENV SP=%d T=%d D=%d R=%d V=%d\n", env.EnvSweepPace, env.EnvTimer, b2i(env.EnvDir), env.VolumeReset, env.Volume)
 }
 
-func PrintPPU(f io.Writer, ppu PPUDump) {
-	RegDump(f, ppu.Registers, AddrPPUBegin, AddrPPUEnd)
+func PrintPPU(f io.Writer, ppu PPUDump, mem []Data8) {
+	RegDump(f, mem, AddrPPUBegin, AddrPPUEnd)
 	fmt.Fprintf(f, "OAMCt:         %d\n", ppu.OAMScanCycle)
 	fmt.Fprintf(f, " PDCt:         %d\n", ppu.PixelDrawCycle)
 	fmt.Fprintf(f, " HBCt:         %d\n", ppu.HBlankRemainingCycles)
@@ -197,7 +196,7 @@ func RegDump(f io.Writer, mem []Data8, start, end Addr) {
 		if !a.IsValid() {
 			continue
 		}
-		fmt.Fprintf(f, "%5s = %02x\n", Addr(addr), mem[addr-start])
+		fmt.Fprintf(f, "%5s = %02x\n", Addr(addr), mem[addr])
 	}
 }
 

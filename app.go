@@ -227,7 +227,7 @@ func (app *App) startWebSocketServer() {
 						fmt.Fprintf(buf, "                                     ")
 					}
 					if buf := buffers[DataIDPPURegisters]; buf != nil {
-						model.PrintPPU(buf, app.GB.PPU.GetDump())
+						model.PrintPPU(buf, app.GB.PPU.GetDump(), app.GB.Bus.Mem)
 					}
 					if buf := buffers[DataIDAPURegisters]; buf != nil {
 						model.PrintAPU(buf, app.GB.Bus.Mem, app.GB.APU)

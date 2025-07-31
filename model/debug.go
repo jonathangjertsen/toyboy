@@ -17,9 +17,9 @@ type UserMessage struct {
 	Warn    bool
 }
 
-func NewDebug(clk *ClockRT, config *ConfigDebug) *Debug {
+func NewDebug(config *ConfigDebug) *Debug {
 	dbg := &Debug{
-		Debugger:     NewDebugger(clk),
+		Debugger:     NewDebugger(),
 		Disassembler: NewDisassembler(&config.Disassembler),
 		Warnings:     map[string]UserMessage{},
 	}
@@ -27,7 +27,7 @@ func NewDebug(clk *ClockRT, config *ConfigDebug) *Debug {
 	return dbg
 }
 
-func (d *Debug) SetPC(addr Addr) {
+func (d *Debug) SetPC(addr Addr, clk *ClockRT) {
 	if d == nil {
 		return
 	}
@@ -35,14 +35,14 @@ func (d *Debug) SetPC(addr Addr) {
 		addr--
 	}
 	d.Disassembler.SetPC(addr)
-	d.Debugger.SetPC(addr)
+	d.Debugger.SetPC(addr, clk)
 }
 
-func (d *Debug) SetIR(op Opcode) {
+func (d *Debug) SetIR(op Opcode, clk *ClockRT) {
 	if d == nil {
 		return
 	}
-	d.Debugger.SetIR(op)
+	d.Debugger.SetIR(op, clk)
 }
 
 func (d *Debug) SetWarning(key string, message string) {

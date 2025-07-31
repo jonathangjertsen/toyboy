@@ -49,23 +49,20 @@ type PPU struct {
 	FBViewport ViewPort
 
 	// Memory access
-	Bus       CPUBusIF
-	debug     *Debug
+	mem       []Data8
 	config    *Config
 	frameSync chan func(*ViewPort)
 }
 
-func NewPPU(rtClock *ClockRT, ints *Interrupts, bus CPUBusIF, config *Config, debug *Debug) *PPU {
+func NewPPU(rtClock *ClockRT, ints *Interrupts, mem []Data8, config *Config) *PPU {
 	ppu := &PPU{
-		Bus:       bus,
-		debug:     debug,
-		DMA:       DMA{Bus: bus},
+		mem:       mem,
+		DMA:       DMA{mem: mem},
 		config:    config,
 		frameSync: make(chan func(*ViewPort), 1),
 	}
 	ppu.SpriteFetcher.Suspended = true
 	ppu.SpriteFetcher.DoneX = 0xff
-	ppu.Shifter.PPU = ppu
 
 	if config.BootROM.Skip {
 		ppu.RegBGP = 0xfc
@@ -90,10 +87,6 @@ func (ppu *PPU) GetDump() PPUDump {
 	dump.BackgroundFetcher = ppu.BackgroundFetcher
 	dump.SpriteFetcher = ppu.SpriteFetcher
 	dump.OAMBuffer = ppu.OAMBuffer
-	dump.Registers = ppu.Bus.ProbeRange(AddrPPUBegin, AddrPPUEnd)
-	if len(dump.Registers) == 0 {
-		panicf("hey %s %s", AddrPPUBegin.Hex(), AddrPPUEnd.Hex())
-	}
 	return dump
 }
 
@@ -190,17 +183,17 @@ func (ppu *PPU) SetOBP1(v Data8) {
 	ppu.OBJPalette1 = v
 }
 
-func (ppu *PPU) fsm(ints *Interrupts) {
+func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT) {
 	if ppu.DMA.Source != 0 {
 		ppu.DMA.fsm()
 	}
 	switch ppu.Mode {
 	case PPUModeVBlank:
-		ppu.fsmVBlank(ints)
+		ppu.fsmVBlank(ints, debug)
 	case PPUModeHBlank:
-		ppu.fsmHBlank(ints)
+		ppu.fsmHBlank(ints, debug)
 	case PPUModePixelDraw:
-		ppu.fsmPixelDraw(ints)
+		ppu.fsmPixelDraw(ints, debug, clk)
 	case PPUModeOAMScan:
 		ppu.fsmOAMScan(ints)
 	}
@@ -293,11 +286,7 @@ func (ppu *PPU) fsmOAMScan(ints *Interrupts) {
 	index := Addr((cycle - 1) / 2)
 
 	// Read sprite out of OAM
-	spriteData := make([]Data8, 4)
-	for offs := Addr(0); offs < 4; offs++ {
-		spriteData[offs] = ppu.Bus.ProbeAddress(AddrOAMBegin + index*4 + offs)
-	}
-	sprite := DecodeObject(spriteData)
+	sprite := DecodeObject(ppu.mem[AddrOAMBegin+index*4 : AddrOAMBegin+(index+1)*4])
 
 	// Check if sprite should be added to buffer
 	if !(sprite.X > 0) {
@@ -316,7 +305,7 @@ func (ppu *PPU) fsmOAMScan(ints *Interrupts) {
 	ppu.OAMBuffer.Add(sprite)
 }
 
-func (ppu *PPU) fsmPixelDraw(ints *Interrupts) {
+func (ppu *PPU) fsmPixelDraw(ints *Interrupts, debug *Debug, clk *ClockRT) {
 	if ppu.SpriteFetcher.Suspended && ppu.SpriteFetcher.DoneX != ppu.Shifter.X {
 		for idx := range ppu.OAMBuffer.Level {
 			obj := ppu.OAMBuffer.Buffer[idx]
@@ -339,7 +328,7 @@ func (ppu *PPU) fsmPixelDraw(ints *Interrupts) {
 
 	ppu.SpriteFetcher.fsm(ppu)
 	ppu.BackgroundFetcher.fsm(ppu)
-	ppu.Shifter.fsm()
+	ppu.Shifter.fsm(ppu, debug, clk)
 
 	// GBEDG: After each pixel shifted out, the PPU checks if it has reached the window
 	if !ppu.BackgroundFetcher.WindowFetching && ppu.BackgroundFetcher.windowReached(ppu) {
@@ -356,7 +345,7 @@ func (ppu *PPU) fsmPixelDraw(ints *Interrupts) {
 	ppu.PixelDrawCycle++
 }
 
-func (ppu *PPU) fsmVBlank(ints *Interrupts) {
+func (ppu *PPU) fsmVBlank(ints *Interrupts, debug *Debug) {
 	if ppu.VBlankLineRemainingCycles > 0 {
 		ppu.VBlankLineRemainingCycles--
 		return
@@ -367,20 +356,20 @@ func (ppu *PPU) fsmVBlank(ints *Interrupts) {
 		f := <-ppu.frameSync
 		f(&ppu.FBViewport)
 	}
-	ppu.IncRegLY(ints)
+	ppu.IncRegLY(ints, debug)
 
 	if ppu.RegLY == 0 {
 		ppu.beginFrame(ints)
 	}
 }
 
-func (ppu *PPU) fsmHBlank(ints *Interrupts) {
+func (ppu *PPU) fsmHBlank(ints *Interrupts, debug *Debug) {
 	if ppu.HBlankRemainingCycles > 0 {
 		ppu.HBlankRemainingCycles--
 		return
 	}
 
-	ppu.IncRegLY(ints)
+	ppu.IncRegLY(ints, debug)
 	if ppu.BackgroundFetcher.WindowPixelRenderedThisScanline {
 		ppu.BackgroundFetcher.WindowLineCounter++
 	}
@@ -394,13 +383,13 @@ func (ppu *PPU) fsmHBlank(ints *Interrupts) {
 	}
 }
 
-func (ppu *PPU) IncRegLY(ints *Interrupts) {
+func (ppu *PPU) IncRegLY(ints *Interrupts, debug *Debug) {
 	ppu.RegLY++
 	if ppu.RegLY >= 153 {
 		ppu.RegLY = 0
 	}
 	ppu.Stat.SetLYCEqLY(ints, ppu.RegLY == ppu.RegLYC)
-	ppu.debug.SetY(ppu.RegLY)
+	debug.SetY(ppu.RegLY)
 }
 
 func (ppu *PPU) Read(addr Addr) Data8 {

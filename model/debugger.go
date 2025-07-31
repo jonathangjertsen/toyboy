@@ -11,13 +11,10 @@ type Debugger struct {
 	BreakPC atomic.Int64
 	BreakIR atomic.Int64
 	y       Data8
-	CLK     *ClockRT
 }
 
-func NewDebugger(clk *ClockRT) Debugger {
-	return Debugger{
-		CLK: clk,
-	}
+func NewDebugger() Debugger {
+	return Debugger{}
 }
 
 func (dbg *Debugger) Init() {
@@ -30,11 +27,11 @@ func (dbg *Debugger) Init() {
 	dbg.BreakIR.Store(-1)
 }
 
-func (dbg *Debugger) Break() {
+func (dbg *Debugger) Break(clk *ClockRT) {
 	if dbg == nil {
 		return
 	}
-	dbg.CLK.pauseAfterCycle.Add(1)
+	clk.pauseAfterCycle.Add(1)
 }
 
 func (dbg *Debugger) SetY(y Data8) {
@@ -44,35 +41,35 @@ func (dbg *Debugger) SetY(y Data8) {
 	dbg.y = y
 }
 
-func (dbg *Debugger) SetX(x Data8) {
+func (dbg *Debugger) SetX(x Data8, clk *ClockRT) {
 	if dbg == nil {
 		return
 	}
 	bx, by := dbg.BreakX.Load(), dbg.BreakY.Load()
 	if int64(x) == bx && int64(dbg.y) == by {
-		dbg.Break()
+		dbg.Break(clk)
 		fmt.Printf("PPU breakpoint\n")
 	}
 }
 
-func (dbg *Debugger) SetIR(ir Opcode) {
+func (dbg *Debugger) SetIR(ir Opcode, clk *ClockRT) {
 	if dbg == nil {
 		return
 	}
 	bpc := dbg.BreakIR.Load()
 	if bpc == int64(ir) {
-		dbg.Break()
+		dbg.Break(clk)
 		fmt.Printf("IR breakpoint\n")
 	}
 }
 
-func (dbg *Debugger) SetPC(pc Addr) {
+func (dbg *Debugger) SetPC(pc Addr, clk *ClockRT) {
 	if dbg == nil {
 		return
 	}
 	bpc := dbg.BreakPC.Load()
 	if bpc == int64(pc) {
-		dbg.Break()
+		dbg.Break(clk)
 		fmt.Printf("PC breakpoint\n")
 	}
 }

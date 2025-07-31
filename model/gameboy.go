@@ -59,15 +59,14 @@ func NewGameboy(
 func (gb *Gameboy) Init(audio *Audio) {
 	mem := NewAddressSpace()
 	interrupts := NewInterrupts(mem)
-	clk := NewRealtimeClock(gb.Config.Clock, audio, interrupts)
-
-	debug := NewDebug(clk, &gb.Config.Debug)
+	debug := NewDebug(&gb.Config.Debug)
+	clk := NewRealtimeClock(gb.Config.Clock, audio, interrupts, debug)
 
 	if gb.Config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
 		copy(mem[:SizeBootROM], bootROM)
 		debug.SetProgram(bootROM)
-		debug.SetPC(0)
+		debug.SetPC(0, clk)
 	} else {
 		panic("unknown boot ROM")
 	}
@@ -81,7 +80,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 
 	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug)
 
-	ppu := NewPPU(clk, interrupts, bus, gb.Config, debug)
+	ppu := NewPPU(clk, interrupts, mem, gb.Config)
 
 	bus.BootROMLock = bootROMLock
 	bus.APU = apu

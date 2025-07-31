@@ -34,11 +34,11 @@ func (brl *BootROMLock) Lock() {
 		brl.debug.SetProgram(brl.mem[:AddrCartridgeBankNEnd])
 
 		// Explore from known entry points (Cartridge entrypoint and interrupt vector)
-		brl.debug.SetPC(0x100)
-		brl.debug.SetPC(0x40)
-		brl.debug.SetPC(0x48)
-		brl.debug.SetPC(0x50)
-		brl.debug.SetPC(0x58)
-		brl.debug.SetPC(0x60)
+		brl.debug.Disassembler.SetPC(0x100)
+		brl.debug.Disassembler.SetPC(0x40)
+		brl.debug.Disassembler.SetPC(0x48)
+		brl.debug.Disassembler.SetPC(0x50)
+		brl.debug.Disassembler.SetPC(0x58)
+		brl.debug.Disassembler.SetPC(0x60)
 	}
 }

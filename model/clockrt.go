@@ -43,7 +43,7 @@ func (r *ClockRT) SetSpeedPercent(pct float64) {
 	})
 }
 
-func NewRealtimeClock(config ConfigClock, audio *Audio, interrupts *Interrupts) *ClockRT {
+func NewRealtimeClock(config ConfigClock, audio *Audio, interrupts *Interrupts, debug *Debug) *ClockRT {
 	clockRT := ClockRT{
 		resume:  make(chan struct{}),
 		pause:   make(chan struct{}),
@@ -52,7 +52,7 @@ func NewRealtimeClock(config ConfigClock, audio *Audio, interrupts *Interrupts) 
 		Onpanic: func() {},
 		Audio:   audio,
 	}
-	go clockRT.run(config.SpeedPercent, interrupts)
+	go clockRT.run(config.SpeedPercent, interrupts, debug)
 	return &clockRT
 }
 
@@ -109,7 +109,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64) {
 	}
 }
 
-func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts) {
+func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts, debug *Debug) {
 	defer func() {
 		if e := recover(); e != nil {
 			clockRT.Onpanic()
@@ -128,7 +128,7 @@ func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts) {
 		var exit bool
 		select {
 		case <-clockRT.ticker.C:
-			clockRT.MCycle(clockRT.mCyclesPerTick, ints)
+			clockRT.MCycle(clockRT.mCyclesPerTick, ints, debug)
 		case <-uiTicker.C:
 			clockRT.uiCycle()
 		case <-clockRT.resume:
@@ -171,7 +171,7 @@ func (clockRT *ClockRT) Stop() {
 	clockRT.stop <- struct{}{}
 }
 
-func (clockRT *ClockRT) MCycle(n int, ints *Interrupts) {
+func (clockRT *ClockRT) MCycle(n int, ints *Interrupts, debug *Debug) {
 	for range n {
 		// Breakpoints will stop here, right before executing next M-cycle
 		if clockRT.pauseAfterCycle.Load() > 0 {
@@ -184,12 +184,11 @@ func (clockRT *ClockRT) MCycle(n int, ints *Interrupts) {
 
 		clockRT.Audio.Clock()
 
+		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
+		clockRT.cpu.fsm(clockRT)
+
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
-
-		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
-		clockRT.cpu.fsm(m)
-
 		if m&0x3f == 0 {
 			clockRT.timer.tickDIV()
 		}
@@ -206,12 +205,12 @@ func (clockRT *ClockRT) MCycle(n int, ints *Interrupts) {
 			if clockRT.Cycle&0xf == 0 {
 				clockRT.apu.Noise.clock()
 			}
-			clockRT.ppu.fsm(ints)
+			clockRT.ppu.fsm(ints, debug, clockRT)
 
 			// T1
 
 			// T2
-			clockRT.ppu.fsm(ints)
+			clockRT.ppu.fsm(ints, debug, clockRT)
 
 			// T3
 		} else {
@@ -220,15 +219,16 @@ func (clockRT *ClockRT) MCycle(n int, ints *Interrupts) {
 				clockRT.ppu.RegLCDC&Bit7 != 0,
 				clockRT.apu.MasterCtl&Bit7 != 0,
 				ints,
+				debug,
 			)
 		}
 	}
 }
 
-func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool, ints *Interrupts) {
+func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool, ints *Interrupts, debug *Debug) {
 	// T0
 	if ppu {
-		clockRT.ppu.fsm(ints)
+		clockRT.ppu.fsm(ints, debug, clockRT)
 	}
 	if apu {
 		clockRT.apu.Wave.clock()
@@ -245,7 +245,7 @@ func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool, ints *Interrupts) 
 
 	// T2
 	if ppu {
-		clockRT.ppu.fsm(ints)
+		clockRT.ppu.fsm(ints, debug, clockRT)
 	}
 
 	// T3

@@ -210,14 +210,6 @@ func (tb *TestBus) GetPeripheral(any) {
 	panic("getPeripheral not implemented")
 }
 
-func setStubPeripherals(clock *model.ClockRT, bus *TestBus) {
-	interrupts := model.NewInterrupts(clock, bus.RAM[:])
-	model.NewPPU(clock, interrupts, bus, &model.DefaultConfig, nil)
-	apu := model.NewAPU(clock, &model.DefaultConfig, bus.RAM[:])
-	model.NewTimer(clock, bus.RAM[:], apu, interrupts)
-
-}
-
 func Run(t *testing.T, tcs []TestCase, opcode model.Opcode) {
 	t.Helper()
 	for i, tc := range tcs {
@@ -233,12 +225,15 @@ func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
 
 	audio, devnull := model.AudioStub()
 	defer func() { close(devnull) }()
+	testBus := TestBus{}
+	ints := model.NewInterrupts(testBus.RAM[:])
 
-	clock := model.NewRealtimeClock(model.DefaultConfig.Clock, audio)
+	clock := model.NewRealtimeClock(model.DefaultConfig.Clock, audio, ints)
 	defer func() { clock.Stop() }()
 
-	testBus := TestBus{}
-	setStubPeripherals(clock, &testBus)
+	apu := model.NewAPU(clock, &model.DefaultConfig, testBus.RAM[:])
+	model.NewTimer(clock, testBus.RAM[:], apu, ints)
+	model.NewPPU(clock, ints, testBus.RAM[:], &model.DefaultConfig, nil)
 
 	config := model.DefaultConfig
 	config.Debug.PanicOnStackUnderflow = false
@@ -259,7 +254,7 @@ func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
 	}
 	cpu.Regs.IR = model.Opcode(testBus.RAM[cpu.Regs.PC])
 
-	clock.MCycle(len(tc.Cycles) + 1)
+	clock.MCycle(len(tc.Cycles)+1, ints)
 
 	if have, want := cpu.Regs.A, tc.Final.A; have != want {
 		t.Fatalf("Test %d Register A have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
