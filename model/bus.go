@@ -175,15 +175,16 @@ func (b *Bus) WriteData(v Data8) {
 
 	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
-			b.Mem[b.Address] = v
+			b.Mem[addr] = v
 			b.Cartridge.Write(addr, v)
 		}
 	} else if addr <= AddrCartridgeBankNEnd {
 		b.Cartridge.Write(addr, v)
 	} else if addr == AddrBootROMLock {
-		b.Mem[b.Address] = v
+		b.Mem[addr] = v
 		b.BootROMLock.Write(addr, v)
 	} else if addr == AddrP1 {
+		b.Mem[addr] = v
 		b.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {
 		b.Interrupts.Write(addr, v)
