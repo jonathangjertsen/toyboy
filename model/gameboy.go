@@ -11,16 +11,18 @@ type Gameboy struct {
 
 	Running atomic.Bool
 
-	Mem       []Data8
-	CLK       *ClockRT
-	Bus       *Bus
-	Debug     *Debug
-	CPU       *CPU
-	PPU       *PPU
-	APU       *APU
-	Cartridge *Cartridge
-	Joypad    *Joypad
-	FrameSync *FrameSync
+	Mem        []Data8
+	CLK        *ClockRT
+	Bus        *Bus
+	Debug      *Debug
+	CPU        *CPU
+	PPU        *PPU
+	APU        *APU
+	Cartridge  *Cartridge
+	Joypad     *Joypad
+	FrameSync  *FrameSync
+	Interrupts *Interrupts
+	Audio      *Audio
 }
 
 func (gb *Gameboy) Start() {
@@ -63,7 +65,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 	interrupts := NewInterrupts(mem)
 	debug := NewDebug(&gb.Config.Debug)
 	fs := NewFrameSync()
-	clk := NewRealtimeClock(gb.Config.Clock, audio, interrupts, debug, mem, fs)
+	clk := NewRealtimeClock()
 
 	if gb.Config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
@@ -75,23 +77,23 @@ func (gb *Gameboy) Init(audio *Audio) {
 	}
 	cartridge := NewCartridge(clk, mem)
 	bootROMLock := NewBootROMLock(mem, cartridge, debug)
-	apu := NewAPU(clk, gb.Config)
-	joypad := NewJoypad(clk, interrupts, mem)
-	timer := NewTimer(clk, mem, apu, interrupts)
+	var apu APU
+	joypad := NewJoypad(interrupts, mem)
+	var timer Timer
 
 	bus := NewBus()
 
 	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug)
 
-	ppu := NewPPU(clk, interrupts)
+	ppu := NewPPU(interrupts)
 
 	bus.BootROMLock = bootROMLock
-	bus.APU = apu
+	bus.APU = &apu
 	bus.PPU = ppu
 	bus.Cartridge = cartridge
 	bus.Joypad = joypad
 	bus.Interrupts = interrupts
-	bus.Timer = timer
+	bus.Timer = &timer
 	bus.Config = gb.Config
 
 	debug.HRAM.Source = mem[AddrHRAMBegin : AddrHRAMEnd+1]
@@ -101,12 +103,16 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Bus = bus
 	gb.CLK = clk
 	gb.CPU = cpu
-	gb.APU = apu
+	gb.APU = &apu
 	gb.Cartridge = cartridge
 	gb.PPU = ppu
 	gb.Debug = debug
 	gb.Joypad = joypad
 	gb.FrameSync = fs
+	gb.Interrupts = interrupts
+	gb.Audio = audio
+
+	go clk.run(gb.Config.Clock.SpeedPercent, interrupts, debug, mem, fs, audio, &apu, ppu, cpu, &timer)
 
 	gb.CPU.Reset()
 

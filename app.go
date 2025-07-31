@@ -126,7 +126,7 @@ type Frame struct {
 
 func (app *App) SetKeyState(in map[string]bool) {
 	jp := app.ButtonMapping.JoypadState(in)
-	app.GB.Joypad.SetState(jp)
+	app.GB.Joypad.SetState(app.GB.CLK, app.GB.Interrupts, jp, app.GB.Mem)
 }
 
 var upgrader = websocket.Upgrader{
@@ -135,7 +135,7 @@ var upgrader = websocket.Upgrader{
 
 func (app *App) MachineStateRequest(req MachineStateRequest) {
 	if req.ClickedNumber == "TargetSpeed" {
-		app.GB.CLK.SetSpeedPercent(req.Numbers["TargetSpeed"])
+		app.GB.CLK.SetSpeedPercent(req.Numbers["TargetSpeed"], app.GB.Audio)
 		fmt.Printf("Updated speed to %f\n", req.Numbers["TargetSpeed"])
 	}
 	app.reqChan <- req

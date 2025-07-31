@@ -44,7 +44,6 @@ type CPUBusIF interface {
 	Reset()
 	WriteAddress([]Data8, Addr)
 	WriteData([]Data8, Data8)
-	GetAddress() Addr
 	GetData() Data8
 	ProbeAddress([]Data8, Addr) Data8
 	ProbeRange([]Data8, Addr, Addr) []Data8
@@ -150,7 +149,6 @@ func NewCPU(
 		rewind:     NewRewind(8192),
 	}
 	cpu.handlers = handlers(cpu)
-	clk.cpu = cpu
 	return cpu
 }
 
@@ -200,7 +198,7 @@ func (cpu *CPU) instructionFetch(clk *ClockRT, mem []Data8) {
 	cpu.Regs.SetWZ(0)
 
 	// Read next instruction opcode
-	rawOp := mem[cpu.Bus.GetAddress()]
+	rawOp := mem[cpu.Regs.PC]
 	cpu.Regs.IR = Opcode(rawOp)
 	cpu.Debug.SetIR(cpu.Regs.IR, clk)
 

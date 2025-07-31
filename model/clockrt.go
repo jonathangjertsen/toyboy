@@ -19,12 +19,6 @@ type ClockRT struct {
 	Onpanic         func(mem []Data8)
 	pauseAfterCycle atomic.Int32
 	Running         atomic.Bool
-	Audio           *Audio
-
-	cpu   *CPU
-	ppu   *PPU
-	apu   *APU
-	timer *Timer
 }
 
 // Executes the function in the clocks' goroutine
@@ -37,22 +31,20 @@ func (r *ClockRT) Sync(f func()) {
 	<-done
 }
 
-func (r *ClockRT) SetSpeedPercent(pct float64) {
+func (r *ClockRT) SetSpeedPercent(pct float64, audio *Audio) {
 	r.Sync(func() {
-		r.setSpeedPercent(pct)
+		r.setSpeedPercent(pct, audio)
 	})
 }
 
-func NewRealtimeClock(config ConfigClock, audio *Audio, interrupts *Interrupts, debug *Debug, mem []Data8, fs *FrameSync) *ClockRT {
+func NewRealtimeClock() *ClockRT {
 	clockRT := ClockRT{
 		resume:  make(chan struct{}),
 		pause:   make(chan struct{}),
 		stop:    make(chan struct{}),
 		jobs:    make(chan func()),
 		Onpanic: func(mem []Data8) {},
-		Audio:   audio,
 	}
-	go clockRT.run(config.SpeedPercent, interrupts, debug, mem, fs)
 	return &clockRT
 }
 
@@ -82,7 +74,7 @@ func (clockRT *ClockRT) wait() bool {
 	return false
 }
 
-func (clockRT *ClockRT) setSpeedPercent(pct float64) {
+func (clockRT *ClockRT) setSpeedPercent(pct float64, audio *Audio) {
 	// Target frequency
 	tFreq := 4194304.0 * pct / 100
 	mFreq := tFreq / 4
@@ -92,7 +84,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64) {
 	mCycleInterval /= 2
 
 	// Update audio
-	clockRT.Audio.SetMPeriod(mCycleInterval)
+	audio.SetMPeriod(mCycleInterval)
 
 	// How often we run the real ticker
 	minTickInterval := time.Millisecond * 2
@@ -109,14 +101,14 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64) {
 	}
 }
 
-func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts, debug *Debug, mem []Data8, fs *FrameSync) {
+func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts, debug *Debug, mem []Data8, fs *FrameSync, audio *Audio, apu *APU, ppu *PPU, cpu *CPU, timer *Timer) {
 	defer func() {
 		if e := recover(); e != nil {
 			clockRT.Onpanic(mem)
 			panic(e)
 		}
 	}()
-	clockRT.setSpeedPercent(initSpeedPercent)
+	clockRT.setSpeedPercent(initSpeedPercent, audio)
 
 	exit := clockRT.wait()
 	if exit {
@@ -128,7 +120,7 @@ func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts, debug *D
 		var exit bool
 		select {
 		case <-clockRT.ticker.C:
-			clockRT.MCycle(clockRT.mCyclesPerTick, ints, debug, mem, fs)
+			clockRT.MCycle(clockRT.mCyclesPerTick, ints, debug, mem, fs, audio, apu, ppu, cpu, timer)
 		case <-uiTicker.C:
 			clockRT.uiCycle()
 		case <-clockRT.resume:
@@ -171,7 +163,18 @@ func (clockRT *ClockRT) Stop() {
 	clockRT.stop <- struct{}{}
 }
 
-func (clockRT *ClockRT) MCycle(n int, ints *Interrupts, debug *Debug, mem []Data8, fs *FrameSync) {
+func (clockRT *ClockRT) MCycle(
+	n int,
+	ints *Interrupts,
+	debug *Debug,
+	mem []Data8,
+	fs *FrameSync,
+	audio *Audio,
+	apu *APU,
+	ppu *PPU,
+	cpu *CPU,
+	timer *Timer,
+) {
 	for range n {
 		// Breakpoints will stop here, right before executing next M-cycle
 		if clockRT.pauseAfterCycle.Load() > 0 {
@@ -182,72 +185,72 @@ func (clockRT *ClockRT) MCycle(n int, ints *Interrupts, debug *Debug, mem []Data
 			clockRT.pauseAfterCycle.Add(-1)
 		}
 
-		clockRT.Audio.Clock()
+		audio.Clock(apu)
 
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
-		clockRT.cpu.fsm(clockRT, mem)
+		cpu.fsm(clockRT, mem)
 
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
 		if m&0x3f == 0 {
-			clockRT.timer.tickDIV()
+			timer.tickDIV(mem, ints, apu)
 		}
 
 		// Clock the peripherals.
 		// 99.99% of the time, both PPU and APU are on, so we clock everything
-		if clockRT.ppu.RegLCDC&clockRT.apu.MasterCtl&Bit7 != 0 {
+		if ppu.RegLCDC&apu.MasterCtl&Bit7 != 0 {
 			// T0
-			clockRT.apu.Wave.clock(mem)
+			apu.Wave.clock(mem)
 			if m&0x1 == 0 {
-				clockRT.apu.Pulse1.clock()
-				clockRT.apu.Pulse2.clock()
+				apu.Pulse1.clock()
+				apu.Pulse2.clock()
 			}
 			if clockRT.Cycle&0xf == 0 {
-				clockRT.apu.Noise.clock()
+				apu.Noise.clock()
 			}
-			clockRT.ppu.fsm(ints, debug, clockRT, mem, fs)
+			ppu.fsm(ints, debug, clockRT, mem, fs)
 
 			// T1
 
 			// T2
-			clockRT.ppu.fsm(ints, debug, clockRT, mem, fs)
+			ppu.fsm(ints, debug, clockRT, mem, fs)
 
 			// T3
 		} else {
 			clockRT.mCycleSlowPath(
 				m,
-				clockRT.ppu.RegLCDC&Bit7 != 0,
-				clockRT.apu.MasterCtl&Bit7 != 0,
 				ints,
 				debug,
 				mem,
 				fs,
+				apu,
+				ppu,
 			)
 		}
 	}
 }
 
-func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool, ints *Interrupts, debug *Debug, mem []Data8, fs *FrameSync) {
+func (clockRT *ClockRT) mCycleSlowPath(m uint, ints *Interrupts, debug *Debug, mem []Data8, fs *FrameSync, apu *APU, ppu *PPU) {
 	// T0
-	if ppu {
-		clockRT.ppu.fsm(ints, debug, clockRT, mem, fs)
+	if ppu.RegLCDC&Bit7 != 0 {
+		ppu.fsm(ints, debug, clockRT, mem, fs)
 	}
-	if apu {
-		clockRT.apu.Wave.clock(mem)
+	if apu.MasterCtl&Bit7 != 0 {
+		apu.Wave.clock(mem)
 		if m&0x1 == 0 {
-			clockRT.apu.Pulse1.clock()
-			clockRT.apu.Pulse2.clock()
+			apu.Pulse1.clock()
+			apu.Pulse2.clock()
 		}
 		if clockRT.Cycle&0xf == 0 {
-			clockRT.apu.Noise.clock()
+			apu.Noise.clock()
 		}
 	}
 
 	// T1
 
 	// T2
-	if ppu {
-		clockRT.ppu.fsm(ints, debug, clockRT, mem, fs)
+	if ppu.RegLCDC&Bit7 != 0 {
+		ppu.fsm(ints, debug, clockRT, mem, fs)
 	}
 
 	// T3

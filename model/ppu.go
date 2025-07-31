@@ -59,13 +59,12 @@ func NewFrameSync() *FrameSync {
 	}
 }
 
-func NewPPU(rtClock *ClockRT, ints *Interrupts) *PPU {
+func NewPPU(ints *Interrupts) *PPU {
 	ppu := &PPU{}
 	ppu.SpriteFetcher.Suspended = true
 	ppu.SpriteFetcher.DoneX = 0xff
 
 	ppu.beginFrame(ints)
-	rtClock.ppu = ppu
 	return ppu
 }
 

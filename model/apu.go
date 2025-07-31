@@ -10,16 +10,6 @@ type APU struct {
 	Noise     NoiseChannel
 }
 
-func NewAPU(clock *ClockRT, config *Config) *APU {
-	apu := &APU{}
-	if config.BootROM.Skip {
-		apu.Reset()
-	}
-	clock.apu = apu
-	clock.Audio.APU = apu
-	return apu
-}
-
 func (apu *APU) LoadSave(save *SaveState) {
 	*apu = save.APU
 }

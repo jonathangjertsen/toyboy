@@ -14,7 +14,6 @@ const (
 )
 
 type Audio struct {
-	APU            *APU
 	SampleBuffers  SampleBuffers
 	SampleInterval time.Duration
 	SampleDivider  int
@@ -51,8 +50,8 @@ func (ab *SampleBuffers) Add(l, r AudioSample) bool {
 	return false
 }
 
-func (audio *Audio) Enabled() bool {
-	return audio.APU != nil && audio.SampleDivider > 0
+func (audio *Audio) Enabled(apu *APU) bool {
+	return apu != nil && audio.SampleDivider > 0
 }
 
 func (audio *Audio) SetMPeriod(mPeriod time.Duration) {
@@ -64,8 +63,8 @@ func (audio *Audio) SetMPeriod(mPeriod time.Duration) {
 	}
 }
 
-func (audio *Audio) Clock() {
-	if !audio.Enabled() {
+func (audio *Audio) Clock(apu *APU) {
+	if !audio.Enabled(apu) {
 		return
 	}
 	audio.MCounter -= audio.SubSampling
@@ -74,11 +73,11 @@ func (audio *Audio) Clock() {
 	}
 	audio.MCounter = audio.SampleDivider*audio.SubSampling - audio.MCounter
 	if !audio.SampleBuffers.Add(
-		audio.APU.Mixer.MixStereoSimple(
-			audio.APU.Pulse1.Sample(),
-			audio.APU.Pulse2.Sample(),
-			audio.APU.Noise.Sample(),
-			audio.APU.Wave.Sample(),
+		apu.Mixer.MixStereoSimple(
+			apu.Pulse1.Sample(),
+			apu.Pulse2.Sample(),
+			apu.Noise.Sample(),
+			apu.Wave.Sample(),
 		),
 	) {
 		return

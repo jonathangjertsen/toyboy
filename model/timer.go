@@ -1,40 +1,24 @@
 package model
 
 type Timer struct {
-	APU              *APU
-	Interrupts       *Interrupts
 	DIV              Data16
 	prevAndResult    bool
 	preReloadCounter int
-	mem              []Data8
-}
-
-var timerBitMask = [4]Data16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
-
-func NewTimer(clock *ClockRT, mem []Data8, apu *APU, interrupts *Interrupts) *Timer {
-	t := &Timer{
-		APU:        apu,
-		Interrupts: interrupts,
-		mem:        mem,
-	}
-
-	clock.timer = t
-	return t
 }
 
 // Tick the DIV timer
-func (t *Timer) tickDIV() {
+func (t *Timer) tickDIV(mem []Data8, ints *Interrupts, apu *APU) {
 	// https://gbdev.io/pandocs/Audio_details.html#div-apu
 	// A “DIV-APU” counter is increased every time DIV’s bit 4 (5 in double-speed mode) goes from 1 to 0
 	div := t.DIV
 	if (div&Bit4 == Bit4) && ((div+1)&Bit4 == 0) { // bit 4 set, bit 3 clear => next time bit 4 will go low
-		t.APU.incDIVAPU()
+		apu.incDIVAPU()
 	}
 	div++
 	t.DIV = div
 
-	t.mem[AddrDIV] = Data8(div >> 8)
-	tac := t.mem[AddrTAC]
+	mem[AddrDIV] = Data8(div >> 8)
+	tac := mem[AddrTAC]
 	var andResult bool
 	var clockSelect Data16
 	if tac&Bit2 != 0 {
@@ -42,7 +26,7 @@ func (t *Timer) tickDIV() {
 	}
 	andResult = (div&clockSelect != 0)
 	if t.prevAndResult && !andResult {
-		tima := &t.mem[AddrTIMA]
+		tima := &mem[AddrTIMA]
 		if *tima == 0xFF {
 			t.preReloadCounter = 4
 			*tima = 0
@@ -54,8 +38,8 @@ func (t *Timer) tickDIV() {
 	if t.preReloadCounter > 0 {
 		t.preReloadCounter--
 		if t.preReloadCounter == 0 {
-			t.mem[AddrTIMA] = t.mem[AddrTMA]
-			t.Interrupts.IRQSet(IntSourceTimer)
+			mem[AddrTIMA] = mem[AddrTMA]
+			ints.IRQSet(IntSourceTimer)
 		}
 	}
 }

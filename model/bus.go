@@ -37,10 +37,6 @@ func (b *Bus) Reset() {
 	}
 }
 
-func (b *Bus) GetAddress() Addr {
-	return b.Address
-}
-
 func (b *Bus) GetData() Data8 {
 	return b.Data
 }
@@ -58,7 +54,7 @@ func (b *Bus) ProbeAddress(mem []Data8, addr Addr) Data8 {
 		return b.PPU.Read(addr)
 	}
 	if addr == AddrP1 {
-		return b.Joypad.Read(addr)
+		return b.Joypad.Read(mem[AddrP1], addr)
 	}
 	return mem[addr]
 }
