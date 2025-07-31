@@ -32,7 +32,6 @@ type CPUBusIF interface {
 	GetData() Data8
 	ProbeAddress(Addr) Data8
 	ProbeRange(Addr, Addr) []Data8
-	GetPeripheral(any)
 }
 
 func (cpu *CPU) CurrInstruction() (DisInstruction, int) {

@@ -45,15 +45,6 @@ func (gb *Gameboy) SoftReset() {
 	})
 }
 
-func (gb *Gameboy) GetCoreDump() CoreDump {
-	var cd CoreDump
-	gb.CLK.Sync(func() {
-		cd = gb.CPU.GetCoreDump()
-		cd.Cycle = gb.CLK.Cycle
-	})
-	return cd
-}
-
 func NewGameboy(
 	config *Config,
 	audio *Audio,

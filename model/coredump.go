@@ -249,9 +249,6 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
 	cd.Disassembly = cpu.Debug.Disassembly(0, 0xffff)
-	var ppu *PPU
-	bus.GetPeripheral(&ppu)
-	cd.PPU = ppu.GetDump()
 	cd.Rewind = cpu.rewind
 	return cd
 }

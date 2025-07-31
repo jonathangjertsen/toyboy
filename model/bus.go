@@ -1,15 +1,11 @@
 package model
 
-import "fmt"
-
 type Bus struct {
 	Mem []Data8
 
 	Data    Data8
 	Address Addr
 	Config  *Config
-
-	inCoreDump bool
 
 	BootROMLock *BootROMLock
 	APU         *APU
@@ -23,17 +19,6 @@ type Bus struct {
 func NewBus(as []Data8) *Bus {
 	return &Bus{
 		Mem: as,
-	}
-}
-
-func (b *Bus) GetPeripheral(ptr any) {
-	switch p := ptr.(type) {
-	case **PPU:
-		*p = b.PPU
-	case **APU:
-		*p = b.APU
-	default:
-		panic(fmt.Errorf("no peripheral of type %T", ptr))
 	}
 }
 
