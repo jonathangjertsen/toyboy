@@ -83,7 +83,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 
 	bootROMLock := NewBootROMLock(clk)
 
-	apu := NewAPU(clk, gb.Config)
+	apu := NewAPU(clk, gb.Config, addressSpace)
 	cartridge := NewCartridge(clk)
 	joypad := NewJoypad(clk, interrupts)
 	serial := NewSerial(clk)

@@ -90,6 +90,8 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 		return b.AddressSpace[addr]
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		return b.APU.Read(addr)
+	} else if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
+		return b.AddressSpace[addr]
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
 		return b.AddressSpace[addr]
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
@@ -140,6 +142,8 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 		return b.AddressSpace[begin : end+1]
 	} else if begin >= AddrAPUBegin && end <= AddrAPUEnd {
 		return readRange(b.APU, begin, end)
+	} else if begin >= AddrWaveRAMBegin && end <= AddrWaveRAMEnd {
+		return b.AddressSpace[begin : end+1]
 	} else if begin >= AddrOAMBegin && end <= AddrOAMEnd {
 		return b.AddressSpace[begin : end+1]
 	} else if begin >= AddrPPUBegin && end <= AddrPPUEnd {
@@ -206,6 +210,8 @@ func (b *Bus) WriteData(v Data8) {
 		b.AddressSpace[addr] = v
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.APU.Write(addr, v)
+	} else if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
+		b.AddressSpace[addr] = v
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
 		b.AddressSpace[addr] = v
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {

@@ -13,7 +13,6 @@ type CoreDump struct {
 	ProgramEnd   Addr
 	AddressSpace *AddressSpace
 	Program      []Data8
-	APU          []Data8
 	PPU          PPUDump
 	Rewind       *Rewind
 	Disassembly  *Disassembly
@@ -103,8 +102,8 @@ func b2i(b bool) int {
 	return 0
 }
 
-func PrintAPU(f io.Writer, apu *APU) {
-	RegDump(f, apu.MemoryRegion.Data, AddrAPUBegin, AddrAPUEnd)
+func PrintAPU(f io.Writer, mem []Data8, apu *APU) {
+	RegDump(f, mem, AddrAPUBegin, AddrAPUEnd)
 	fmt.Fprintf(f, "DivAPU:    %d\n", apu.DIVAPU)
 	fmt.Fprintf(f, "Pulse1 on=%d dac=%d\n", b2i(apu.Pulse1.activated), b2i(apu.Pulse1.dacEnabled))
 	printPeriodCounter(f, &apu.Pulse1.PeriodCounter)
@@ -193,10 +192,6 @@ func PrintPPU(f io.Writer, ppu PPUDump) {
 	fmt.Fprintf(f, "OAMBuffer.LV:  %d\n", ppu.OAMBuffer.Level)
 }
 
-func (cd *CoreDump) PrintAPU(f io.Writer) {
-	RegDump(f, cd.APU, AddrAPUBegin, AddrAPUEnd)
-}
-
 func RegDump(f io.Writer, mem []Data8, start, end Addr) {
 	for addr := start; addr <= end; addr++ {
 		a := Addr(addr)
@@ -259,7 +254,6 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
 	cd.Program = bus.ProbeRange(0x0000, AddrCartridgeBank0End)
 	cd.Disassembly = cpu.Debug.Disassembly(0, 0xffff)
-	cd.APU = bus.APU.Data
 	var ppu *PPU
 	bus.GetPeripheral(&ppu)
 	cd.PPU = ppu.GetDump()

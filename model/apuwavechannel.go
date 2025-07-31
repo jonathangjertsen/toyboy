@@ -3,7 +3,11 @@ package model
 type WaveChannel struct {
 	PeriodCounter PeriodCounter
 	LengthTimer   LengthTimer
-	WaveGenerator WaveGenerator
+
+	AddressSpace *AddressSpace
+	Index        Addr
+	OutLevel     Data8
+	output       AudioSample
 
 	RegDACEn         Data8
 	RegLengthTimer   Data8
@@ -30,7 +34,7 @@ func (wc *WaveChannel) SetLengthTimer(v Data8) {
 
 func (wc *WaveChannel) SetOutputLevel(v Data8) {
 	wc.RegOutputLevel = v
-	wc.WaveGenerator.OutLevel = (v >> 5) & 0x3
+	wc.OutLevel = (v >> 5) & 0x3
 }
 
 func (wc *WaveChannel) SetPeriodLow(v Data8) {
@@ -66,16 +70,37 @@ func (wc *WaveChannel) trigger() {
 	// The period divider is set to the contents of NR13 and NR14.
 	wc.PeriodCounter.periodDivider = wc.PeriodCounter.periodDividerReset
 
-	wc.WaveGenerator.Index = 1
+	wc.Index = 1
 }
 
 func (wc *WaveChannel) clock() {
 	if !wc.activated {
 		return
 	}
-	if wc.PeriodCounter.clock() {
-		wc.WaveGenerator.clock()
+	if !wc.PeriodCounter.clock() {
+		return
 	}
+
+	data := wc.AddressSpace[AddrWaveRAMBegin+wc.Index>>1]
+	if wc.Index&1 == 0 {
+		// upper nibble on even index
+		data >>= 4
+	} else {
+		// lower nibble on odd index
+		data &= 0x0f
+	}
+	switch wc.OutLevel {
+	case 0:
+		data = 0
+	case 1:
+	case 2:
+		data >>= 1
+	case 3:
+		data >>= 2
+	}
+	wc.output = AudioSample(data)
+	wc.Index++
+	wc.Index &= 0x1f
 }
 
 func (wc *WaveChannel) Sample() AudioSample {
@@ -83,6 +108,5 @@ func (wc *WaveChannel) Sample() AudioSample {
 		return 0
 	}
 
-	out := wc.WaveGenerator.output
-	return out
+	return wc.output
 }

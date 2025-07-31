@@ -97,7 +97,7 @@ const (
 	AddrVRAMBegin            = AddrTileDataBegin
 	AddrVRAMEnd              = AddrTileMap1End
 	AddrAPUBegin             = AddrNR10
-	AddrAPUEnd               = AddrWaveRAMEnd
+	AddrAPUEnd               = AddrNR52
 	AddrPPUBegin             = AddrLCDC
 	AddrPPUEnd               = AddrWX
 	AddrTimerBegin           = AddrDIV
