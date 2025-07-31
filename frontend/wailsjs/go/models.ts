@@ -764,7 +764,6 @@ export namespace main {
 	    Model: model.Config;
 	    PProfURL: string;
 	    GUI: ConfigGUI;
-	    TestMode: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -776,7 +775,6 @@ export namespace main {
 	        this.Model = this.convertValues(source["Model"], model.Config);
 	        this.PProfURL = source["PProfURL"];
 	        this.GUI = this.convertValues(source["GUI"], ConfigGUI);
-	        this.TestMode = source["TestMode"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

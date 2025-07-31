@@ -114,7 +114,6 @@ type Config struct {
 	Model    model.Config
 	PProfURL string
 	GUI      ConfigGUI
-	TestMode bool
 }
 
 type ConfigGUI struct {
