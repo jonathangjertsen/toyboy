@@ -88,46 +88,13 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	if begin > end {
 		return nil
 	}
-	len := end - begin + 1
-	if end <= AddrCartridgeBankNEnd {
-		return b.Mem[begin : end+1]
-	} else if begin >= AddrVRAMBegin && end <= AddrVRAMEnd {
-		return b.Mem[begin : end+1]
-	} else if begin >= AddrHRAMBegin && end <= AddrHRAMEnd {
-		return b.Mem[begin : end+1]
-	} else if begin >= AddrWRAMBegin && end <= AddrWRAMEnd {
-		return b.Mem[begin : end+1]
-	} else if begin >= AddrAPUBegin && end <= AddrAPUEnd {
+	if begin >= AddrAPUBegin && end <= AddrAPUEnd {
 		return readRange(b.APU, begin, end)
-	} else if begin >= AddrWaveRAMBegin && end <= AddrWaveRAMEnd {
-		return b.Mem[begin : end+1]
-	} else if begin >= AddrOAMBegin && end <= AddrOAMEnd {
-		return b.Mem[begin : end+1]
-	} else if begin >= AddrPPUBegin && end <= AddrPPUEnd {
-		return readRange(b.PPU, begin, end)
-	} else if begin >= AddrProhibitedBegin && end <= AddrProhibitedEnd {
-		return b.Mem[begin : end+1]
-	} else if (begin >= 0xff4c && end <= 0xff4f) || (begin >= 0xff51 && end <= 0xff70) {
-		// GBC stuff
-		return b.Mem[begin : end+1]
-	} else if begin >= 0xff71 && end <= 0xff7f {
-		return b.Mem[begin : end+1]
-	} else if begin >= AddrTimerBegin && end <= AddrTimerEnd {
-		return b.Mem[begin : end+1]
-	} else if len == 1 && begin == AddrP1 {
-		return readRange(b.Joypad, begin, end)
-	} else if len == 1 && (begin == AddrIF || begin == AddrIE) {
-		return b.Mem[begin : end+1]
-	} else if len == 1 && begin == AddrBootROMLock {
-		return b.Mem[begin : end+1]
-	} else if len == 1 && (begin == AddrSB || begin == AddrSC) {
-		return b.Mem[begin : end+1]
-	} else {
-		if !b.inCoreDump {
-			//panicf("Read from unmapped address %s", addr.Hex())
-		}
 	}
-	return nil
+	if begin >= AddrPPUBegin && end <= AddrPPUEnd {
+		return readRange(b.PPU, begin, end)
+	}
+	return b.Mem[begin : end+1]
 }
 
 func readRange(device interface{ Read(Addr) Data8 }, begin, end Addr) []Data8 {
