@@ -11,7 +11,7 @@ type CoreDump struct {
 	Regs         RegisterFile
 	ProgramStart Addr
 	ProgramEnd   Addr
-	AddressSpace *AddressSpace
+	Mem          []Data8
 	Program      []Data8
 	PPU          PPUDump
 	Rewind       *Rewind
@@ -68,19 +68,19 @@ func (cd *CoreDump) PrintProgram(f io.Writer) {
 	if cd.ProgramEnd >= min(Addr(len(cd.Program)), 0x8000) {
 		return
 	}
-	MemDump(f, cd.Program[cd.ProgramStart:cd.ProgramEnd+1], cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
+	MemDump(f, cd.Mem, cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
 }
 
 func (cd *CoreDump) PrintHRAM(f io.Writer) {
-	MemDump(f, cd.AddressSpace[:], 0, Addr(SizeHRAM), cd.Regs.SP)
+	MemDump(f, cd.Mem, AddrHRAMBegin, AddrHRAMEnd, cd.Regs.SP)
 }
 
 func (cd *CoreDump) PrintOAM(f io.Writer) {
-	MemDump(f, cd.AddressSpace[:], 0, Addr(SizeOAM), 0)
+	MemDump(f, cd.Mem, AddrOAMBegin, AddrOAMEnd, 0)
 }
 
 func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
-	oam := cd.AddressSpace[AddrOAMBegin : AddrOAMEnd+1]
+	oam := cd.Mem[AddrOAMBegin : AddrOAMEnd+1]
 	for idx := range 40 {
 		obj := DecodeObject(oam[idx*4 : (idx+1)*4])
 		fmt.Fprintf(f, "%02d T=%03d X=%03d Y=%03d Attr=%x\n", idx, obj.TileIndex, obj.X, obj.Y, obj.Attributes.Hex())
@@ -88,11 +88,11 @@ func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintVRAM(f io.Writer) {
-	MemDump(f, cd.AddressSpace[:], 0, Addr(SizeVRAM), 0)
+	MemDump(f, cd.Mem, AddrVRAMBegin, AddrVRAMEnd, 0)
 }
 
 func (cd *CoreDump) PrintWRAM(f io.Writer) {
-	MemDump(f, cd.AddressSpace[:], 0, Addr(SizeWRAM), cd.Regs.SP)
+	MemDump(f, cd.Mem, AddrWRAMBegin, AddrWRAMEnd, cd.Regs.SP)
 }
 
 func b2i(b bool) int {
@@ -216,9 +216,9 @@ func MemDump(f io.Writer, mem []Data8, start, end, highlight Addr) {
 			fmt.Fprintf(f, "\n%s |", addr.Hex())
 		}
 		if highlight == addr {
-			fmt.Fprintf(f, "[%02x]", mem[addr-start])
+			fmt.Fprintf(f, "[%02x]", mem[addr])
 		} else {
-			fmt.Fprintf(f, " %02x ", mem[addr-start])
+			fmt.Fprintf(f, " %02x ", mem[addr])
 		}
 	}
 
@@ -239,7 +239,7 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	defer end()
 
 	var cd CoreDump
-	cd.AddressSpace = bus.AddressSpace
+	cd.Mem = bus.Mem
 	cd.Regs = cpu.Regs
 	cd.ProgramStart = 0
 	if cpu.Regs.PC > 0x40 {

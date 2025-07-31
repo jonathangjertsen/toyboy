@@ -3,7 +3,7 @@ package model
 import "fmt"
 
 type Bus struct {
-	AddressSpace *AddressSpace
+	Mem []Data8
 
 	Data    Data8
 	Address Addr
@@ -22,9 +22,9 @@ type Bus struct {
 	Timer       *Timer
 }
 
-func NewBus(as *AddressSpace) *Bus {
+func NewBus(as []Data8) *Bus {
 	return &Bus{
-		AddressSpace: as,
+		Mem: as,
 	}
 }
 
@@ -78,22 +78,22 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 		if b.BootROMLock.BootOff {
 			return b.Cartridge.Read(addr)
 		} else {
-			return b.AddressSpace[addr]
+			return b.Mem[addr]
 		}
 	} else if addr <= AddrCartridgeBankNEnd {
 		return b.Cartridge.Read(addr)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
-		return b.AddressSpace[addr]
+		return b.Mem[addr]
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
-		return b.AddressSpace[addr]
+		return b.Mem[addr]
 	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
-		return b.AddressSpace[addr]
+		return b.Mem[addr]
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		return b.APU.Read(addr)
 	} else if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
-		return b.AddressSpace[addr]
+		return b.Mem[addr]
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
-		return b.AddressSpace[addr]
+		return b.Mem[addr]
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		return b.PPU.Read(addr)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
@@ -110,7 +110,7 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	} else if addr == AddrIF || addr == AddrIE {
 		return b.Interrupts.Read(addr)
 	} else if addr == AddrBootROMLock {
-		return b.AddressSpace[addr]
+		return b.Mem[addr]
 	} else if addr == AddrSB || addr == AddrSC {
 		return b.Serial.Read(addr)
 	} else {
@@ -130,22 +130,22 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 		if b.BootROMLock.BootOff {
 			return b.Cartridge.ReadRange(begin, end)
 		} else {
-			return b.AddressSpace[begin : end+1]
+			return b.Mem[begin : end+1]
 		}
 	} else if end <= AddrCartridgeBankNEnd {
 		return b.Cartridge.ReadRange(begin, end)
 	} else if begin >= AddrVRAMBegin && end <= AddrVRAMEnd {
-		return b.AddressSpace[begin : end+1]
+		return b.Mem[begin : end+1]
 	} else if begin >= AddrHRAMBegin && end <= AddrHRAMEnd {
-		return b.AddressSpace[begin : end+1]
+		return b.Mem[begin : end+1]
 	} else if begin >= AddrWRAMBegin && end <= AddrWRAMEnd {
-		return b.AddressSpace[begin : end+1]
+		return b.Mem[begin : end+1]
 	} else if begin >= AddrAPUBegin && end <= AddrAPUEnd {
 		return readRange(b.APU, begin, end)
 	} else if begin >= AddrWaveRAMBegin && end <= AddrWaveRAMEnd {
-		return b.AddressSpace[begin : end+1]
+		return b.Mem[begin : end+1]
 	} else if begin >= AddrOAMBegin && end <= AddrOAMEnd {
-		return b.AddressSpace[begin : end+1]
+		return b.Mem[begin : end+1]
 	} else if begin >= AddrPPUBegin && end <= AddrPPUEnd {
 		return readRange(b.PPU, begin, end)
 	} else if begin >= AddrProhibitedBegin && end <= AddrProhibitedEnd {
@@ -162,7 +162,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	} else if len == 1 && (begin == AddrIF || begin == AddrIE) {
 		return readRange(b.Interrupts, begin, end)
 	} else if len == 1 && begin == AddrBootROMLock {
-		return b.AddressSpace[begin : end+1]
+		return b.Mem[begin : end+1]
 	} else if len == 1 && (begin == AddrSB || begin == AddrSC) {
 		return readRange(b.Serial, begin, end)
 	} else {
@@ -196,24 +196,24 @@ func (b *Bus) WriteData(v Data8) {
 	} else if addr <= AddrCartridgeBankNEnd {
 		b.Cartridge.Write(addr, v)
 	} else if addr == AddrBootROMLock {
-		b.AddressSpace[b.Address] = v
+		b.Mem[b.Address] = v
 		b.BootROMLock.Write(addr, v)
 	} else if addr == AddrP1 {
 		b.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {
 		b.Interrupts.Write(addr, v)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
-		b.AddressSpace[addr] = v
+		b.Mem[addr] = v
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
-		b.AddressSpace[addr] = v
+		b.Mem[addr] = v
 	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
-		b.AddressSpace[addr] = v
+		b.Mem[addr] = v
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.APU.Write(addr, v)
 	} else if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
-		b.AddressSpace[addr] = v
+		b.Mem[addr] = v
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
-		b.AddressSpace[addr] = v
+		b.Mem[addr] = v
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.PPU.Write(addr, v)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
