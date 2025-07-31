@@ -14,6 +14,6 @@ func main() {
 	dis := model.NewDisassembler(&model.DefaultConfig.Debug.Disassembler)
 	dis.SetProgram(bytes)
 	dis.ExploreFrom(model.AddrCartridgeEntryPoint)
-	out := dis.Disassembly()
+	out := dis.Disassembly(0, model.AddrCartridgeBankNEnd)
 	out.Print(os.Stdout)
 }
