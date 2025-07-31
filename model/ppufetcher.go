@@ -108,7 +108,7 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 	addr += (offsetX + offsetY) & 0x3ff
 
 	bgf.TileIndexAddr = addr
-	bgf.TileIndex = bgf.PPU.Bus.ProbeAddress(AddrVRAMBegin)
+	bgf.TileIndex = bgf.PPU.Bus.ProbeAddress(addr)
 }
 
 func (bgf *BackgroundFetcher) fetchTileLSB() {
@@ -130,7 +130,7 @@ func (bgf *BackgroundFetcher) fetchTileLSB() {
 		addr += 2 * Addr((bgf.PPU.RegLY+bgf.PPU.RegSCY)%8)
 	}
 	bgf.TileLSBAddr = addr
-	bgf.TileLSB = bgf.PPU.Bus.ProbeAddress(AddrVRAMBegin)
+	bgf.TileLSB = bgf.PPU.Bus.ProbeAddress(addr)
 }
 
 func (bgf *BackgroundFetcher) fetchTileMSB() {

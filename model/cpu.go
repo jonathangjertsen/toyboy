@@ -31,7 +31,7 @@ type CPUBusIF interface {
 	GetAddress() Addr
 	GetData() Data8
 	ProbeAddress(Addr) Data8
-	ProbeRange(begin, end Addr) []Data8
+	ProbeRange(Addr, Addr) []Data8
 	GetPeripheral(any)
 }
 
