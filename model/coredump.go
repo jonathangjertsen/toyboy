@@ -13,7 +13,6 @@ type CoreDump struct {
 	ProgramEnd   Addr
 	AddressSpace *AddressSpace
 	Program      []Data8
-	VRAM         []Data8
 	APU          []Data8
 	PPU          PPUDump
 	Rewind       *Rewind
@@ -90,11 +89,11 @@ func (cd *CoreDump) PrintOAMAttrs(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintVRAM(f io.Writer) {
-	MemDump(f, cd.VRAM, AddrVRAMBegin, AddrVRAMEnd, 0)
+	MemDump(f, cd.AddressSpace[:], 0, Addr(SizeVRAM), 0)
 }
 
 func (cd *CoreDump) PrintWRAM(f io.Writer) {
-	MemDump(f, cd.VRAM, AddrWRAMBegin, AddrWRAMEnd, cd.Regs.SP)
+	MemDump(f, cd.AddressSpace[:], 0, Addr(SizeWRAM), cd.Regs.SP)
 }
 
 func b2i(b bool) int {
@@ -260,7 +259,6 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
 	cd.Program = bus.ProbeRange(0x0000, AddrCartridgeBank0End)
 	cd.Disassembly = cpu.Debug.Disassembly(0, 0xffff)
-	cd.VRAM = bus.VRAM.Data
 	cd.APU = bus.APU.Data
 	var ppu *PPU
 	bus.GetPeripheral(&ppu)

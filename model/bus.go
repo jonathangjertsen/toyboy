@@ -12,7 +12,6 @@ type Bus struct {
 	inCoreDump bool
 
 	BootROMLock *BootROMLock
-	VRAM        *MemoryRegion
 	APU         *APU
 	PPU         *PPU
 	Cartridge   *Cartridge
@@ -84,7 +83,7 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	} else if addr <= AddrCartridgeBankNEnd {
 		return b.Cartridge.Read(addr)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
-		return b.VRAM.Data[addr-AddrVRAMBegin]
+		return b.AddressSpace[addr]
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
 		return b.AddressSpace[addr]
 	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
@@ -134,7 +133,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	} else if end <= AddrCartridgeBankNEnd {
 		return b.Cartridge.ReadRange(begin, end)
 	} else if begin >= AddrVRAMBegin && end <= AddrVRAMEnd {
-		return b.VRAM.Data[begin-AddrVRAMBegin : end-AddrVRAMBegin+1]
+		return b.AddressSpace[begin : end+1]
 	} else if begin >= AddrHRAMBegin && end <= AddrHRAMEnd {
 		return b.AddressSpace[begin : end+1]
 	} else if begin >= AddrWRAMBegin && end <= AddrWRAMEnd {
@@ -200,7 +199,7 @@ func (b *Bus) WriteData(v Data8) {
 	} else if addr == AddrIF || addr == AddrIE {
 		b.Interrupts.Write(addr, v)
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
-		b.VRAM.Data[addr-AddrVRAMBegin] = v
+		b.AddressSpace[addr] = v
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
 		b.AddressSpace[addr] = v
 	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
