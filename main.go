@@ -41,11 +41,14 @@ func main() {
 
 		gb := model.NewGameboy(&config.Model, audio)
 
-		f, err := os.ReadFile("assets/cartridges/tetris.gb")
-		if err != nil {
+		if err := model.LoadROM(
+			"assets/cartridges/tetris.gb",
+			gb.Bus.Mem,
+			gb.Cartridge,
+			gb.Bus.BootROMLock,
+		); err != nil {
 			panic(err)
 		}
-		gb.Cartridge.LoadROM(f)
 
 		gb.Start()
 		select {}
