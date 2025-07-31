@@ -15,8 +15,6 @@ type CPU struct {
 	clockCycle                 uint
 	wroteToAddressBusThisCycle bool
 
-	handlers [256]InstructionHandling
-
 	rewind *Rewind
 
 	lastBranchResult int
@@ -113,7 +111,7 @@ func join16(msb, lsb Data8) Data16 {
 }
 
 func (cpu *CPU) SetPC(pc Addr) {
-	if pc > 0xff {
+	if pc > 0xff && cpu.Debug != nil {
 		cpu.Debug.CLK.pauseAfterCycle.Add(1)
 	}
 	cpu.Regs.PC = pc
@@ -138,14 +136,7 @@ func NewCPU(
 		Debug:      debug,
 		Interrupts: interrupts,
 		rewind:     NewRewind(1024 * 16),
-	}
-
-	cpu.handlers = handlers(cpu)
-
-	if h, ok := cpu.handlers[initOpcode].(func(cpu *CPU) CycleHandler); ok {
-		cpu.handler = h
-	} else {
-		panicf("not implemented CycleHandler for opcode %s", initOpcode.String())
+		handler:    Handlers[initOpcode],
 	}
 
 	clk.cpu = cpu
@@ -171,20 +162,20 @@ func (cpu *CPU) fsm(c uint) {
 	if cpu.Interrupts != nil && cpu.Interrupts.PendingInterrupt != 0 {
 		fetch = cpu.execTransferToISR()
 	} else {
-		if cpu.handler != nil {
-			cpu.handler = cpu.handler(cpu)
-			fetch = cpu.handler == nil
+		if cpu.handler == nil {
+			// Start new instruction
+			// Can use either switch statement or jump table. Profile to see which is faster.
+
+			// Uncomment to use switch statement version:
+			cpu.handler = Handler(cpu)
+
+			// Uncomment to use jump table version:
+			//cpu.handler = Handlers[cpu.Regs.IR](cpu)
 		} else {
-			handler := cpu.handlers[cpu.Regs.IR]
-			if h, ok := handler.(func(int) bool); ok {
-				fetch = h(cpu.machineCycle)
-			} else if h2, ok := handler.(func(cpu *CPU) CycleHandler); ok {
-				cpu.handler = h2(cpu)
-				fetch = cpu.handler == nil
-			} else {
-				panicf("fail (handler is %T)", handler)
-			}
+			// Continue existing instructino
+			cpu.handler = cpu.handler(cpu)
 		}
+		fetch = cpu.handler == nil
 	}
 	if fetch {
 		cpu.writeAddressBus(cpu.Regs.PC)

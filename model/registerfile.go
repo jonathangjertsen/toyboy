@@ -29,8 +29,10 @@ type RegisterFile struct {
 	SP Addr
 	IR Opcode
 
-	TempZ Data8
-	TempW Data8
+	TempZ    Data8
+	TempW    Data8
+	TempPtr  [2]*Data8
+	TempCond bool
 }
 
 const (
