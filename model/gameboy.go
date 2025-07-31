@@ -2,6 +2,8 @@ package model
 
 import (
 	"sync/atomic"
+
+	"github.com/jonathangjertsen/toyboy/assets"
 )
 
 type Gameboy struct {
@@ -69,11 +71,17 @@ func (gb *Gameboy) Init(audio *Audio) {
 	debug := NewDebug(clk, &gb.Config.Debug)
 
 	interrupts := NewInterrupts(clk)
+	addressSpace := NewAddressSpace()
+
+	if gb.Config.BootROM.Variant == "DMGBoot" {
+		copy(addressSpace[:], Data8Slice(assets.DMGBoot))
+		debug.SetProgram(assets.DMGBoot)
+		debug.SetPC(0)
+	} else {
+		panic("unknown boot ROM")
+	}
 
 	bootROMLock := NewBootROMLock(clk)
-	bootROM := NewBootROM(clk, gb.Config.BootROM)
-	debug.SetProgram(ByteSlice(bootROM.Data))
-	debug.SetPC(0)
 
 	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
 	apu := NewAPU(clk, gb.Config)
@@ -96,7 +104,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 		debug.SetPC(0x60)
 	}
 
-	addressSpace := NewAddressSpace()
 	bus := NewBus(addressSpace)
 
 	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug, OpcodeNop)
@@ -104,7 +111,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	ppu := NewPPU(clk, interrupts, bus, gb.Config, debug)
 
 	bus.BootROMLock = bootROMLock
-	bus.BootROM = &bootROM
 	bus.VRAM = &vram
 	bus.APU = apu
 	bus.OAM = &oam

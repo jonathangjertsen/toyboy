@@ -12,7 +12,6 @@ type Bus struct {
 	inCoreDump bool
 
 	BootROMLock *BootROMLock
-	BootROM     *MemoryRegion
 	VRAM        *MemoryRegion
 	APU         *APU
 	OAM         *MemoryRegion
@@ -81,7 +80,7 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 		if b.BootROMLock.BootOff {
 			return b.Cartridge.Read(addr)
 		} else {
-			return b.BootROM.Data[addr]
+			return b.AddressSpace[addr]
 		}
 	} else if addr <= AddrCartridgeBankNEnd {
 		return b.Cartridge.Read(addr)
@@ -131,7 +130,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 		if b.BootROMLock.BootOff {
 			return b.Cartridge.ReadRange(begin, end)
 		} else {
-			return b.BootROM.Data[begin : end+1]
+			return b.AddressSpace[begin : end+1]
 		}
 	} else if end <= AddrCartridgeBankNEnd {
 		return b.Cartridge.ReadRange(begin, end)
