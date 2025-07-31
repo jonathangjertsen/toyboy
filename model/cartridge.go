@@ -5,7 +5,6 @@ import (
 )
 
 type Cartridge struct {
-	Mem             []Data8
 	ROM             [512][ROMBankSize]Data8
 	RAM             [4][RAMBankSize]Data8
 	MBCFeatures     MBCFeatures
@@ -15,18 +14,29 @@ type Cartridge struct {
 	BankModeSel     Data8
 	SelectedRAMBank Data8
 	SelectedROMBank Data8
+
+	mem []Data8
 }
 
 func NewCartridge(clk *ClockRT, mem []Data8) *Cartridge {
 	return &Cartridge{
-		Mem:             mem,
+		mem:             mem,
 		BankNo1:         1,
 		SelectedROMBank: 1,
 	}
 }
 
+func (cart *Cartridge) LoadSave(save *SaveState, mem []Data8) {
+	*cart = save.Cartridge
+	cart.mem = mem
+}
+
+func (cart *Cartridge) Save(save *SaveState) {
+	save.Cartridge = *cart
+}
+
 func (cart *Cartridge) SetROMBank(which Data8) {
-	copy(cart.Mem[AddrCartridgeBankNBegin:AddrCartridgeBankNEnd], cart.ROM[which][:])
+	copy(cart.mem[AddrCartridgeBankNBegin:AddrCartridgeBankNEnd], cart.ROM[which][:])
 	cart.SelectedROMBank = which
 }
 
@@ -34,10 +44,10 @@ func (cart *Cartridge) SetRAMBank(which Data8) {
 	fmt.Printf("SetRAMBank %d\n", which)
 
 	// Store current RAM contents to bank
-	copy(cart.RAM[cart.SelectedRAMBank][:], cart.Mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd])
+	copy(cart.RAM[cart.SelectedRAMBank][:], cart.mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd])
 
 	// Load from bank to RAM
-	copy(cart.Mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd], cart.RAM[which][:])
+	copy(cart.mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd], cart.RAM[which][:])
 	cart.SelectedRAMBank = which
 }
 

@@ -1,33 +1,21 @@
 package model
 
 type APU struct {
+	Mixer     Mixer
+	DIVAPU    Data8
 	MasterCtl Data8
-
-	Pulse1 PulseChannelWithSweep
-	Pulse2 PulseChannel
-	Wave   WaveChannel
-	Noise  NoiseChannel
-
-	Mixer Mixer
-
-	DIVAPU Data8
-
-	canWriteLengthTimersWithAPUOff bool
+	Pulse1    PulseChannelWithSweep
+	Pulse2    PulseChannel
+	Wave      WaveChannel
+	Noise     NoiseChannel
 }
 
 func NewAPU(clock *ClockRT, config *Config, addressSpace []Data8) *APU {
 	apu := &APU{
-		canWriteLengthTimersWithAPUOff: true, // on monochrome models
-		Pulse1: PulseChannelWithSweep{
-			PulseChannel: PulseChannel{
-				DutyGenerator: NewDutyGenerator(),
-			},
-		},
-		Pulse2: PulseChannel{
-			DutyGenerator: NewDutyGenerator(),
-		},
+		Pulse1: PulseChannelWithSweep{},
+		Pulse2: PulseChannel{},
 		Wave: WaveChannel{
-			Mem: addressSpace,
+			mem: addressSpace,
 		},
 		Mixer: Mixer{},
 	}
@@ -37,6 +25,15 @@ func NewAPU(clock *ClockRT, config *Config, addressSpace []Data8) *APU {
 	clock.apu = apu
 	clock.Audio.APU = apu
 	return apu
+}
+
+func (apu *APU) LoadSave(save *SaveState, mem []Data8) {
+	*apu = save.APU
+	apu.Wave.mem = mem
+}
+
+func (apu *APU) Save(save *SaveState) {
+	save.APU = *apu
 }
 
 func (apu *APU) Reset() {
@@ -186,9 +183,6 @@ func (apu *APU) SetPulse1Sweep(v Data8) {
 }
 
 func (apu *APU) SetPulse1LengthDuty(v Data8) {
-	if !apu.canWriteLengthTimersWithAPUOff && (apu.MasterCtl&Bit7 == 0) {
-		return
-	}
 	apu.Pulse1.SetLengthDuty(v)
 }
 
@@ -214,9 +208,6 @@ func (apu *APU) SetPulse1PeriodHighCtl(v Data8) {
 }
 
 func (apu *APU) SetPulse2LengthDuty(v Data8) {
-	if !apu.canWriteLengthTimersWithAPUOff && (apu.MasterCtl&Bit7 == 0) {
-		return
-	}
 	apu.Pulse2.SetLengthDuty(v)
 }
 
@@ -249,9 +240,6 @@ func (apu *APU) SetWaveDACEn(v Data8) {
 }
 
 func (apu *APU) SetWaveLengthTimer(v Data8) {
-	if !apu.canWriteLengthTimersWithAPUOff && (apu.MasterCtl&Bit7 == 0) {
-		return
-	}
 	apu.Wave.SetLengthTimer(v)
 }
 
@@ -277,9 +265,6 @@ func (apu *APU) SetWavePeriodHighCtl(v Data8) {
 }
 
 func (apu *APU) SetNoiseLengthTimer(v Data8) {
-	if !apu.canWriteLengthTimersWithAPUOff && (apu.MasterCtl&Bit7 == 0) {
-		return
-	}
 	apu.Noise.SetLengthTimer(v)
 }
 
@@ -321,16 +306,16 @@ func (apu *APU) SetChannelPan(v Data8) {
 func (apu *APU) ReadMasterCtl() Data8 {
 	v := apu.MasterCtl
 	v &= 0x80
-	if apu.Pulse1.activated {
+	if apu.Pulse1.Activated {
 		v |= 1
 	}
-	if apu.Pulse2.activated {
+	if apu.Pulse2.Activated {
 		v |= 2
 	}
-	if apu.Wave.activated {
+	if apu.Wave.Activated {
 		v |= 4
 	}
-	if apu.Noise.activated {
+	if apu.Noise.Activated {
 		v |= 8
 	}
 	return v

@@ -5,8 +5,8 @@ type Bus struct {
 
 	Data    Data8
 	Address Addr
-	Config  *Config
 
+	Config      *Config
 	BootROMLock *BootROMLock
 	APU         *APU
 	PPU         *PPU
@@ -20,6 +20,17 @@ func NewBus(as []Data8) *Bus {
 	return &Bus{
 		Mem: as,
 	}
+}
+
+func (bus *Bus) LoadSave(save *SaveState, mem []Data8) {
+	bus.Data = save.BusData
+	bus.Address = save.BusAddress
+	bus.Mem = mem
+}
+
+func (bus *Bus) Save(save *SaveState) {
+	save.BusData = bus.Data
+	save.BusAddress = bus.Address
 }
 
 func (b *Bus) Reset() {

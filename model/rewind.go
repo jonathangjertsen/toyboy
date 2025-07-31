@@ -6,8 +6,8 @@ type Rewind struct {
 	Full   bool
 }
 
-func NewRewind(size int) *Rewind {
-	return &Rewind{
+func NewRewind(size int) Rewind {
+	return Rewind{
 		Buffer: make([]ExecLogEntry, size),
 	}
 }

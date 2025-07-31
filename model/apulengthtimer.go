@@ -1,22 +1,22 @@
 package model
 
 type LengthTimer struct {
-	lengthEnable     bool
-	lengthTimer      Data16
-	lengthTimerReset Data8
+	Enable  bool
+	Counter Data16
+	Reset   Data8
 }
 
 func (lt *LengthTimer) SetResetValue(v Data8) {
-	lt.lengthTimerReset = v
+	lt.Reset = v
 }
 
 func (lt *LengthTimer) clock(expireValue Data16) bool {
-	if !lt.lengthEnable {
+	if !lt.Enable {
 		return false
 	}
-	if lt.lengthTimer < expireValue {
-		lt.lengthTimer++
+	if lt.Counter < expireValue {
+		lt.Counter++
 		return false
 	}
-	return lt.lengthTimer == expireValue
+	return lt.Counter == expireValue
 }

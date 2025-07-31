@@ -3,7 +3,7 @@ package model
 type BootROMLock struct {
 	BootOff bool
 
-	mem       []Data8
+	mem       []Data8 `json:"-"`
 	cartridge *Cartridge
 	debug     *Debug
 }

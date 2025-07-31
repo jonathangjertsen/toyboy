@@ -1,38 +1,38 @@
 package model
 
 type Envelope struct {
-	volume       Data8
-	volumeReset  Data8
-	envTimer     Data8
-	envDir       bool
-	envSweepPace Data8
+	Volume       Data8
+	VolumeReset  Data8
+	EnvTimer     Data8
+	EnvDir       bool
+	EnvSweepPace Data8
 }
 
 func (env *Envelope) SetVolumeEnvelope(v Data8) bool {
-	env.envSweepPace = v & 0x7
-	env.envDir = v&Bit3 != 0
-	env.volumeReset = (v >> 4) & 0xf
+	env.EnvSweepPace = v & 0x7
+	env.EnvDir = v&Bit3 != 0
+	env.VolumeReset = (v >> 4) & 0xf
 	return v&0xf8 != 0
 }
 
 func (env *Envelope) clock(envtick Data8) {
-	if env.envSweepPace == 0 {
+	if env.EnvSweepPace == 0 {
 		return
 	}
-	if envtick%env.envSweepPace != 0 {
+	if envtick%env.EnvSweepPace != 0 {
 		return
 	}
-	if env.envDir {
-		if env.volume < 16 {
-			env.volume++
+	if env.EnvDir {
+		if env.Volume < 16 {
+			env.Volume++
 		}
 	} else {
-		if env.volume > 0 {
-			env.volume--
+		if env.Volume > 0 {
+			env.Volume--
 		}
 	}
 }
 
 func (env *Envelope) scale(sample AudioSample) AudioSample {
-	return sample * AudioSample(env.volume)
+	return sample * AudioSample(env.Volume)
 }

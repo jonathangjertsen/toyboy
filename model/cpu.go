@@ -1,27 +1,43 @@
 package model
 
 type CPU struct {
-	Config *Config
-	Bus    CPUBusIF
-	Debug  *Debug
-
-	Regs       RegisterFile
+	Config     *Config
+	Bus        CPUBusIF
+	Debug      *Debug
 	Interrupts *Interrupts
-
-	CBOp CBOp
-
-	halted bool
-
-	machineCycle int
-
-	clockCycle                 uint
-	wroteToAddressBusThisCycle bool // deprecated
 
 	handlers [256]InstructionHandling
 
-	rewind *Rewind
+	Regs                       RegisterFile
+	CBOp                       CBOp
+	halted                     bool
+	machineCycle               int
+	clockCycle                 uint
+	wroteToAddressBusThisCycle bool // deprecated
+	rewind                     Rewind
+	lastBranchResult           int
+}
 
-	lastBranchResult int
+func (cpu *CPU) LoadSave(save *SaveState, mem []Data8) {
+	cpu.Regs = save.CPURegisterFile
+	cpu.machineCycle = save.CPUMachineCycle
+	cpu.clockCycle = save.CPUClockCycle
+	cpu.wroteToAddressBusThisCycle = save.CPUWroteToAddressBusThisCycle
+	cpu.lastBranchResult = save.CPULastBranchResult
+	cpu.halted = save.CPUHalted
+	cpu.rewind = save.CPURewindBuffer
+	cpu.CBOp = save.CPUCBOp
+}
+
+func (cpu *CPU) Save(save *SaveState) {
+	save.CPURegisterFile = cpu.Regs
+	save.CPUMachineCycle = cpu.machineCycle
+	save.CPUClockCycle = cpu.clockCycle
+	save.CPUWroteToAddressBusThisCycle = cpu.wroteToAddressBusThisCycle
+	save.CPULastBranchResult = cpu.lastBranchResult
+	save.CPUHalted = cpu.halted
+	save.CPURewindBuffer = cpu.rewind
+	save.CPUCBOp = cpu.CBOp
 }
 
 type CPUBusIF interface {

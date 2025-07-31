@@ -13,7 +13,7 @@ type CoreDump struct {
 	ProgramEnd   Addr
 	Mem          []Data8
 	PPU          PPUDump
-	Rewind       *Rewind
+	Rewind       Rewind
 	Disassembly  *Disassembly
 }
 
@@ -104,20 +104,20 @@ func b2i(b bool) int {
 func PrintAPU(f io.Writer, mem []Data8, apu *APU) {
 	RegDump(f, mem, AddrAPUBegin, AddrAPUEnd)
 	fmt.Fprintf(f, "DivAPU:    %d\n", apu.DIVAPU)
-	fmt.Fprintf(f, "Pulse1 on=%d dac=%d\n", b2i(apu.Pulse1.activated), b2i(apu.Pulse1.dacEnabled))
+	fmt.Fprintf(f, "Pulse1 on=%d dac=%d\n", b2i(apu.Pulse1.Activated), b2i(apu.Pulse1.DacEnabled))
 	printPeriodCounter(f, &apu.Pulse1.PeriodCounter)
 	printLengthTimer(f, &apu.Pulse1.LengthTimer)
-	printDutyGenerator(f, &apu.Pulse1.DutyGenerator)
+	printDutyGenerator(f, &apu.Pulse1.PulseChannel)
 	printEnvelope(f, &apu.Pulse1.Envelope)
-	fmt.Fprintf(f, "Pulse2 on=%d dac=%d\n", b2i(apu.Pulse2.activated), b2i(apu.Pulse1.dacEnabled))
+	fmt.Fprintf(f, "Pulse2 on=%d dac=%d\n", b2i(apu.Pulse2.Activated), b2i(apu.Pulse1.DacEnabled))
 	printPeriodCounter(f, &apu.Pulse2.PeriodCounter)
 	printLengthTimer(f, &apu.Pulse2.LengthTimer)
-	printDutyGenerator(f, &apu.Pulse2.DutyGenerator)
+	printDutyGenerator(f, &apu.Pulse2)
 	printEnvelope(f, &apu.Pulse2.Envelope)
-	fmt.Fprintf(f, "Wave on=%d dac=%d\n", b2i(apu.Wave.activated), b2i(apu.Wave.dacEnabled))
+	fmt.Fprintf(f, "Wave on=%d dac=%d\n", b2i(apu.Wave.Activated), b2i(apu.Wave.DacEnabled))
 	printPeriodCounter(f, &apu.Wave.PeriodCounter)
 	printLengthTimer(f, &apu.Wave.LengthTimer)
-	fmt.Fprintf(f, "Noise on=%d dac=%d\n", b2i(apu.Noise.activated), b2i(apu.Noise.dacEnabled))
+	fmt.Fprintf(f, "Noise on=%d dac=%d\n", b2i(apu.Noise.Activated), b2i(apu.Noise.DacEnabled))
 	printPeriodCounter(f, &apu.Noise.PeriodCounter)
 	printLengthTimer(f, &apu.Noise.LengthTimer)
 	printEnvelope(f, &apu.Noise.Envelope)
@@ -125,19 +125,19 @@ func PrintAPU(f io.Writer, mem []Data8, apu *APU) {
 }
 
 func printPeriodCounter(f io.Writer, pc *PeriodCounter) {
-	fmt.Fprintf(f, "  PC RST=%d V=%d\n", pc.periodDividerReset, pc.periodDivider)
+	fmt.Fprintf(f, "  PC RST=%d V=%d\n", pc.Reset, pc.Counter)
 }
 
 func printLengthTimer(f io.Writer, lt *LengthTimer) {
-	fmt.Fprintf(f, "  LT EN=%d RST=%d V=%d\n", b2i(lt.lengthEnable), lt.lengthTimerReset, lt.lengthTimer)
+	fmt.Fprintf(f, "  LT EN=%d RST=%d V=%d\n", b2i(lt.Enable), lt.Reset, lt.Counter)
 }
 
-func printDutyGenerator(f io.Writer, dg *DutyGenerator) {
-	fmt.Fprintf(f, "  DG WF=%d V=%d\n", dg.waveform, dg.output)
+func printDutyGenerator(f io.Writer, pc *PulseChannel) {
+	fmt.Fprintf(f, "  DG WF=%d V=%d\n", pc.Waveform, pc.Output)
 }
 
 func printEnvelope(f io.Writer, env *Envelope) {
-	fmt.Fprintf(f, "  ENV SP=%d T=%d D=%d R=%d V=%d\n", env.envSweepPace, env.envTimer, b2i(env.envDir), env.volumeReset, env.volume)
+	fmt.Fprintf(f, "  ENV SP=%d T=%d D=%d R=%d V=%d\n", env.EnvSweepPace, env.EnvTimer, b2i(env.EnvDir), env.VolumeReset, env.Volume)
 }
 
 func PrintPPU(f io.Writer, ppu PPUDump) {

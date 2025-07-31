@@ -10,41 +10,41 @@ type NoiseChannel struct {
 	RegRNG            Data8
 	RegCtl            Data8
 
-	activated       bool
-	dacEnabled      bool
-	clockDivider    Data8
-	clockShift      Data8
-	lfsrWidth       Data8
-	lfsr            Data16
-	output          AudioSample
-	clockCounter    int
-	clockCounterTop int
+	Activated       bool
+	DacEnabled      bool
+	ClockDivider    Data8
+	ClockShift      Data8
+	LFSRWidth       Data8
+	LFSR            Data16
+	Output          AudioSample
+	ClockCounter    int
+	ClockCounterTop int
 }
 
 func (nc *NoiseChannel) tickLengthTimer() {
 	if disable := nc.LengthTimer.clock(64); disable {
-		nc.activated = false
+		nc.Activated = false
 	}
 }
 func (nc *NoiseChannel) clock() {
-	if !nc.activated {
+	if !nc.Activated {
 		return
 	}
 
-	nc.clockCounter--
-	if nc.clockCounter > 0 {
+	nc.ClockCounter--
+	if nc.ClockCounter > 0 {
 		return
 	}
-	nc.clockCounter = nc.clockCounterTop
+	nc.ClockCounter = nc.ClockCounterTop
 
-	lfsr := nc.lfsr
+	lfsr := nc.LFSR
 
 	// Compute (LFSR) XOR (LFSR >> 1)
 	// This puts LFSR0 XOR LFSR1 in bit position 0
 	bit := ^(lfsr ^ (lfsr >> 1)) & 1
 
 	// Place that bit where appropriate
-	if nc.lfsrWidth == 7 {
+	if nc.LFSRWidth == 7 {
 		lfsr &= ^Data16(1<<15) & ^Data16(1<<7)
 		lfsr |= (bit << 15) | (bit << 7)
 	} else {
@@ -55,12 +55,12 @@ func (nc *NoiseChannel) clock() {
 	// Shift out the bit
 	lfsr >>= 1
 
-	nc.lfsr = lfsr
+	nc.LFSR = lfsr
 
 	if bit == 1 {
-		nc.output = AudioSample(nc.Envelope.volume)
+		nc.Output = AudioSample(nc.Envelope.Volume)
 	} else {
-		nc.output = 0
+		nc.Output = 0
 	}
 }
 
@@ -71,21 +71,21 @@ func (nc *NoiseChannel) SetLengthTimer(v Data8) {
 
 func (nc *NoiseChannel) SetVolumeEnvelope(v Data8) {
 	nc.RegVolumeEnvelope = v
-	nc.dacEnabled = nc.Envelope.SetVolumeEnvelope(v)
-	if !nc.dacEnabled {
-		nc.activated = false
+	nc.DacEnabled = nc.Envelope.SetVolumeEnvelope(v)
+	if !nc.DacEnabled {
+		nc.Activated = false
 	}
 }
 
 func (nc *NoiseChannel) SetRNG(v Data8) {
 	nc.RegRNG = v
-	nc.clockDivider = v & 0x7
+	nc.ClockDivider = v & 0x7
 	if v&Bit3 != 0 {
-		nc.lfsrWidth = 7
+		nc.LFSRWidth = 7
 	} else {
-		nc.lfsrWidth = 15
+		nc.LFSRWidth = 15
 	}
-	nc.clockShift = v >> 4
+	nc.ClockShift = v >> 4
 
 	// F = 262144 / (div * 2 ^ shift) Hz
 	// T = (div * (2 ^ shift)) / 262144
@@ -97,17 +97,17 @@ func (nc *NoiseChannel) SetRNG(v Data8) {
 	// So we need to clock() every MCLK / 2 cycles,
 	//   let div2 = div2 == 0 ? 1 : div * 2,
 	//   and the nclock the lfsr every div' * 2 ^ shift times
-	div2 := int(nc.clockDivider) * 2
+	div2 := int(nc.ClockDivider) * 2
 	if div2 == 0 {
 		div2++
 	}
-	div2 <<= nc.clockShift
-	nc.clockCounterTop = div2
+	div2 <<= nc.ClockShift
+	nc.ClockCounterTop = div2
 }
 
 func (nc *NoiseChannel) SetCtl(v Data8) {
 	nc.RegCtl = v
-	nc.LengthTimer.lengthEnable = v&Bit6 != 0
+	nc.LengthTimer.Enable = v&Bit6 != 0
 	if v&Bit7 != 0 {
 		nc.trigger()
 	}
@@ -115,32 +115,32 @@ func (nc *NoiseChannel) SetCtl(v Data8) {
 
 func (nc *NoiseChannel) trigger() {
 	// Ch4 is enabled.
-	if nc.dacEnabled {
-		nc.activated = true
+	if nc.DacEnabled {
+		nc.Activated = true
 	}
 
 	// If length timer expired it is reset.
-	if nc.LengthTimer.lengthTimer == 64 {
-		nc.LengthTimer.lengthTimer = Data16(nc.LengthTimer.lengthTimerReset)
+	if nc.LengthTimer.Counter == 64 {
+		nc.LengthTimer.Counter = Data16(nc.LengthTimer.Reset)
 	}
 
 	// The period divider is set to the contents of NR33 and NR34?
-	nc.PeriodCounter.periodDivider = nc.PeriodCounter.periodDividerReset
+	nc.PeriodCounter.Counter = nc.PeriodCounter.Reset
 
 	// Envelope timer is reset.
-	nc.Envelope.envTimer = 0
+	nc.Envelope.EnvTimer = 0
 
 	// Volume is set to contents of NR42 initial volume.
-	nc.Envelope.volume = nc.Envelope.volumeReset
+	nc.Envelope.Volume = nc.Envelope.VolumeReset
 
 	// LFSR is reset
-	nc.lfsr = 0
+	nc.LFSR = 0
 }
 
 func (nc *NoiseChannel) Sample() AudioSample {
-	if !nc.activated {
+	if !nc.Activated {
 		return 0
 	}
 
-	return nc.output
+	return nc.Output
 }
