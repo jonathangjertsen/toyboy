@@ -28,10 +28,9 @@ type PPU struct {
 	Interrupts *Interrupts
 
 	// For other systems to hook in
-	MemoryRegion MemoryRegion
-	Debug        *Debug
-	FrameCount   uint
-	Config       *Config
+	Debug      *Debug
+	FrameCount uint
+	Config     *Config
 
 	// PPU overall state
 	Mode PPUMode
@@ -65,14 +64,13 @@ type PPU struct {
 
 func NewPPU(rtClock *ClockRT, interrupts *Interrupts, bus CPUBusIF, config *Config, debug *Debug) *PPU {
 	ppu := &PPU{
-		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, SizePPU),
-		Bus:          bus,
-		Debug:        debug,
-		Interrupts:   interrupts,
-		Stat:         Stat{Interrupts: interrupts},
-		DMA:          DMA{Bus: bus},
-		Config:       config,
-		FrameSync:    make(chan func(*ViewPort), 1),
+		Bus:        bus,
+		Debug:      debug,
+		Interrupts: interrupts,
+		Stat:       Stat{Interrupts: interrupts},
+		DMA:        DMA{Bus: bus},
+		Config:     config,
+		FrameSync:  make(chan func(*ViewPort), 1),
 	}
 	ppu.BackgroundFetcher.PPU = ppu
 	ppu.SpriteFetcher.PPU = ppu

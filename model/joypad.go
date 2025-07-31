@@ -3,9 +3,9 @@ package model
 type Joypad struct {
 	clk        *ClockRT
 	Interrupts *Interrupts
-	Written    MemoryRegion
 	Action     Data8
 	Direction  Data8
+	mem        []Data8
 }
 
 type JoypadState struct {
@@ -19,25 +19,24 @@ type JoypadState struct {
 	Select bool
 }
 
-func NewJoypad(clock *ClockRT, ints *Interrupts) *Joypad {
+func NewJoypad(clock *ClockRT, ints *Interrupts, mem []Data8) *Joypad {
 	jp := &Joypad{
 		clk:        clock,
 		Interrupts: ints,
-		Written:    NewMemoryRegion(clock, 0xff00, 0x0001),
 		Action:     0xf,
 		Direction:  0xf,
+		mem:        mem,
 	}
-	jp.Written.Data[0] = 0x1f
+	mem[AddrP1] = 0x1f
 	return jp
 }
 
 func (jp *Joypad) Write(addr Addr, v Data8) {
 	// TODO: this can trigger an interrupt
-	jp.Written.Write(addr, v)
 }
 
 func (jp *Joypad) Read(addr Addr) Data8 {
-	written := jp.Written.Read(addr)
+	written := jp.mem[AddrP1]
 	out := Data8(0x0f)
 	if written&0x20 == 0 {
 		out &= jp.Action
@@ -83,7 +82,7 @@ func (jp *Joypad) SetState(jps JoypadState) {
 		newDirection := 0xf ^ directionMask
 
 		doJoypadInterrupt := false
-		if jp.Written.Data[0]&0x20 == 0 {
+		if jp.mem[AddrP1]&0x20 == 0 {
 			doJoypadInterrupt = (jp.Action & ^newAction) != 0
 		} else {
 			doJoypadInterrupt = (jp.Direction & ^newDirection) != 0

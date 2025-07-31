@@ -74,14 +74,8 @@ func (b *Bus) WriteAddress(addr Addr) {
 }
 
 func (b *Bus) ProbeAddress(addr Addr) Data8 {
-	if addr <= AddrBootROMEnd {
-		if b.BootROMLock.BootOff {
-			return b.Cartridge.Read(addr)
-		} else {
-			return b.Mem[addr]
-		}
-	} else if addr <= AddrCartridgeBankNEnd {
-		return b.Cartridge.Read(addr)
+	if addr <= AddrCartridgeBankNEnd {
+		return b.Mem[addr]
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		return b.Mem[addr]
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
@@ -126,14 +120,8 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 		return nil
 	}
 	len := end - begin + 1
-	if end <= AddrBootROMEnd {
-		if b.BootROMLock.BootOff {
-			return b.Cartridge.ReadRange(begin, end)
-		} else {
-			return b.Mem[begin : end+1]
-		}
-	} else if end <= AddrCartridgeBankNEnd {
-		return b.Cartridge.ReadRange(begin, end)
+	if end <= AddrCartridgeBankNEnd {
+		return b.Mem[begin : end+1]
 	} else if begin >= AddrVRAMBegin && end <= AddrVRAMEnd {
 		return b.Mem[begin : end+1]
 	} else if begin >= AddrHRAMBegin && end <= AddrHRAMEnd {
@@ -186,19 +174,17 @@ func (b *Bus) WriteData(v Data8) {
 	addr := b.Address
 
 	if addr <= AddrBootROMEnd {
-		if !b.inCoreDump {
-			if b.BootROMLock.BootOff {
-				//panicf("Attempted write to cartridge (addr=%s v=%s)", addr.Hex(), v.Hex())
-			} else {
-				//panicf("Attempted write to bootrom (addr=%s v=%s)", addr.Hex(), v.Hex())
-			}
+		if b.BootROMLock.BootOff {
+			b.Mem[addr] = v
+			b.Cartridge.Write(addr, v)
 		}
 	} else if addr <= AddrCartridgeBankNEnd {
 		b.Cartridge.Write(addr, v)
 	} else if addr == AddrBootROMLock {
-		b.Mem[b.Address] = v
+		b.Mem[addr] = v
 		b.BootROMLock.Write(addr, v)
 	} else if addr == AddrP1 {
+		b.Mem[addr] = v
 		b.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {
 		b.Interrupts.Write(addr, v)
@@ -209,12 +195,14 @@ func (b *Bus) WriteData(v Data8) {
 	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
 		b.Mem[addr] = v
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
+		b.Mem[addr] = v
 		b.APU.Write(addr, v)
 	} else if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
 		b.Mem[addr] = v
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
 		b.Mem[addr] = v
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
+		b.Mem[addr] = v
 		b.PPU.Write(addr, v)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
 		b.Prohibited.Write(addr, v)
