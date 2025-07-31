@@ -264,7 +264,7 @@ func (app *App) startWebSocketServer() {
 						)
 						model.MemDump(
 							buf,
-							app.GB.Bus.WRAM.Data,
+							app.GB.Bus.AddressSpace[model.AddrWRAMBegin:model.AddrWRAMEnd+1],
 							model.Addr(rang.Begin),
 							model.Addr(rang.End),
 							app.GB.CPU.Regs.SP,

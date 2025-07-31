@@ -76,7 +76,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	debug.SetPC(0)
 
 	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
-	wram := NewMemoryRegion(clk, AddrWRAMBegin, SizeWRAM)
 	apu := NewAPU(clk, gb.Config)
 	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
 	cartridge := NewCartridge(clk)
@@ -107,7 +106,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bus.BootROMLock = bootROMLock
 	bus.BootROM = &bootROM
 	bus.VRAM = &vram
-	bus.WRAM = &wram
 	bus.APU = apu
 	bus.OAM = &oam
 	bus.PPU = ppu
@@ -120,7 +118,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bus.Config = gb.Config
 
 	debug.HRAM.Source = bus.AddressSpace[AddrHRAMBegin : AddrHRAMEnd+1]
-	debug.WRAM.Source = wram.Data
+	debug.WRAM.Source = bus.AddressSpace[AddrWRAMBegin : AddrWRAMEnd+1]
 
 	gb.Bus = bus
 	gb.CLK = clk
