@@ -100,3 +100,18 @@ func highpass(audio []AudioSample, capacitor *AudioSample) {
 		audio[i] = out >> FracBits
 	}
 }
+
+func AudioStub() (*Audio, chan []AudioSample) {
+	devnull := make(chan []AudioSample, 1024)
+	go func() {
+		for range devnull {
+		}
+	}()
+	audio := &Audio{
+		SampleInterval: time.Second / 44100,
+		SampleBuffers:  NewSampleBuffers(512),
+		SubSampling:    1024,
+		Out:            devnull,
+	}
+	return audio, devnull
+}

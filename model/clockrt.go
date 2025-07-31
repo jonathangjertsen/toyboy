@@ -60,7 +60,7 @@ func (clockRT *ClockRT) AttachUIDevice(dev func()) {
 	clockRT.uiDevices = append(clockRT.uiDevices, dev)
 }
 
-func (clockRT *ClockRT) wait() {
+func (clockRT *ClockRT) wait() bool {
 	clockRT.Running.Store(false)
 	for {
 		resumed := false
@@ -71,12 +71,15 @@ func (clockRT *ClockRT) wait() {
 			resumed = true
 		case job := <-clockRT.jobs:
 			job()
+		case <-clockRT.stop:
+			return true
 		}
 		if resumed {
 			break
 		}
 	}
 	clockRT.Running.Store(true)
+	return false
 }
 
 func (clockRT *ClockRT) setSpeedPercent(pct float64) {
@@ -115,7 +118,10 @@ func (clockRT *ClockRT) run(initSpeedPercent float64) {
 	}()
 	clockRT.setSpeedPercent(initSpeedPercent)
 
-	clockRT.wait()
+	exit := clockRT.wait()
+	if exit {
+		return
+	}
 	clockRT.ticker = time.NewTicker(clockRT.tickInterval)
 	uiTicker := time.NewTicker(time.Second / 60)
 	for {
@@ -128,7 +134,7 @@ func (clockRT *ClockRT) run(initSpeedPercent float64) {
 		case <-clockRT.resume:
 			fmt.Printf("Ignored resume\n")
 		case <-clockRT.pause:
-			clockRT.wait()
+			exit = clockRT.wait()
 		case job := <-clockRT.jobs:
 			job()
 		case <-clockRT.stop:
@@ -154,7 +160,7 @@ func (clockRT *ClockRT) Start() {
 }
 
 // Pause the clock
-// When this function returns, the clock has stopped
+// When this function returns, the clock has paused
 func (clockRT *ClockRT) Pause() {
 	clockRT.pause <- struct{}{}
 }
@@ -169,7 +175,10 @@ func (clockRT *ClockRT) MCycle(n int) {
 	for range n {
 		// Breakpoints will stop here, right before executing next M-cycle
 		if clockRT.pauseAfterCycle.Load() > 0 {
-			clockRT.wait()
+			exit := clockRT.wait()
+			if exit {
+				return
+			}
 			clockRT.pauseAfterCycle.Add(-1)
 		}
 

@@ -108,7 +108,7 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 	addr += (offsetX + offsetY) & 0x3ff
 
 	bgf.TileIndexAddr = addr
-	bgf.TileIndex = bgf.PPU.Bus.VRAM.Data[addr-AddrVRAMBegin]
+	bgf.TileIndex = bgf.PPU.Bus.ProbeAddress(AddrVRAMBegin)
 }
 
 func (bgf *BackgroundFetcher) fetchTileLSB() {
@@ -130,11 +130,11 @@ func (bgf *BackgroundFetcher) fetchTileLSB() {
 		addr += 2 * Addr((bgf.PPU.RegLY+bgf.PPU.RegSCY)%8)
 	}
 	bgf.TileLSBAddr = addr
-	bgf.TileLSB = bgf.PPU.Bus.VRAM.Data[addr-AddrVRAMBegin]
+	bgf.TileLSB = bgf.PPU.Bus.ProbeAddress(AddrVRAMBegin)
 }
 
 func (bgf *BackgroundFetcher) fetchTileMSB() {
-	bgf.TileMSB = bgf.PPU.Bus.VRAM.Data[bgf.TileLSBAddr+1-AddrVRAMBegin]
+	bgf.TileMSB = bgf.PPU.Bus.ProbeAddress(bgf.TileLSBAddr + 1)
 }
 
 func (bgf *BackgroundFetcher) windowReached() bool {
@@ -247,11 +247,11 @@ func (sf *SpriteFetcher) fetchTileLSB() {
 	}
 
 	sf.TileLSBAddr = addr
-	sf.TileLSB = sf.PPU.Bus.VRAM.Data[addr-AddrVRAMBegin]
+	sf.TileLSB = sf.PPU.Bus.ProbeAddress(addr)
 }
 
 func (sf *SpriteFetcher) fetchTileMSB() {
-	sf.TileMSB = sf.PPU.Bus.VRAM.Data[sf.TileLSBAddr+1-AddrVRAMBegin]
+	sf.TileMSB = sf.PPU.Bus.ProbeAddress(sf.TileLSBAddr + 1)
 }
 
 func (sf *SpriteFetcher) pushFIFO() bool {

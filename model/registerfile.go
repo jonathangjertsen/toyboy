@@ -1,5 +1,21 @@
 package model
 
+const (
+	A = iota
+	F
+	B
+	C
+	D
+	E
+	H
+	L
+	PC
+	SP
+	IR
+	TempZ
+	TempW
+)
+
 type RegisterFile struct {
 	A  Data8
 	F  Data8

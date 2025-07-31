@@ -100,7 +100,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 
 	bus := &Bus{}
 
-	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug)
+	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug, OpcodeNop)
 
 	ppu := NewPPU(clk, interrupts, bus, gb.Config, debug)
 

@@ -14,9 +14,15 @@ func Test(t *testing.T) {
 		if i == 0xcb {
 			for j := range 256 {
 				testCB(t, uint8(j))
+				if t.Failed() {
+					return
+				}
 			}
 		} else {
 			testOpcode(t, uint8(i))
+			if t.Failed() {
+				return
+			}
 		}
 	}
 }
@@ -46,7 +52,7 @@ func testOpcode(t *testing.T, opcodeRaw uint8) {
 
 	if !t.Run(opcode.String(), func(t *testing.T) {
 		tcs := tests.MustReadFile(fmt.Sprintf("%02x", uint8(opcode)))
-		tests.Run(t, tcs)
+		tests.Run(t, tcs, opcode)
 	}) {
 		return
 	}
@@ -57,7 +63,7 @@ func testCB(t *testing.T, cb uint8) {
 	opcode := model.NewCBOp(model.Data8(cb))
 	if !t.Run("CB"+opcode.String(), func(t *testing.T) {
 		tcs := tests.MustReadFile(fmt.Sprintf("cb %02x", uint8(cb)))
-		tests.Run(t, tcs)
+		tests.Run(t, tcs, model.OpcodeCB)
 	}) {
 		return
 	}

@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 
+	"github.com/jonathangjertsen/toyboy/model"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/logger"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -31,6 +33,15 @@ func main() {
 		go func() {
 			http.ListenAndServe(config.PProfURL, nil)
 		}()
+	}
+
+	if len(os.Args) == 2 && os.Args[1] == "debug" {
+		audio, devnull := model.AudioStub()
+		defer func() { close(devnull) }()
+
+		gb := model.NewGameboy(&config.Model, audio)
+		gb.Start()
+		select {}
 	}
 
 	// Create an instance of the app structure

@@ -8,8 +8,6 @@ type CPU struct {
 	Regs       RegisterFile
 	Interrupts *Interrupts
 
-	CBOp CBOp
-
 	halted bool
 
 	machineCycle int
@@ -22,6 +20,8 @@ type CPU struct {
 	rewind *Rewind
 
 	lastBranchResult int
+
+	handler CycleHandler
 }
 
 type CPUBusIF interface {
@@ -33,6 +33,7 @@ type CPUBusIF interface {
 	GetAddress() Addr
 	GetData() Data8
 	ProbeAddress(Addr) Data8
+	ProbeRange(begin, end Addr) []Data8
 	GetPeripheral(any)
 }
 
@@ -48,7 +49,6 @@ func (cpu *CPU) Reset() {
 		cpu.Interrupts.MemIF.Data[0] = 0
 		cpu.Interrupts.IME = false
 	}
-	cpu.CBOp = CBOp{}
 	cpu.machineCycle = 0
 	cpu.clockCycle = 0
 	cpu.Bus.Reset()
@@ -113,6 +113,9 @@ func join16(msb, lsb Data8) Data16 {
 }
 
 func (cpu *CPU) SetPC(pc Addr) {
+	if pc > 0xff {
+		cpu.Debug.CLK.pauseAfterCycle.Add(1)
+	}
 	cpu.Regs.PC = pc
 }
 
@@ -127,15 +130,24 @@ func NewCPU(
 	bus CPUBusIF,
 	config *Config,
 	debug *Debug,
+	initOpcode Opcode,
 ) *CPU {
 	cpu := &CPU{
 		Config:     config,
 		Bus:        bus,
 		Debug:      debug,
 		Interrupts: interrupts,
-		rewind:     NewRewind(8192),
+		rewind:     NewRewind(1024 * 16),
 	}
+
 	cpu.handlers = handlers(cpu)
+
+	if h, ok := cpu.handlers[initOpcode].(func(cpu *CPU) CycleHandler); ok {
+		cpu.handler = h
+	} else {
+		panicf("not implemented CycleHandler for opcode %s", initOpcode.String())
+	}
+
 	clk.cpu = cpu
 	return cpu
 }
@@ -156,28 +168,32 @@ func (cpu *CPU) fsm(c uint) {
 	}
 
 	var fetch bool
-	if c > 0 {
-		if cpu.Interrupts != nil && cpu.Interrupts.PendingInterrupt != 0 {
-			fetch = cpu.execTransferToISR()
-		} else {
-			fetch = cpu.handlers[cpu.Regs.IR](cpu.machineCycle)
-		}
-		if fetch {
-			cpu.writeAddressBus(cpu.Regs.PC)
-			if cpu.Interrupts == nil || cpu.Interrupts.PendingInterrupt == 0 {
-				cpu.instructionFetch()
-			}
-			cpu.IncPC()
-			cpu.machineCycle = 0
-		}
+	if cpu.Interrupts != nil && cpu.Interrupts.PendingInterrupt != 0 {
+		fetch = cpu.execTransferToISR()
 	} else {
-		// initial instruction
-		fetch = true
-		cpu.writeAddressBus(cpu.Regs.PC)
-		cpu.instructionFetch()
-		cpu.IncPC()
+		if cpu.handler != nil {
+			cpu.handler = cpu.handler(cpu)
+			fetch = cpu.handler == nil
+		} else {
+			handler := cpu.handlers[cpu.Regs.IR]
+			if h, ok := handler.(func(int) bool); ok {
+				fetch = h(cpu.machineCycle)
+			} else if h2, ok := handler.(func(cpu *CPU) CycleHandler); ok {
+				cpu.handler = h2(cpu)
+				fetch = cpu.handler == nil
+			} else {
+				panicf("fail (handler is %T)", handler)
+			}
+		}
 	}
-
+	if fetch {
+		cpu.writeAddressBus(cpu.Regs.PC)
+		if cpu.Interrupts == nil || cpu.Interrupts.PendingInterrupt == 0 {
+			cpu.instructionFetch()
+		}
+		cpu.IncPC()
+		cpu.machineCycle = 0
+	}
 	cpu.machineCycle++
 }
 
