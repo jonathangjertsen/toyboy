@@ -49,25 +49,15 @@ type PPU struct {
 	FBViewport ViewPort
 
 	// Memory access
-	mem       []Data8
-	config    *Config
 	frameSync chan func(*ViewPort)
 }
 
-func NewPPU(rtClock *ClockRT, ints *Interrupts, mem []Data8, config *Config) *PPU {
+func NewPPU(rtClock *ClockRT, ints *Interrupts) *PPU {
 	ppu := &PPU{
-		mem:       mem,
-		DMA:       DMA{mem: mem},
-		config:    config,
 		frameSync: make(chan func(*ViewPort), 1),
 	}
 	ppu.SpriteFetcher.Suspended = true
 	ppu.SpriteFetcher.DoneX = 0xff
-
-	if config.BootROM.Skip {
-		ppu.RegBGP = 0xfc
-		ppu.RegLCDC = 0x91
-	}
 
 	ppu.beginFrame(ints)
 	rtClock.ppu = ppu
@@ -183,9 +173,9 @@ func (ppu *PPU) SetOBP1(v Data8) {
 	ppu.OBJPalette1 = v
 }
 
-func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT) {
+func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT, mem []Data8) {
 	if ppu.DMA.Source != 0 {
-		ppu.DMA.fsm()
+		ppu.DMA.fsm(mem)
 	}
 	switch ppu.Mode {
 	case PPUModeVBlank:
@@ -193,9 +183,9 @@ func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT) {
 	case PPUModeHBlank:
 		ppu.fsmHBlank(ints, debug)
 	case PPUModePixelDraw:
-		ppu.fsmPixelDraw(ints, debug, clk)
+		ppu.fsmPixelDraw(ints, debug, clk, mem)
 	case PPUModeOAMScan:
-		ppu.fsmOAMScan(ints)
+		ppu.fsmOAMScan(ints, mem)
 	}
 }
 
@@ -272,7 +262,7 @@ func (ppu *PPU) beginVBlank(ints *Interrupts) {
 	ppu.FrameCount++
 }
 
-func (ppu *PPU) fsmOAMScan(ints *Interrupts) {
+func (ppu *PPU) fsmOAMScan(ints *Interrupts, mem []Data8) {
 	cycle := ppu.OAMScanCycle
 	ppu.OAMScanCycle++
 	if ppu.OAMScanCycle == 80 {
@@ -286,7 +276,7 @@ func (ppu *PPU) fsmOAMScan(ints *Interrupts) {
 	index := Addr((cycle - 1) / 2)
 
 	// Read sprite out of OAM
-	sprite := DecodeObject(ppu.mem[AddrOAMBegin+index*4 : AddrOAMBegin+(index+1)*4])
+	sprite := DecodeObject(mem[AddrOAMBegin+index*4 : AddrOAMBegin+(index+1)*4])
 
 	// Check if sprite should be added to buffer
 	if !(sprite.X > 0) {
@@ -305,7 +295,7 @@ func (ppu *PPU) fsmOAMScan(ints *Interrupts) {
 	ppu.OAMBuffer.Add(sprite)
 }
 
-func (ppu *PPU) fsmPixelDraw(ints *Interrupts, debug *Debug, clk *ClockRT) {
+func (ppu *PPU) fsmPixelDraw(ints *Interrupts, debug *Debug, clk *ClockRT, mem []Data8) {
 	if ppu.SpriteFetcher.Suspended && ppu.SpriteFetcher.DoneX != ppu.Shifter.X {
 		for idx := range ppu.OAMBuffer.Level {
 			obj := ppu.OAMBuffer.Buffer[idx]
@@ -326,8 +316,8 @@ func (ppu *PPU) fsmPixelDraw(ints *Interrupts, debug *Debug, clk *ClockRT) {
 		}
 	}
 
-	ppu.SpriteFetcher.fsm(ppu)
-	ppu.BackgroundFetcher.fsm(ppu)
+	ppu.SpriteFetcher.fsm(ppu, mem)
+	ppu.BackgroundFetcher.fsm(ppu, mem)
 	ppu.Shifter.fsm(ppu, debug, clk)
 
 	// GBEDG: After each pixel shifted out, the PPU checks if it has reached the window

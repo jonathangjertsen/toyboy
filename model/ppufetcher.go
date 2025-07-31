@@ -29,7 +29,7 @@ type BackgroundFetcher struct {
 	WindowPixelRenderedThisScanline bool
 }
 
-func (bgf *BackgroundFetcher) fsm(ppu *PPU) {
+func (bgf *BackgroundFetcher) fsm(ppu *PPU, mem []Data8) {
 	if bgf.Suspended {
 		return
 	}
@@ -43,21 +43,21 @@ func (bgf *BackgroundFetcher) fsm(ppu *PPU) {
 		if bgfCycle&1 == 0 {
 			return
 		}
-		bgf.fetchTileNo(ppu)
+		bgf.fetchTileNo(ppu, mem)
 		bgf.State = FetcherStateFetchTileLSB
 	case FetcherStateFetchTileLSB:
 		// Takes 2 cycles
 		if bgfCycle&1 == 0 {
 			return
 		}
-		bgf.fetchTileLSB(ppu)
+		bgf.fetchTileLSB(ppu, mem)
 		bgf.State = FetcherStateFetchTileMSB
 	case FetcherStateFetchTileMSB:
 		// Takes 2 cycles
 		if bgfCycle&1 == 0 {
 			return
 		}
-		bgf.fetchTileMSB(ppu)
+		bgf.fetchTileMSB(ppu, mem)
 		bgf.State = FetcherStatePushFIFO
 	case FetcherStatePushFIFO:
 		if bgf.pushFIFO(ppu) {
@@ -67,7 +67,7 @@ func (bgf *BackgroundFetcher) fsm(ppu *PPU) {
 	}
 }
 
-func (bgf *BackgroundFetcher) fetchTileNo(ppu *PPU) {
+func (bgf *BackgroundFetcher) fetchTileNo(ppu *PPU, mem []Data8) {
 	// GBEDG: During the first step the fetcher fetches and stores the tile number of the tile which should be used.
 	// Which Tilemap is used depends on whether the PPU is currently rendering Background or Window pixels
 	// and on the bits 3 and 5 of the LCDC register.
@@ -106,10 +106,10 @@ func (bgf *BackgroundFetcher) fetchTileNo(ppu *PPU) {
 	addr += (offsetX + offsetY) & 0x3ff
 
 	bgf.TileIndexAddr = addr
-	bgf.TileIndex = ppu.mem[addr]
+	bgf.TileIndex = mem[addr]
 }
 
-func (bgf *BackgroundFetcher) fetchTileLSB(ppu *PPU) {
+func (bgf *BackgroundFetcher) fetchTileLSB(ppu *PPU, mem []Data8) {
 	idx := bgf.TileIndex
 	signedAddressing := ppu.RegLCDC&Bit4 == 0
 	var addr Addr
@@ -128,11 +128,11 @@ func (bgf *BackgroundFetcher) fetchTileLSB(ppu *PPU) {
 		addr += 2 * Addr((ppu.RegLY+ppu.RegSCY)%8)
 	}
 	bgf.TileLSBAddr = addr
-	bgf.TileLSB = ppu.mem[addr]
+	bgf.TileLSB = mem[addr]
 }
 
-func (bgf *BackgroundFetcher) fetchTileMSB(ppu *PPU) {
-	bgf.TileMSB = ppu.mem[bgf.TileLSBAddr+1]
+func (bgf *BackgroundFetcher) fetchTileMSB(ppu *PPU, mem []Data8) {
+	bgf.TileMSB = mem[bgf.TileLSBAddr+1]
 }
 
 func (bgf *BackgroundFetcher) windowReached(ppu *PPU) bool {
@@ -173,7 +173,7 @@ type SpriteFetcher struct {
 	DoneX     Data8
 }
 
-func (sf *SpriteFetcher) fsm(ppu *PPU) {
+func (sf *SpriteFetcher) fsm(ppu *PPU, mem []Data8) {
 	sfCycle := sf.Cycle
 	sf.Cycle++
 
@@ -193,14 +193,14 @@ func (sf *SpriteFetcher) fsm(ppu *PPU) {
 		if sfCycle&1 == 0 {
 			return
 		}
-		sf.fetchTileLSB(ppu)
+		sf.fetchTileLSB(ppu, mem)
 		sf.State = FetcherStateFetchTileMSB
 	case FetcherStateFetchTileMSB:
 		// Takes 2 cycles
 		if sfCycle&1 == 0 {
 			return
 		}
-		sf.fetchTileMSB(ppu)
+		sf.fetchTileMSB(ppu, mem)
 		sf.State = FetcherStatePushFIFO
 	case FetcherStatePushFIFO:
 		if sf.pushFIFO(ppu) {
@@ -215,7 +215,7 @@ func (sf *SpriteFetcher) fetchTileNo(ppu *PPU) {
 	sf.TileIndex = ppu.OAMBuffer.Buffer[sf.SpriteIDX].TileIndex
 }
 
-func (sf *SpriteFetcher) fetchTileLSB(ppu *PPU) {
+func (sf *SpriteFetcher) fetchTileLSB(ppu *PPU, mem []Data8) {
 	obj := ppu.OAMBuffer.Buffer[sf.SpriteIDX]
 
 	screenY := ppu.RegLY + ppu.RegSCY
@@ -245,11 +245,11 @@ func (sf *SpriteFetcher) fetchTileLSB(ppu *PPU) {
 	}
 
 	sf.TileLSBAddr = addr
-	sf.TileLSB = ppu.mem[addr]
+	sf.TileLSB = mem[addr]
 }
 
-func (sf *SpriteFetcher) fetchTileMSB(ppu *PPU) {
-	sf.TileMSB = ppu.mem[sf.TileLSBAddr+1]
+func (sf *SpriteFetcher) fetchTileMSB(ppu *PPU, mem []Data8) {
+	sf.TileMSB = mem[sf.TileLSBAddr+1]
 }
 
 func (sf *SpriteFetcher) pushFIFO(ppu *PPU) bool {

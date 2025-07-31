@@ -4,8 +4,6 @@ type DMA struct {
 	Reg    Data8
 	Source Addr
 	Dest   Addr
-
-	mem []Data8
 }
 
 func (d *DMA) Write(v Data8) {
@@ -14,14 +12,14 @@ func (d *DMA) Write(v Data8) {
 	d.Dest = AddrOAMBegin
 }
 
-func (d *DMA) fsm() {
+func (d *DMA) fsm(mem []Data8) {
 	if d.Source == 0 {
 		return
 	}
 
 	// Write next data
 	// TODO: presumably this is not actually how it works
-	d.mem[d.Dest] = d.mem[d.Source]
+	mem[d.Dest] = mem[d.Source]
 
 	if d.Dest == AddrOAMEnd {
 		// Done

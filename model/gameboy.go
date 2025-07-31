@@ -60,7 +60,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 	mem := NewAddressSpace()
 	interrupts := NewInterrupts(mem)
 	debug := NewDebug(&gb.Config.Debug)
-	clk := NewRealtimeClock(gb.Config.Clock, audio, interrupts, debug)
+	clk := NewRealtimeClock(gb.Config.Clock, audio, interrupts, debug, mem)
 
 	if gb.Config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
@@ -80,7 +80,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 
 	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug)
 
-	ppu := NewPPU(clk, interrupts, mem, gb.Config)
+	ppu := NewPPU(clk, interrupts)
 
 	bus.BootROMLock = bootROMLock
 	bus.APU = apu
