@@ -49,7 +49,6 @@ func (jp *Joypad) Read(addr Addr) Data8 {
 }
 
 func (jp *Joypad) SetState(jps JoypadState) {
-	// TODO:
 	jp.clk.Sync(func() {
 		actionMask := Data8(0b0000)
 		directionMask := Data8(0b0000)

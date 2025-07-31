@@ -102,7 +102,7 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	} else if addr == AddrP1 {
 		return b.Joypad.Read(addr)
 	} else if addr == AddrIF || addr == AddrIE {
-		return b.Interrupts.Read(addr)
+		return b.Mem[addr]
 	} else if addr == AddrBootROMLock {
 		return b.Mem[addr]
 	} else if addr == AddrSB || addr == AddrSC {
@@ -148,7 +148,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	} else if len == 1 && begin == AddrP1 {
 		return readRange(b.Joypad, begin, end)
 	} else if len == 1 && (begin == AddrIF || begin == AddrIE) {
-		return readRange(b.Interrupts, begin, end)
+		return b.Mem[begin : end+1]
 	} else if len == 1 && begin == AddrBootROMLock {
 		return b.Mem[begin : end+1]
 	} else if len == 1 && (begin == AddrSB || begin == AddrSC) {
@@ -187,7 +187,8 @@ func (b *Bus) WriteData(v Data8) {
 		b.Mem[addr] = v
 		b.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {
-		b.Interrupts.Write(addr, v)
+		b.Mem[addr] = v
+		b.Interrupts.IRQCheck()
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		b.Mem[addr] = v
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {

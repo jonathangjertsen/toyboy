@@ -43,8 +43,8 @@ func (cpu *CPU) Reset() {
 	cpu.Regs = RegisterFile{}
 	cpu.Regs.SP = 0xfffe
 	if cpu.Interrupts != nil {
-		cpu.Interrupts.MemIE.Data[0] = 0
-		cpu.Interrupts.MemIF.Data[0] = 0
+		cpu.Interrupts.mem[AddrIE] = 0
+		cpu.Interrupts.mem[AddrIF] = 0
 		cpu.Interrupts.IME = false
 	}
 	cpu.machineCycle = 0

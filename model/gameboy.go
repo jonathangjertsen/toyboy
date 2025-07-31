@@ -70,27 +70,27 @@ func (gb *Gameboy) Init(audio *Audio) {
 
 	debug := NewDebug(clk, &gb.Config.Debug)
 
-	interrupts := NewInterrupts(clk)
-	addressSpace := NewAddressSpace()
+	mem := NewAddressSpace()
+	interrupts := NewInterrupts(clk, mem)
 
 	if gb.Config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
-		copy(addressSpace[:SizeBootROM], bootROM)
+		copy(mem[:SizeBootROM], bootROM)
 		debug.SetProgram(bootROM)
 		debug.SetPC(0)
 	} else {
 		panic("unknown boot ROM")
 	}
-	cartridge := NewCartridge(clk, addressSpace)
-	bootROMLock := NewBootROMLock(addressSpace, cartridge, debug)
+	cartridge := NewCartridge(clk, mem)
+	bootROMLock := NewBootROMLock(mem, cartridge, debug)
 
-	apu := NewAPU(clk, gb.Config, addressSpace)
-	joypad := NewJoypad(clk, interrupts, addressSpace)
+	apu := NewAPU(clk, gb.Config, mem)
+	joypad := NewJoypad(clk, interrupts, mem)
 	serial := NewSerial(clk)
 	prohibited := NewProhibited(clk)
 	timer := NewTimer(clk, apu, interrupts)
 
-	bus := NewBus(addressSpace)
+	bus := NewBus(mem)
 
 	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug, OpcodeNop)
 
