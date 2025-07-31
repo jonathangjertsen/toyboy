@@ -86,7 +86,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 	apu := NewAPU(clk, gb.Config, mem)
 	joypad := NewJoypad(clk, interrupts, mem)
 	serial := NewSerial(clk)
-	timer := NewTimer(clk, apu, interrupts)
+	timer := NewTimer(clk, mem, apu, interrupts)
 
 	bus := NewBus(mem)
 
