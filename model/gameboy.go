@@ -98,7 +98,8 @@ func (gb *Gameboy) Init(audio *Audio) {
 		debug.SetPC(0x60)
 	}
 
-	bus := &Bus{}
+	addressSpace := NewAddressSpace()
+	bus := NewBus(addressSpace)
 
 	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug, OpcodeNop)
 
