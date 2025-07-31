@@ -11,8 +11,8 @@ type CoreDump struct {
 	Regs         RegisterFile
 	ProgramStart Addr
 	ProgramEnd   Addr
+	AddressSpace *AddressSpace
 	Program      []Data8
-	HRAM         []Data8
 	OAM          []Data8
 	VRAM         []Data8
 	APU          []Data8
@@ -75,7 +75,7 @@ func (cd *CoreDump) PrintProgram(f io.Writer) {
 }
 
 func (cd *CoreDump) PrintHRAM(f io.Writer) {
-	MemDump(f, cd.HRAM, AddrHRAMBegin, AddrHRAMEnd, cd.Regs.SP)
+	MemDump(f, cd.AddressSpace[:], 0, Addr(SizeHRAM), cd.Regs.SP)
 }
 
 func (cd *CoreDump) PrintOAM(f io.Writer) {
@@ -246,6 +246,7 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	defer end()
 
 	var cd CoreDump
+	cd.AddressSpace = bus.AddressSpace
 	cd.Regs = cpu.Regs
 	cd.ProgramStart = 0
 	if cpu.Regs.PC > 0x40 {
@@ -260,7 +261,6 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
 	cd.Program = bus.ProbeRange(0x0000, AddrCartridgeBank0End)
 	cd.Disassembly = cpu.Debug.Disassembly(0, 0xffff)
-	cd.HRAM = bus.HRAM.Data
 	cd.OAM = bus.OAM.Data
 	cd.VRAM = bus.VRAM.Data
 	cd.APU = bus.APU.Data
