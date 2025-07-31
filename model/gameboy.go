@@ -85,7 +85,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bootROMLock := NewBootROMLock(mem, cartridge, debug)
 	apu := NewAPU(clk, gb.Config, mem)
 	joypad := NewJoypad(clk, interrupts, mem)
-	serial := NewSerial(clk)
 	timer := NewTimer(clk, mem, apu, interrupts)
 
 	bus := NewBus(mem)
@@ -100,7 +99,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bus.Cartridge = cartridge
 	bus.Joypad = joypad
 	bus.Interrupts = interrupts
-	bus.Serial = serial
 	bus.Timer = timer
 	bus.Config = gb.Config
 

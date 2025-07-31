@@ -17,7 +17,6 @@ type Bus struct {
 	Cartridge   *Cartridge
 	Joypad      *Joypad
 	Interrupts  *Interrupts
-	Serial      *Serial
 	Timer       *Timer
 }
 
@@ -104,7 +103,7 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	} else if addr == AddrBootROMLock {
 		return b.Mem[addr]
 	} else if addr == AddrSB || addr == AddrSC {
-		return b.Serial.Read(addr)
+		return b.Mem[addr]
 	} else {
 		if !b.inCoreDump {
 			//panicf("Read from unmapped address %s", addr.Hex())
@@ -150,7 +149,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	} else if len == 1 && begin == AddrBootROMLock {
 		return b.Mem[begin : end+1]
 	} else if len == 1 && (begin == AddrSB || begin == AddrSC) {
-		return readRange(b.Serial, begin, end)
+		return b.Mem[begin : end+1]
 	} else {
 		if !b.inCoreDump {
 			//panicf("Read from unmapped address %s", addr.Hex())
@@ -213,7 +212,7 @@ func (b *Bus) WriteData(v Data8) {
 	} else if addr >= 0xff71 && addr <= 0xff7f {
 		b.Mem[addr] = v
 	} else if addr == AddrSB || addr == AddrSC {
-		b.Serial.Write(addr, v)
+		b.Mem[addr] = v
 	} else {
 		if !b.inCoreDump {
 			//panicf("write to unmapped address %s", addr.Hex())
