@@ -42,12 +42,12 @@ func (cpu *CPU) Save(save *SaveState) {
 
 type CPUBusIF interface {
 	Reset()
-	WriteAddress(Addr)
-	WriteData(Data8)
+	WriteAddress([]Data8, Addr)
+	WriteData([]Data8, Data8)
 	GetAddress() Addr
 	GetData() Data8
-	ProbeAddress(Addr) Data8
-	ProbeRange(Addr, Addr) []Data8
+	ProbeAddress([]Data8, Addr) Data8
+	ProbeRange([]Data8, Addr, Addr) []Data8
 }
 
 func (cpu *CPU) CurrInstruction() (DisInstruction, int) {
@@ -154,7 +154,7 @@ func NewCPU(
 	return cpu
 }
 
-func (cpu *CPU) fsm(clk *ClockRT) {
+func (cpu *CPU) fsm(clk *ClockRT, mem []Data8) {
 	cpu.wroteToAddressBusThisCycle = false
 	cpu.clockCycle = clk.Cycle
 	cpu.applyPendingIME()
@@ -172,14 +172,14 @@ func (cpu *CPU) fsm(clk *ClockRT) {
 	var fetch bool
 	if cpu.clockCycle > 0 {
 		if cpu.Interrupts != nil && cpu.Interrupts.PendingInterrupt != 0 {
-			fetch = cpu.execTransferToISR(clk)
+			fetch = cpu.execTransferToISR(clk, mem)
 		} else {
-			fetch = cpu.handlers[cpu.Regs.IR](cpu.machineCycle)
+			fetch = cpu.handlers[cpu.Regs.IR](mem, cpu.machineCycle)
 		}
 		if fetch {
-			cpu.writeAddressBus(cpu.Regs.PC)
+			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			if cpu.Interrupts == nil || cpu.Interrupts.PendingInterrupt == 0 {
-				cpu.instructionFetch(clk)
+				cpu.instructionFetch(clk, mem)
 			}
 			cpu.IncPC()
 			cpu.machineCycle = 0
@@ -187,20 +187,20 @@ func (cpu *CPU) fsm(clk *ClockRT) {
 	} else {
 		// initial instruction
 		fetch = true
-		cpu.writeAddressBus(cpu.Regs.PC)
-		cpu.instructionFetch(clk)
+		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.instructionFetch(clk, mem)
 		cpu.IncPC()
 	}
 
 	cpu.machineCycle++
 }
 
-func (cpu *CPU) instructionFetch(clk *ClockRT) {
+func (cpu *CPU) instructionFetch(clk *ClockRT, mem []Data8) {
 	// Reset inter-instruction state
 	cpu.Regs.SetWZ(0)
 
 	// Read next instruction opcode
-	rawOp := cpu.Bus.ProbeAddress(cpu.Bus.GetAddress())
+	rawOp := mem[cpu.Bus.GetAddress()]
 	cpu.Regs.IR = Opcode(rawOp)
 	cpu.Debug.SetIR(cpu.Regs.IR, clk)
 
@@ -214,7 +214,7 @@ func (cpu *CPU) instructionFetch(clk *ClockRT) {
 		panicf("no size set for %v", cpu.Regs.IR)
 	}
 	for i := Size16(1); i < size; i++ {
-		di.Raw[i] = cpu.Bus.ProbeAddress(cpu.Regs.PC + Addr(i))
+		di.Raw[i] = mem[cpu.Regs.PC+Addr(i)]
 	}
 
 	// Update rewind buffer
@@ -227,20 +227,20 @@ func (cpu *CPU) instructionFetch(clk *ClockRT) {
 	cpu.Debug.SetPC(cpu.Regs.PC, clk)
 }
 
-func (cpu *CPU) execTransferToISR(clk *ClockRT) bool {
+func (cpu *CPU) execTransferToISR(clk *ClockRT, mem []Data8) bool {
 	switch cpu.machineCycle {
 	// wait states
 	case 1, 2:
 	// push MSB of PC to stack
 	case 3:
 		cpu.SetSP(cpu.Regs.SP - 1)
-		cpu.writeAddressBus(cpu.Regs.SP)
-		cpu.Bus.WriteData(cpu.Regs.PC.MSB())
+		cpu.writeAddressBus(mem, cpu.Regs.SP)
+		cpu.Bus.WriteData(mem, cpu.Regs.PC.MSB())
 		// push LSB of PC to stack
 	case 4:
 		cpu.SetSP(cpu.Regs.SP - 1)
-		cpu.writeAddressBus(cpu.Regs.SP)
-		cpu.Bus.WriteData(cpu.Regs.PC.LSB())
+		cpu.writeAddressBus(mem, cpu.Regs.SP)
+		cpu.Bus.WriteData(mem, cpu.Regs.PC.LSB())
 	case 5:
 		isr := cpu.Interrupts.PendingInterrupt.ISR()
 		cpu.SetPC(isr)
@@ -253,8 +253,8 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT) bool {
 	return false
 }
 
-func (cpu *CPU) writeAddressBus(addr Addr) {
-	cpu.Bus.WriteAddress(addr)
+func (cpu *CPU) writeAddressBus(mem []Data8, addr Addr) {
+	cpu.Bus.WriteAddress(mem, addr)
 }
 
 func (cpu *CPU) applyPendingIME() {

@@ -16,8 +16,6 @@ type WaveChannel struct {
 
 	DacEnabled bool
 	Activated  bool
-
-	mem []Data8
 }
 
 func (wc *WaveChannel) SetDACEn(v Data8) {
@@ -74,7 +72,7 @@ func (wc *WaveChannel) trigger() {
 	wc.Index = 1
 }
 
-func (wc *WaveChannel) clock() {
+func (wc *WaveChannel) clock(mem []Data8) {
 	if !wc.Activated {
 		return
 	}
@@ -82,7 +80,7 @@ func (wc *WaveChannel) clock() {
 		return
 	}
 
-	data := wc.mem[AddrWaveRAMBegin+wc.Index>>1]
+	data := mem[AddrWaveRAMBegin+wc.Index>>1]
 	if wc.Index&1 == 0 {
 		// upper nibble on even index
 		data >>= 4

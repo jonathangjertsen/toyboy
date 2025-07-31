@@ -11,6 +11,7 @@ type Gameboy struct {
 
 	Running atomic.Bool
 
+	Mem       []Data8
 	CLK       *ClockRT
 	Bus       *Bus
 	Debug     *Debug
@@ -74,11 +75,11 @@ func (gb *Gameboy) Init(audio *Audio) {
 	}
 	cartridge := NewCartridge(clk, mem)
 	bootROMLock := NewBootROMLock(mem, cartridge, debug)
-	apu := NewAPU(clk, gb.Config, mem)
+	apu := NewAPU(clk, gb.Config)
 	joypad := NewJoypad(clk, interrupts, mem)
 	timer := NewTimer(clk, mem, apu, interrupts)
 
-	bus := NewBus(mem)
+	bus := NewBus()
 
 	cpu := NewCPU(clk, interrupts, bus, gb.Config, debug)
 
@@ -93,9 +94,10 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bus.Timer = timer
 	bus.Config = gb.Config
 
-	debug.HRAM.Source = bus.Mem[AddrHRAMBegin : AddrHRAMEnd+1]
-	debug.WRAM.Source = bus.Mem[AddrWRAMBegin : AddrWRAMEnd+1]
+	debug.HRAM.Source = mem[AddrHRAMBegin : AddrHRAMEnd+1]
+	debug.WRAM.Source = mem[AddrWRAMBegin : AddrWRAMEnd+1]
 
+	gb.Mem = mem
 	gb.Bus = bus
 	gb.CLK = clk
 	gb.CPU = cpu

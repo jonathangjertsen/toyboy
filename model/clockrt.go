@@ -16,7 +16,7 @@ type ClockRT struct {
 	stop            chan struct{}
 	jobs            chan func()
 	uiDevices       []func()
-	Onpanic         func()
+	Onpanic         func(mem []Data8)
 	pauseAfterCycle atomic.Int32
 	Running         atomic.Bool
 	Audio           *Audio
@@ -49,7 +49,7 @@ func NewRealtimeClock(config ConfigClock, audio *Audio, interrupts *Interrupts, 
 		pause:   make(chan struct{}),
 		stop:    make(chan struct{}),
 		jobs:    make(chan func()),
-		Onpanic: func() {},
+		Onpanic: func(mem []Data8) {},
 		Audio:   audio,
 	}
 	go clockRT.run(config.SpeedPercent, interrupts, debug, mem, fs)
@@ -112,7 +112,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64) {
 func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts, debug *Debug, mem []Data8, fs *FrameSync) {
 	defer func() {
 		if e := recover(); e != nil {
-			clockRT.Onpanic()
+			clockRT.Onpanic(mem)
 			panic(e)
 		}
 	}()
@@ -185,7 +185,7 @@ func (clockRT *ClockRT) MCycle(n int, ints *Interrupts, debug *Debug, mem []Data
 		clockRT.Audio.Clock()
 
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
-		clockRT.cpu.fsm(clockRT)
+		clockRT.cpu.fsm(clockRT, mem)
 
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
@@ -197,7 +197,7 @@ func (clockRT *ClockRT) MCycle(n int, ints *Interrupts, debug *Debug, mem []Data
 		// 99.99% of the time, both PPU and APU are on, so we clock everything
 		if clockRT.ppu.RegLCDC&clockRT.apu.MasterCtl&Bit7 != 0 {
 			// T0
-			clockRT.apu.Wave.clock()
+			clockRT.apu.Wave.clock(mem)
 			if m&0x1 == 0 {
 				clockRT.apu.Pulse1.clock()
 				clockRT.apu.Pulse2.clock()
@@ -233,7 +233,7 @@ func (clockRT *ClockRT) mCycleSlowPath(m uint, ppu, apu bool, ints *Interrupts, 
 		clockRT.ppu.fsm(ints, debug, clockRT, mem, fs)
 	}
 	if apu {
-		clockRT.apu.Wave.clock()
+		clockRT.apu.Wave.clock(mem)
 		if m&0x1 == 0 {
 			clockRT.apu.Pulse1.clock()
 			clockRT.apu.Pulse2.clock()

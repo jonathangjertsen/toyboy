@@ -10,15 +10,8 @@ type APU struct {
 	Noise     NoiseChannel
 }
 
-func NewAPU(clock *ClockRT, config *Config, addressSpace []Data8) *APU {
-	apu := &APU{
-		Pulse1: PulseChannelWithSweep{},
-		Pulse2: PulseChannel{},
-		Wave: WaveChannel{
-			mem: addressSpace,
-		},
-		Mixer: Mixer{},
-	}
+func NewAPU(clock *ClockRT, config *Config) *APU {
+	apu := &APU{}
 	if config.BootROM.Skip {
 		apu.Reset()
 	}
@@ -27,9 +20,8 @@ func NewAPU(clock *ClockRT, config *Config, addressSpace []Data8) *APU {
 	return apu
 }
 
-func (apu *APU) LoadSave(save *SaveState, mem []Data8) {
+func (apu *APU) LoadSave(save *SaveState) {
 	*apu = save.APU
-	apu.Wave.mem = mem
 }
 
 func (apu *APU) Save(save *SaveState) {

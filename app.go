@@ -104,7 +104,7 @@ func (app *App) startGB() {
 
 	if err := model.LoadROM(
 		"assets/cartridges/tetris.gb",
-		app.GB.Bus.Mem,
+		app.GB.Mem,
 		app.GB.Cartridge,
 		app.GB.Bus.BootROMLock,
 	); err != nil {
@@ -227,15 +227,15 @@ func (app *App) startWebSocketServer(fs *model.FrameSync) {
 						fmt.Fprintf(buf, "                                     ")
 					}
 					if buf := buffers[DataIDPPURegisters]; buf != nil {
-						model.PrintPPU(buf, app.GB.PPU.GetDump(), app.GB.Bus.Mem)
+						model.PrintPPU(buf, app.GB.PPU.GetDump(), app.GB.Mem)
 					}
 					if buf := buffers[DataIDAPURegisters]; buf != nil {
-						model.PrintAPU(buf, app.GB.Bus.Mem, app.GB.APU)
+						model.PrintAPU(buf, app.GB.Mem, app.GB.APU)
 					}
 					if buf := buffers[DataIDHRAM]; buf != nil {
 						model.MemDump(
 							buf,
-							app.GB.Bus.Mem,
+							app.GB.Mem,
 							model.AddrHRAMBegin,
 							model.AddrHRAMEnd,
 							app.GB.CPU.Regs.SP,
@@ -244,7 +244,7 @@ func (app *App) startWebSocketServer(fs *model.FrameSync) {
 					if buf := buffers[DataIDOAM]; buf != nil {
 						model.MemDump(
 							buf,
-							app.GB.Bus.Mem,
+							app.GB.Mem,
 							model.AddrOAMBegin,
 							model.AddrOAMEnd,
 							0,
@@ -266,7 +266,7 @@ func (app *App) startWebSocketServer(fs *model.FrameSync) {
 						)
 						model.MemDump(
 							buf,
-							app.GB.Bus.Mem,
+							app.GB.Mem,
 							model.Addr(rang.Begin),
 							model.Addr(rang.End),
 							app.GB.CPU.Regs.SP,

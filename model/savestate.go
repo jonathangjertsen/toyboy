@@ -48,8 +48,8 @@ func LoadSave(
 ) {
 	copy(mem, save.Mem)
 
-	apu.LoadSave(save, mem)
-	bus.LoadSave(save, mem)
+	apu.LoadSave(save)
+	bus.LoadSave(save)
 	cart.LoadSave(save, mem)
 	cpu.LoadSave(save, mem)
 }

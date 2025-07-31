@@ -1,8 +1,6 @@
 package model
 
 type Bus struct {
-	Mem []Data8
-
 	Data    Data8
 	Address Addr
 
@@ -16,16 +14,13 @@ type Bus struct {
 	Timer       *Timer
 }
 
-func NewBus(as []Data8) *Bus {
-	return &Bus{
-		Mem: as,
-	}
+func NewBus() *Bus {
+	return &Bus{}
 }
 
-func (bus *Bus) LoadSave(save *SaveState, mem []Data8) {
+func (bus *Bus) LoadSave(save *SaveState) {
 	bus.Data = save.BusData
 	bus.Address = save.BusAddress
-	bus.Mem = mem
 }
 
 func (bus *Bus) Save(save *SaveState) {
@@ -50,12 +45,12 @@ func (b *Bus) GetData() Data8 {
 	return b.Data
 }
 
-func (b *Bus) WriteAddress(addr Addr) {
+func (b *Bus) WriteAddress(mem []Data8, addr Addr) {
 	b.Address = addr
-	b.Data = b.ProbeAddress(addr)
+	b.Data = b.ProbeAddress(mem, addr)
 }
 
-func (b *Bus) ProbeAddress(addr Addr) Data8 {
+func (b *Bus) ProbeAddress(mem []Data8, addr Addr) Data8 {
 	if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		return b.APU.Read(addr)
 	}
@@ -65,10 +60,10 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	if addr == AddrP1 {
 		return b.Joypad.Read(addr)
 	}
-	return b.Mem[addr]
+	return mem[addr]
 }
 
-func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
+func (b *Bus) ProbeRange(mem []Data8, begin, end Addr) []Data8 {
 	if begin > end {
 		return nil
 	}
@@ -78,7 +73,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	if begin >= AddrPPUBegin && end <= AddrPPUEnd {
 		return readRange(b.PPU, begin, end)
 	}
-	return b.Mem[begin : end+1]
+	return mem[begin : end+1]
 }
 
 func readRange(device interface{ Read(Addr) Data8 }, begin, end Addr) []Data8 {
@@ -89,7 +84,7 @@ func readRange(device interface{ Read(Addr) Data8 }, begin, end Addr) []Data8 {
 	return out
 }
 
-func (b *Bus) WriteData(v Data8) {
+func (b *Bus) WriteData(mem []Data8, v Data8) {
 	b.Data = v
 	addr := b.Address
 
@@ -103,7 +98,7 @@ func (b *Bus) WriteData(v Data8) {
 		b.Cartridge.Write(addr, v)
 		return
 	}
-	b.Mem[addr] = v
+	mem[addr] = v
 
 	if addr == AddrBootROMLock {
 		b.BootROMLock.Write(addr, v)

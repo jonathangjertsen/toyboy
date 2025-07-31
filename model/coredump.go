@@ -227,14 +227,9 @@ func MemDump(f io.Writer, mem []Data8, start, end, highlight Addr) {
 	fmt.Fprintf(f, "\n")
 }
 
-func (cpu *CPU) GetCoreDump() CoreDump {
-	bus, ok := cpu.Bus.(*Bus)
-	if !ok {
-		return CoreDump{}
-	}
-
+func (cpu *CPU) GetCoreDump(mem []Data8) CoreDump {
 	var cd CoreDump
-	cd.Mem = bus.Mem
+	cd.Mem = mem
 	cd.Regs = cpu.Regs
 	cd.ProgramStart = 0
 	if cpu.Regs.PC > 0x40 {
@@ -252,8 +247,8 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 	return cd
 }
 
-func (cpu *CPU) Dump() {
-	cd := cpu.GetCoreDump()
+func (cpu *CPU) Dump(mem []Data8) {
+	cd := cpu.GetCoreDump(mem)
 	f := os.Stdout
 	fmt.Fprintf(f, "\n--------\nCore dump:\n")
 	PrintRegs(f, cd.Regs)
