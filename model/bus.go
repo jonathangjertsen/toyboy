@@ -111,50 +111,27 @@ func (b *Bus) WriteData(v Data8) {
 
 	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
-			b.Mem[addr] = v
 			b.Cartridge.Write(addr, v)
 		}
-	} else if addr <= AddrCartridgeBankNEnd {
+		return
+	}
+	if addr <= AddrCartridgeBankNEnd {
 		b.Cartridge.Write(addr, v)
-	} else if addr == AddrBootROMLock {
-		b.Mem[addr] = v
+		return
+	}
+	b.Mem[addr] = v
+
+	if addr == AddrBootROMLock {
 		b.BootROMLock.Write(addr, v)
 	} else if addr == AddrP1 {
-		b.Mem[addr] = v
 		b.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {
-		b.Mem[addr] = v
 		b.Interrupts.IRQCheck()
-	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
-		b.Mem[addr] = v
-	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
-		b.Mem[addr] = v
-	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
-		b.Mem[addr] = v
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
-		b.Mem[addr] = v
 		b.APU.Write(addr, v)
-	} else if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
-		b.Mem[addr] = v
-	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
-		b.Mem[addr] = v
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		b.Mem[addr] = v
 		b.PPU.Write(addr, v)
-	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
-		b.Mem[addr] = v
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
-		b.Mem[addr] = v
 		b.Timer.Write(addr, v)
-	} else if (addr >= 0xff4c && addr <= 0xff4f) || (addr >= 0xff51 && addr <= 0xff70) {
-		// GBC stuff
-	} else if addr >= 0xff71 && addr <= 0xff7f {
-		b.Mem[addr] = v
-	} else if addr == AddrSB || addr == AddrSC {
-		b.Mem[addr] = v
-	} else {
-		if !b.inCoreDump {
-			//panicf("write to unmapped address %s", addr.Hex())
-		}
 	}
 }
