@@ -260,6 +260,7 @@ var Handlers = [256]CycleHandler{
 	OpcodeUndefF4:  implUndefined,
 	OpcodeUndefFC:  implUndefined,
 	OpcodeUndefFD:  implUndefined,
+	OpcodeSTOP:     implSTOP,
 }
 
 // Switch statement:
@@ -776,6 +777,9 @@ func Handler(cpu *CPU) CycleHandler {
 		return implUndefFC(cpu)
 	case OpcodeUndefFD:
 		return implUndefFD(cpu)
+	case OpcodeSTOP:
+		return implSTOP(cpu)
 	}
-	panic("unreachable")
+	panicf("unreachable (opcode=%s / 0x%02x)", cpu.Regs.IR, uint8(cpu.Regs.IR))
+	return nil
 }

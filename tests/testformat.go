@@ -89,13 +89,13 @@ func TestCaseStateFromCPU(cpu *model.CPU) *CPUState {
 		PC: cpu.Regs.PC,
 		SP: cpu.Regs.SP,
 		A:  cpu.Regs.A,
-		B:  cpu.Regs.B,
-		C:  cpu.Regs.C,
-		D:  cpu.Regs.D,
-		E:  cpu.Regs.E,
+		B:  cpu.Regs.BC.MSR,
+		C:  cpu.Regs.BC.LSR,
+		D:  cpu.Regs.DE.MSR,
+		E:  cpu.Regs.DE.LSR,
 		F:  cpu.Regs.F,
-		H:  cpu.Regs.H,
-		L:  cpu.Regs.L,
+		H:  cpu.Regs.HL.MSR,
+		L:  cpu.Regs.HL.LSR,
 	}
 }
 
@@ -245,13 +245,13 @@ func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
 	cpu := model.NewCPU(clock, nil, &testBus, &config, nil, opcode)
 	cpu.Reset()
 	cpu.Regs.A = tc.Initial.A
-	cpu.Regs.B = tc.Initial.B
-	cpu.Regs.C = tc.Initial.C
-	cpu.Regs.D = tc.Initial.D
-	cpu.Regs.E = tc.Initial.E
+	cpu.Regs.BC.MSR = tc.Initial.B
+	cpu.Regs.BC.LSR = tc.Initial.C
+	cpu.Regs.DE.MSR = tc.Initial.D
+	cpu.Regs.DE.LSR = tc.Initial.E
 	cpu.Regs.F = tc.Initial.F
-	cpu.Regs.H = tc.Initial.H
-	cpu.Regs.L = tc.Initial.L
+	cpu.Regs.HL.MSR = tc.Initial.H
+	cpu.Regs.HL.LSR = tc.Initial.L
 	cpu.Regs.PC = tc.Initial.PC
 	cpu.Regs.SP = tc.Initial.SP
 	for _, entry := range tc.Initial.RAM {
@@ -264,16 +264,16 @@ func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
 	if have, want := cpu.Regs.A, tc.Final.A; have != want {
 		t.Fatalf("Test %d Register A have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
 	}
-	if have, want := cpu.Regs.B, tc.Final.B; have != want {
+	if have, want := cpu.Regs.BC.MSR, tc.Final.B; have != want {
 		t.Fatalf("Test %d Register B have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
 	}
-	if have, want := cpu.Regs.C, tc.Final.C; have != want {
+	if have, want := cpu.Regs.BC.LSR, tc.Final.C; have != want {
 		t.Fatalf("Test %d Register C have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
 	}
-	if have, want := cpu.Regs.D, tc.Final.D; have != want {
+	if have, want := cpu.Regs.DE.MSR, tc.Final.D; have != want {
 		t.Fatalf("Test %d Register D have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
 	}
-	if have, want := cpu.Regs.E, tc.Final.E; have != want {
+	if have, want := cpu.Regs.DE.LSR, tc.Final.E; have != want {
 		t.Fatalf("Test %d Register E have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
 	}
 	if have, want := cpu.Regs.F.Bit(model.FlagBitZ), tc.Final.F.Bit(model.FlagBitZ); have != want {
@@ -291,10 +291,10 @@ func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
 	if have, want := cpu.Regs.F, tc.Final.F; have != want {
 		t.Fatalf("Test %d Register F have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
 	}
-	if have, want := cpu.Regs.H, tc.Final.H; have != want {
+	if have, want := cpu.Regs.HL.MSR, tc.Final.H; have != want {
 		t.Fatalf("Test %d Register H have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
 	}
-	if have, want := cpu.Regs.L, tc.Final.L; have != want {
+	if have, want := cpu.Regs.HL.LSR, tc.Final.L; have != want {
 		t.Fatalf("Test %d Register L have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
 	}
 	if have, want := cpu.Regs.PC, tc.Final.PC; have != want {

@@ -28,6 +28,10 @@ func NewDebug(clk *ClockRT, config *ConfigDebug) *Debug {
 }
 
 func (d *Debug) SetPC(addr Addr) {
+	if addr >= 0x0101 {
+		panic("")
+	}
+
 	if d == nil {
 		return
 	}

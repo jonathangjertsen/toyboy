@@ -17,48 +17,48 @@ func implNop(cpu *CPU) CycleHandler {
 // LD SP nn
 
 func implLDSPnn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implLDSPnn_2
 }
 
 func implLDSPnn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 
 	return implLDSPnn_3
 }
 
 func implLDSPnn_3(cpu *CPU) CycleHandler {
-	cpu.SetSP(Addr(cpu.Regs.GetWZ()))
+	cpu.SetSP(cpu.Regs.Temp.Addr())
 	return nil
 }
 
 // LD HL nn
 
 func implLDHLnn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implLDHLnn_2
 }
 
 func implLDHLnn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 	return implLDHLnn_3
 }
 
 func implLDHLnn_3(cpu *CPU) CycleHandler {
-	cpu.SetHL(cpu.Regs.GetWZ())
+	cpu.Regs.HL = cpu.Regs.Temp
 	return nil
 }
 
 // LD HL, SP+e
 
 func implLDHLSPe(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implLDHLSPe_2
 }
 
 func implLDHLSPe_2(cpu *CPU) CycleHandler {
-	res := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
-	cpu.Regs.L = res.Value
+	res := ADD(cpu.Regs.SP.LSB(), cpu.Regs.Temp.LSR, false)
+	cpu.Regs.HL.LSR = res.Value
 	res.Z0 = true
 	cpu.Regs.SetFlags(res)
 	return implLDHLSPe_3
@@ -66,11 +66,11 @@ func implLDHLSPe_2(cpu *CPU) CycleHandler {
 
 func implLDHLSPe_3(cpu *CPU) CycleHandler {
 	adj := Data8(0x00)
-	if cpu.Regs.TempZ&Bit7 != 0 {
+	if cpu.Regs.Temp.LSR&Bit7 != 0 {
 		adj = 0xff
 	}
 	res := ADD(cpu.Regs.SP.MSB(), adj, cpu.Regs.GetFlagC())
-	cpu.Regs.H = res.Value
+	cpu.Regs.HL.MSR = res.Value
 	return nil
 }
 
@@ -81,109 +81,106 @@ func implLDSPHL(*CPU) CycleHandler {
 }
 
 func implLDSPHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SP = Addr(cpu.GetHL())
+	cpu.Regs.SP = cpu.Regs.HL.Addr()
 	return nil
 }
 
 // LD (HL), (PC+n)
 
 func implLDHLn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implLDHLn_2
 }
 
 func implLDHLn_2(cpu *CPU) CycleHandler {
-	cpu.store(Addr(cpu.GetHL()), cpu.Regs.TempZ)
+	cpu.store(cpu.Regs.HL.Addr(), cpu.Regs.Temp.LSR)
 	return implNop
 }
 
 // LD r, (HL)
 
 func implLDAHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.A) }
-func implLDBHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.B) }
-func implLDCHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.C) }
-func implLDDHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.D) }
-func implLDEHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.E) }
-func implLDHHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.H) }
-func implLDLHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.L) }
+func implLDBHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.BC.MSR) }
+func implLDCHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.BC.LSR) }
+func implLDDHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.DE.MSR) }
+func implLDEHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.DE.LSR) }
+func implLDHHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.HL.MSR) }
+func implLDLHL(cpu *CPU) CycleHandler { return implLDrHL(cpu, &cpu.Regs.HL.LSR) }
 
 func implLDrHL(cpu *CPU, r *Data8) CycleHandler {
-	*r = cpu.load(Addr(cpu.GetHL()))
+	*r = cpu.load(cpu.Regs.HL.Addr())
 	return implNop
 }
 
 // LD A, nn
 
 func implLDAnn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implLDAnn_2
 }
 
 func implLDAnn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 	return implLDAnn_3
 }
 
 func implLDAnn_3(cpu *CPU) CycleHandler {
-	cpu.Regs.A = cpu.load(Addr(cpu.Regs.GetWZ()))
+	cpu.Regs.A = cpu.load(cpu.Regs.Temp.Addr())
 	return implNop
 }
 
 // LD nn, A
 
 func implLDnnA(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implLDnnA_2
 }
 
 func implLDnnA_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 	return implLDnnA_3
 }
 
 func implLDnnA_3(cpu *CPU) CycleHandler {
-	cpu.store(Addr(cpu.Regs.GetWZ()), cpu.Regs.A)
+	cpu.store(cpu.Regs.Temp.Addr(), cpu.Regs.A)
 	return implNop
 }
 
 // LD nn, SP
 
 func implLDnnSP(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implLDnnSP_2
 }
 
 func implLDnnSP_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 	return implLDnnSP_3
 }
 
 func implLDnnSP_3(cpu *CPU) CycleHandler {
-	cpu.store(Addr(cpu.Regs.GetWZ()), cpu.Regs.SP.LSB())
-	cpu.Regs.TempZ++
-	if cpu.Regs.TempZ == 0 {
-		cpu.Regs.TempW++
-	}
+	cpu.store(cpu.Regs.Temp.Addr(), cpu.Regs.SP.LSB())
+	cpu.Regs.Temp.Inc()
 	return implLDnnSP_4
 }
 
 func implLDnnSP_4(cpu *CPU) CycleHandler {
-	cpu.store(Addr(cpu.Regs.GetWZ()), cpu.Regs.SP.MSB())
+	cpu.store(cpu.Regs.Temp.Addr(), cpu.Regs.SP.MSB())
 	return implNop
 }
 
 // LD (HL), r
 
 func implLDHLA(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.A) }
-func implLDHLB(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.B) }
-func implLDHLC(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.C) }
-func implLDHLD(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.D) }
-func implLDHLE(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.E) }
-func implLDHLH(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.H) }
-func implLDHLL(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.L) }
+func implLDHLB(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.BC.MSR) }
+func implLDHLC(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.BC.LSR) }
+func implLDHLD(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.DE.MSR) }
+func implLDHLE(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.DE.LSR) }
+func implLDHLH(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.HL.MSR) }
+func implLDHLL(cpu *CPU) CycleHandler { return implLDHLr(cpu, cpu.Regs.HL.LSR) }
 
 func implLDHLr(cpu *CPU, r Data8) CycleHandler {
-	cpu.store(Addr(cpu.GetHL()), r)
+	cpu.store(cpu.Regs.HL.Addr(), r)
 
 	return implNop
 }
@@ -191,8 +188,8 @@ func implLDHLr(cpu *CPU, r Data8) CycleHandler {
 // LD (HL+), A
 
 func implLDHLAInc(cpu *CPU) CycleHandler {
-	cpu.store(Addr(cpu.GetHL()), cpu.Regs.A)
-	cpu.SetHL(cpu.GetHL() + 1)
+	cpu.store(cpu.Regs.HL.Addr(), cpu.Regs.A)
+	cpu.Regs.HL.Inc()
 
 	return implNop
 }
@@ -200,8 +197,8 @@ func implLDHLAInc(cpu *CPU) CycleHandler {
 // LD (HL-), A
 
 func implLDHLADec(cpu *CPU) CycleHandler {
-	cpu.store(Addr(cpu.GetHL()), cpu.Regs.A)
-	cpu.SetHL(cpu.GetHL() - 1)
+	cpu.store(cpu.Regs.HL.Addr(), cpu.Regs.A)
+	cpu.Regs.HL.Dec()
 
 	return implNop
 }
@@ -209,7 +206,7 @@ func implLDHLADec(cpu *CPU) CycleHandler {
 // LD A (C+$FF00)
 
 func implLDHAC(cpu *CPU) CycleHandler {
-	cpu.Regs.A = cpu.load(Addr(join16(0xff, cpu.Regs.C)))
+	cpu.Regs.A = cpu.load(Addr(join16(0xff, cpu.Regs.BC.LSR)))
 
 	return implNop
 }
@@ -217,7 +214,7 @@ func implLDHAC(cpu *CPU) CycleHandler {
 // LD (C+$FF00), A
 
 func implLDHCA(cpu *CPU) CycleHandler {
-	cpu.store(Addr(join16(0xff, cpu.Regs.C)), cpu.Regs.A)
+	cpu.store(Addr(join16(0xff, cpu.Regs.BC.LSR)), cpu.Regs.A)
 
 	return implNop
 }
@@ -225,13 +222,13 @@ func implLDHCA(cpu *CPU) CycleHandler {
 // LD (n+$FF00), A
 
 func implLDHnA(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 
 	return implLDHnA_2
 }
 
 func implLDHnA_2(cpu *CPU) CycleHandler {
-	cpu.store(Addr(join16(0xff, cpu.Regs.TempZ)), cpu.Regs.A)
+	cpu.store(Addr(join16(0xff, cpu.Regs.Temp.LSR)), cpu.Regs.A)
 
 	return implNop
 }
@@ -239,13 +236,13 @@ func implLDHnA_2(cpu *CPU) CycleHandler {
 // LD A,(n+$FF00)
 
 func implLDHAn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 
 	return implLDHAn_2
 }
 
 func implLDHAn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.A = cpu.load(Addr(join16(0xff, cpu.Regs.TempZ)))
+	cpu.Regs.A = cpu.load(Addr(join16(0xff, cpu.Regs.Temp.LSR)))
 
 	return implNop
 }
@@ -253,60 +250,60 @@ func implLDHAn_2(cpu *CPU) CycleHandler {
 // LD r, r'
 
 func implLDAA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.A) }
-func implLDBA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.B, cpu.Regs.A) }
-func implLDCA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.C, cpu.Regs.A) }
-func implLDDA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.D, cpu.Regs.A) }
-func implLDEA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.E, cpu.Regs.A) }
-func implLDHA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.H, cpu.Regs.A) }
-func implLDLA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.L, cpu.Regs.A) }
+func implLDBA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.MSR, cpu.Regs.A) }
+func implLDCA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.LSR, cpu.Regs.A) }
+func implLDDA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.MSR, cpu.Regs.A) }
+func implLDEA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.LSR, cpu.Regs.A) }
+func implLDHA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.MSR, cpu.Regs.A) }
+func implLDLA(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.LSR, cpu.Regs.A) }
 
-func implLDAB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.B) }
-func implLDBB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.B, cpu.Regs.B) }
-func implLDCB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.C, cpu.Regs.B) }
-func implLDDB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.D, cpu.Regs.B) }
-func implLDEB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.E, cpu.Regs.B) }
-func implLDHB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.H, cpu.Regs.B) }
-func implLDLB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.L, cpu.Regs.B) }
+func implLDAB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.BC.MSR) }
+func implLDBB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.MSR, cpu.Regs.BC.MSR) }
+func implLDCB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.LSR, cpu.Regs.BC.MSR) }
+func implLDDB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.MSR, cpu.Regs.BC.MSR) }
+func implLDEB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.LSR, cpu.Regs.BC.MSR) }
+func implLDHB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.MSR, cpu.Regs.BC.MSR) }
+func implLDLB(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.LSR, cpu.Regs.BC.MSR) }
 
-func implLDAC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.C) }
-func implLDBC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.B, cpu.Regs.C) }
-func implLDCC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.C, cpu.Regs.C) }
-func implLDDC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.D, cpu.Regs.C) }
-func implLDEC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.E, cpu.Regs.C) }
-func implLDHC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.H, cpu.Regs.C) }
-func implLDLC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.L, cpu.Regs.C) }
+func implLDAC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.BC.LSR) }
+func implLDBC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.MSR, cpu.Regs.BC.LSR) }
+func implLDCC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.LSR, cpu.Regs.BC.LSR) }
+func implLDDC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.MSR, cpu.Regs.BC.LSR) }
+func implLDEC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.LSR, cpu.Regs.BC.LSR) }
+func implLDHC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.MSR, cpu.Regs.BC.LSR) }
+func implLDLC(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.LSR, cpu.Regs.BC.LSR) }
 
-func implLDAD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.D) }
-func implLDBD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.B, cpu.Regs.D) }
-func implLDCD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.C, cpu.Regs.D) }
-func implLDDD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.D, cpu.Regs.D) }
-func implLDED(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.E, cpu.Regs.D) }
-func implLDHD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.H, cpu.Regs.D) }
-func implLDLD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.L, cpu.Regs.D) }
+func implLDAD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.DE.MSR) }
+func implLDBD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.MSR, cpu.Regs.DE.MSR) }
+func implLDCD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.LSR, cpu.Regs.DE.MSR) }
+func implLDDD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.MSR, cpu.Regs.DE.MSR) }
+func implLDED(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.LSR, cpu.Regs.DE.MSR) }
+func implLDHD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.MSR, cpu.Regs.DE.MSR) }
+func implLDLD(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.LSR, cpu.Regs.DE.MSR) }
 
-func implLDAE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.E) }
-func implLDBE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.B, cpu.Regs.E) }
-func implLDCE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.C, cpu.Regs.E) }
-func implLDDE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.D, cpu.Regs.E) }
-func implLDEE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.E, cpu.Regs.E) }
-func implLDHE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.H, cpu.Regs.E) }
-func implLDLE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.L, cpu.Regs.E) }
+func implLDAE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.DE.LSR) }
+func implLDBE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.MSR, cpu.Regs.DE.LSR) }
+func implLDCE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.LSR, cpu.Regs.DE.LSR) }
+func implLDDE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.MSR, cpu.Regs.DE.LSR) }
+func implLDEE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.LSR, cpu.Regs.DE.LSR) }
+func implLDHE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.MSR, cpu.Regs.DE.LSR) }
+func implLDLE(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.LSR, cpu.Regs.DE.LSR) }
 
-func implLDAH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.H) }
-func implLDBH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.B, cpu.Regs.H) }
-func implLDCH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.C, cpu.Regs.H) }
-func implLDDH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.D, cpu.Regs.H) }
-func implLDEH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.E, cpu.Regs.H) }
-func implLDHH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.H, cpu.Regs.H) }
-func implLDLH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.L, cpu.Regs.H) }
+func implLDAH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.HL.MSR) }
+func implLDBH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.MSR, cpu.Regs.HL.MSR) }
+func implLDCH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.LSR, cpu.Regs.HL.MSR) }
+func implLDDH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.MSR, cpu.Regs.HL.MSR) }
+func implLDEH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.LSR, cpu.Regs.HL.MSR) }
+func implLDHH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.MSR, cpu.Regs.HL.MSR) }
+func implLDLH(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.LSR, cpu.Regs.HL.MSR) }
 
-func implLDAL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.L) }
-func implLDBL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.B, cpu.Regs.L) }
-func implLDCL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.C, cpu.Regs.L) }
-func implLDDL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.D, cpu.Regs.L) }
-func implLDEL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.E, cpu.Regs.L) }
-func implLDHL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.H, cpu.Regs.L) }
-func implLDLL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.L, cpu.Regs.L) }
+func implLDAL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.A, cpu.Regs.HL.LSR) }
+func implLDBL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.MSR, cpu.Regs.HL.LSR) }
+func implLDCL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.BC.LSR, cpu.Regs.HL.LSR) }
+func implLDDL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.MSR, cpu.Regs.HL.LSR) }
+func implLDEL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.DE.LSR, cpu.Regs.HL.LSR) }
+func implLDHL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.MSR, cpu.Regs.HL.LSR) }
+func implLDLL(cpu *CPU) CycleHandler { return implLDrr(&cpu.Regs.HL.LSR, cpu.Regs.HL.LSR) }
 
 func implLDrr(dest *Data8, src Data8) CycleHandler {
 	*dest = src
@@ -317,29 +314,29 @@ func implLDrr(dest *Data8, src Data8) CycleHandler {
 // LD r, n
 
 func implLDAn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.A) }
-func implLDBn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.B) }
-func implLDCn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.C) }
-func implLDDn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.D) }
-func implLDEn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.E) }
-func implLDHn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.H) }
-func implLDLn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.L) }
+func implLDBn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.BC.MSR) }
+func implLDCn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.BC.LSR) }
+func implLDDn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.DE.MSR) }
+func implLDEn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.DE.LSR) }
+func implLDHn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.HL.MSR) }
+func implLDLn(cpu *CPU) CycleHandler { return implLDrn(cpu, &cpu.Regs.HL.LSR) }
 
 func implLDrn(cpu *CPU, reg *Data8) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	cpu.Regs.TempPtr[0] = reg
 
 	return implLDrn_2
 }
 
 func implLDrn_2(cpu *CPU) CycleHandler {
-	*cpu.Regs.TempPtr[0] = cpu.Regs.TempZ
+	*cpu.Regs.TempPtr[0] = cpu.Regs.Temp.LSR
 	return nil
 }
 
 // LD (rr'), a
 
-func implLDBCA(cpu *CPU) CycleHandler { return implLDrrA(cpu, cpu.Regs.B, cpu.Regs.C) }
-func implLDDEA(cpu *CPU) CycleHandler { return implLDrrA(cpu, cpu.Regs.D, cpu.Regs.E) }
+func implLDBCA(cpu *CPU) CycleHandler { return implLDrrA(cpu, cpu.Regs.BC.MSR, cpu.Regs.BC.LSR) }
+func implLDDEA(cpu *CPU) CycleHandler { return implLDrrA(cpu, cpu.Regs.DE.MSR, cpu.Regs.DE.LSR) }
 
 func implLDrrA(cpu *CPU, msr, lsr Data8) CycleHandler {
 	cpu.store(Addr(join16(msr, lsr)), cpu.Regs.A)
@@ -348,11 +345,11 @@ func implLDrrA(cpu *CPU, msr, lsr Data8) CycleHandler {
 
 // LD (rr'), nn
 
-func implLDBCnn(cpu *CPU) CycleHandler { return implLDxxnn(cpu, &cpu.Regs.B, &cpu.Regs.C) }
-func implLDDEnn(cpu *CPU) CycleHandler { return implLDxxnn(cpu, &cpu.Regs.D, &cpu.Regs.E) }
+func implLDBCnn(cpu *CPU) CycleHandler { return implLDxxnn(cpu, &cpu.Regs.BC.MSR, &cpu.Regs.BC.LSR) }
+func implLDDEnn(cpu *CPU) CycleHandler { return implLDxxnn(cpu, &cpu.Regs.DE.MSR, &cpu.Regs.DE.LSR) }
 
 func implLDxxnn(cpu *CPU, msr, lsr *Data8) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	cpu.Regs.TempPtr[0] = msr
 	cpu.Regs.TempPtr[1] = lsr
 
@@ -360,69 +357,63 @@ func implLDxxnn(cpu *CPU, msr, lsr *Data8) CycleHandler {
 }
 
 func implLDxxnn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 
 	return implLDxxnn_3
 }
 
 func implLDxxnn_3(cpu *CPU) CycleHandler {
-	*cpu.Regs.TempPtr[0] = cpu.Regs.TempW
-	*cpu.Regs.TempPtr[1] = cpu.Regs.TempZ
+	*cpu.Regs.TempPtr[0] = cpu.Regs.Temp.MSR
+	*cpu.Regs.TempPtr[1] = cpu.Regs.Temp.LSR
 	return nil
 }
 
 // LD A, (rr')
 
-func implLDABC(cpu *CPU) CycleHandler { return implLDArr(cpu, cpu.Regs.B, cpu.Regs.C) }
-func implLDADE(cpu *CPU) CycleHandler { return implLDArr(cpu, cpu.Regs.D, cpu.Regs.E) }
+func implLDABC(cpu *CPU) CycleHandler { return implLDArr(cpu, cpu.Regs.BC.MSR, cpu.Regs.BC.LSR) }
+func implLDADE(cpu *CPU) CycleHandler { return implLDArr(cpu, cpu.Regs.DE.MSR, cpu.Regs.DE.LSR) }
 
 func implLDArr(cpu *CPU, msr, lsr Data8) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(join16(msr, lsr)))
+	cpu.Regs.Temp.LSR = cpu.load(Addr(join16(msr, lsr)))
 	return implLDArr_2
 }
 
 func implLDArr_2(cpu *CPU) CycleHandler {
-	cpu.Regs.A = cpu.Regs.TempZ
+	cpu.Regs.A = cpu.Regs.Temp.LSR
 	return nil
 }
 
 // LD A, (HL+)
 
 func implLDAHLInc(cpu *CPU) CycleHandler {
-	cpu.Regs.A = cpu.load(Addr(cpu.GetHL()))
-	cpu.Regs.L++
-	if cpu.Regs.L == 0 {
-		cpu.Regs.H++
-	}
+	cpu.Regs.A = cpu.load(cpu.Regs.HL.Addr())
+	cpu.Regs.HL.Inc()
 	return implNop
 }
 
 // LD A, (HL-)
 
 func implLDAHLDec(cpu *CPU) CycleHandler {
-	cpu.Regs.A = cpu.load(Addr(cpu.GetHL()))
-	cpu.Regs.L--
-	if cpu.Regs.L == 0xFF {
-		cpu.Regs.H--
-	}
+	cpu.Regs.A = cpu.load(cpu.Regs.HL.Addr())
+	cpu.Regs.HL.Dec()
 	return implNop
 }
 
 // JR PC+e
 
 func implJRe(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implJRe_2
 }
 
 func implJRe_2(cpu *CPU) CycleHandler {
-	newPC := Data16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ)))
-	cpu.Regs.SetWZ(newPC)
+	newPC := Data16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.Temp.LSR)))
+	cpu.Regs.Temp.Set(newPC)
 	return implJRe_3
 }
 
 func implJRe_3(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.Regs.GetWZ()))
+	cpu.SetPC(cpu.Regs.Temp.Addr())
 	return nil
 }
 
@@ -445,49 +436,50 @@ func implJRNCe(cpu *CPU) CycleHandler {
 }
 
 func implJRcce(cpu *CPU, cond bool) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 
-	if cond {
-		cpu.lastBranchResult = +1
-		return implJRcce_2
+	if !cond {
+		cpu.lastBranchResult = -1
+		return implNop
 	}
-	cpu.lastBranchResult = -1
-	return implNop
+
+	cpu.lastBranchResult = +1
+	return implJRcce_2
 }
 
 func implJRcce_2(cpu *CPU) CycleHandler {
-	newPC := Data16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ)))
-	cpu.Regs.SetWZ(newPC)
+	newPC := Data16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.Temp.LSR)))
+	cpu.Regs.Temp.Set(newPC)
 	return implJRcce_3
 }
 
 func implJRcce_3(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.Regs.GetWZ()))
+	cpu.SetPC(cpu.Regs.Temp.Addr())
 	return nil
 }
 
 // JP HL
 
 func implJPHL(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.GetHL() - 1))
+	cpu.SetPC(cpu.Regs.HL.Addr())
 	return nil
 }
 
 // JP nn
 
 func implJPnn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implJPnn_2
 }
 
 func implJPnn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 	return implJPnn_3
 }
 
 func implJPnn_3(cpu *CPU) CycleHandler {
 	cpu.lastBranchResult = +1
-	cpu.SetPC(Addr(cpu.Regs.GetWZ() - 1))
+	cpu.SetPC(cpu.Regs.Temp.Addr())
 	return implNop
 }
 
@@ -510,35 +502,35 @@ func implJPNCnn(cpu *CPU) CycleHandler {
 }
 
 func implJPccnn(cpu *CPU, cond bool) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	cpu.Regs.TempCond = cond
 	return implJPccnn_2
 }
 
 func implJPccnn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 	if !cpu.Regs.TempCond {
 		cpu.lastBranchResult = -1
-		return implNop
+		return nil
 	}
 	cpu.lastBranchResult = +1
 	return implJPccnn_3
 }
 
 func implJPccnn_3(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.Regs.GetWZ() - 1))
+	cpu.SetPC(cpu.Regs.Temp.Addr())
 	return implNop
 }
 
 // CALL nn
 
 func implCALLnn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implCALLnn_2
 }
 
 func implCALLnn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 	return implCALLnn_3
 }
 
@@ -557,7 +549,7 @@ func implCALLnn_5(cpu *CPU) CycleHandler {
 }
 
 func implCALLnn_6(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.Regs.GetWZ()))
+	cpu.SetPC(cpu.Regs.Temp.Addr())
 	return nil
 }
 
@@ -568,19 +560,19 @@ func implCALLCnn(cpu *CPU) CycleHandler  { return implCALLccnn(cpu, cpu.Regs.Get
 func implCALLNCnn(cpu *CPU) CycleHandler { return implCALLccnn(cpu, !cpu.Regs.GetFlagC()) }
 
 func implCALLccnn(cpu *CPU, cond bool) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	cpu.Regs.TempCond = cond
 	return implCALLccnn_2
 }
 
 func implCALLccnn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.MSR = cpu.fetchByteAtPC()
 	return implCALLccnn_3
 }
 
 func implCALLccnn_3(cpu *CPU) CycleHandler {
 	if !cpu.Regs.TempCond {
-		return implNop
+		return nil
 	}
 	return implCALLccnn_4
 }
@@ -596,7 +588,7 @@ func implCALLccnn_5(cpu *CPU) CycleHandler {
 }
 
 func implCALLccnn_6(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.Regs.GetWZ() - 1))
+	cpu.SetPC(cpu.Regs.Temp.Addr())
 	return nil
 }
 
@@ -613,7 +605,8 @@ func implRST0x38(cpu *CPU) CycleHandler { return implRSTn(cpu, 0x38) }
 
 func implRSTn(cpu *CPU, vec Data8) CycleHandler {
 	cpu.push((cpu.Regs.PC + 1).MSB())
-	cpu.Regs.TempZ = vec
+	cpu.Regs.Temp.LSR = vec
+	cpu.Regs.Temp.MSR = 0
 	return implRSTn_2
 }
 
@@ -623,41 +616,41 @@ func implRSTn_2(cpu *CPU) CycleHandler {
 }
 
 func implRSTn_3(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(join16(0x00, cpu.Regs.TempZ) - 1))
-	return implNop
+	cpu.SetPC(cpu.Regs.Temp.Addr())
+	return nil
 }
 
 // RET
 
 func implRET(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.pop()
+	cpu.Regs.Temp.LSR = cpu.pop()
 	return implRET_2
 }
 
 func implRET_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.pop()
+	cpu.Regs.Temp.MSR = cpu.pop()
 	return implRET_3
 }
 
 func implRET_3(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.Regs.GetWZ() - 1))
+	cpu.SetPC(cpu.Regs.Temp.Addr())
 	return implNop
 }
 
 // RETI
 
 func implRETI(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.pop()
+	cpu.Regs.Temp.LSR = cpu.pop()
 	return implRETI_2
 }
 
 func implRETI_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.pop()
+	cpu.Regs.Temp.MSR = cpu.pop()
 	return implRETI_3
 }
 
 func implRETI_3(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.Regs.GetWZ() - 1))
+	cpu.SetPC(cpu.Regs.Temp.Addr())
 	// TODO verify if this is the right cycle
 	if cpu.Interrupts != nil {
 		cpu.Interrupts.IME = true
@@ -693,35 +686,35 @@ func implRETcc(cpu *CPU, cond bool) CycleHandler {
 }
 
 func implRETcc_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.pop()
+	cpu.Regs.Temp.LSR = cpu.pop()
 	return implRETcc_3
 }
 
 func implRETcc_3(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.pop()
+	cpu.Regs.Temp.MSR = cpu.pop()
 	return implRETcc_4
 }
 
 func implRETcc_4(cpu *CPU) CycleHandler {
-	cpu.SetPC(Addr(cpu.Regs.GetWZ()) - 1)
+	cpu.SetPC(cpu.Regs.Temp.Addr() - 1)
 	return implNop
 }
 
 // PUSH rr'
 
 func implPUSHAF(cpu *CPU) CycleHandler { return implPUSHrr(cpu, cpu.Regs.A, cpu.Regs.F) }
-func implPUSHBC(cpu *CPU) CycleHandler { return implPUSHrr(cpu, cpu.Regs.B, cpu.Regs.C) }
-func implPUSHDE(cpu *CPU) CycleHandler { return implPUSHrr(cpu, cpu.Regs.D, cpu.Regs.E) }
-func implPUSHHL(cpu *CPU) CycleHandler { return implPUSHrr(cpu, cpu.Regs.H, cpu.Regs.L) }
+func implPUSHBC(cpu *CPU) CycleHandler { return implPUSHrr(cpu, cpu.Regs.BC.MSR, cpu.Regs.BC.LSR) }
+func implPUSHDE(cpu *CPU) CycleHandler { return implPUSHrr(cpu, cpu.Regs.DE.MSR, cpu.Regs.DE.LSR) }
+func implPUSHHL(cpu *CPU) CycleHandler { return implPUSHrr(cpu, cpu.Regs.HL.MSR, cpu.Regs.HL.LSR) }
 
 func implPUSHrr(cpu *CPU, msb, lsb Data8) CycleHandler {
 	cpu.push(msb)
-	cpu.Regs.TempZ = lsb
+	cpu.Regs.Temp.LSR = lsb
 	return implPUSHrr_2
 }
 
 func implPUSHrr_2(cpu *CPU) CycleHandler {
-	cpu.push(cpu.Regs.TempZ)
+	cpu.push(cpu.Regs.Temp.LSR)
 	return implPUSHrr_3
 }
 
@@ -732,12 +725,12 @@ func implPUSHrr_3(*CPU) CycleHandler {
 // POP rr'
 
 func implPOPAF(cpu *CPU) CycleHandler { return implPOPrr(cpu, &cpu.Regs.A, &cpu.Regs.F) }
-func implPOPBC(cpu *CPU) CycleHandler { return implPOPrr(cpu, &cpu.Regs.B, &cpu.Regs.C) }
-func implPOPDE(cpu *CPU) CycleHandler { return implPOPrr(cpu, &cpu.Regs.D, &cpu.Regs.E) }
-func implPOPHL(cpu *CPU) CycleHandler { return implPOPrr(cpu, &cpu.Regs.H, &cpu.Regs.L) }
+func implPOPBC(cpu *CPU) CycleHandler { return implPOPrr(cpu, &cpu.Regs.BC.MSR, &cpu.Regs.BC.LSR) }
+func implPOPDE(cpu *CPU) CycleHandler { return implPOPrr(cpu, &cpu.Regs.DE.MSR, &cpu.Regs.DE.LSR) }
+func implPOPHL(cpu *CPU) CycleHandler { return implPOPrr(cpu, &cpu.Regs.HL.MSR, &cpu.Regs.HL.LSR) }
 
 func implPOPrr(cpu *CPU, msb, lsb *Data8) CycleHandler {
-	cpu.Regs.TempZ = cpu.pop()
+	cpu.Regs.Temp.LSR = cpu.pop()
 
 	cpu.Regs.TempPtr[0] = msb
 	cpu.Regs.TempPtr[1] = lsb
@@ -746,7 +739,7 @@ func implPOPrr(cpu *CPU, msb, lsb *Data8) CycleHandler {
 }
 
 func implPOPrr_2(cpu *CPU) CycleHandler {
-	cpu.Regs.TempW = cpu.pop()
+	cpu.Regs.Temp.MSR = cpu.pop()
 
 	return implPOPrr_3
 }
@@ -755,11 +748,11 @@ func implPOPrr_3(cpu *CPU) CycleHandler {
 	msb := cpu.Regs.TempPtr[0]
 	lsb := cpu.Regs.TempPtr[1]
 
-	*msb = cpu.Regs.TempW
+	*msb = cpu.Regs.Temp.MSR
 	if lsb == &cpu.Regs.F {
-		*lsb = cpu.Regs.TempZ & 0xf0
+		*lsb = cpu.Regs.Temp.LSR & 0xf0
 	} else {
-		*lsb = cpu.Regs.TempZ
+		*lsb = cpu.Regs.Temp.LSR
 	}
 
 	return nil
@@ -790,12 +783,12 @@ func implRRCA(cpu *CPU) CycleHandler {
 // AND A, r
 
 func implANDA(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.A) }
-func implANDB(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.B) }
-func implANDC(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.C) }
-func implANDD(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.D) }
-func implANDE(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.E) }
-func implANDH(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.H) }
-func implANDL(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.L) }
+func implANDB(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.BC.MSR) }
+func implANDC(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.BC.LSR) }
+func implANDD(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.DE.MSR) }
+func implANDE(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.DE.LSR) }
+func implANDH(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.HL.MSR) }
+func implANDL(cpu *CPU) CycleHandler { return implANDr(cpu, cpu.Regs.HL.LSR) }
 
 func implANDr(cpu *CPU, r Data8) CycleHandler {
 	cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, r))
@@ -805,36 +798,36 @@ func implANDr(cpu *CPU, r Data8) CycleHandler {
 // AND A, n
 
 func implANDn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implANDn_2
 }
 
 func implANDn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, cpu.Regs.TempZ))
+	cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, cpu.Regs.Temp.LSR))
 	return nil
 }
 
 // AND A, (HL)
 
 func implANDHL(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implANDHL_2
 }
 
 func implANDHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, cpu.Regs.TempZ))
+	cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, cpu.Regs.Temp.LSR))
 	return nil
 }
 
 // CP A, r
 
 func implCPA(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.A) }
-func implCPB(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.B) }
-func implCPC(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.C) }
-func implCPD(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.D) }
-func implCPE(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.E) }
-func implCPH(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.H) }
-func implCPL(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.L) }
+func implCPB(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.BC.MSR) }
+func implCPC(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.BC.LSR) }
+func implCPD(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.DE.MSR) }
+func implCPE(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.DE.LSR) }
+func implCPH(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.HL.MSR) }
+func implCPL(cpu *CPU) CycleHandler { return implCPr(cpu, cpu.Regs.HL.LSR) }
 
 func implCPr(cpu *CPU, r Data8) CycleHandler {
 	cpu.Regs.SetFlags(SUB(cpu.Regs.A, r, false))
@@ -844,36 +837,36 @@ func implCPr(cpu *CPU, r Data8) CycleHandler {
 // CP A, n
 
 func implCPn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implCPn_2
 }
 
 func implCPn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlags(SUB(cpu.Regs.A, cpu.Regs.TempZ, false))
+	cpu.Regs.SetFlags(SUB(cpu.Regs.A, cpu.Regs.Temp.LSR, false))
 	return nil
 }
 
 // CP A, (HL)
 
 func implCPHL(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implCPHL_2
 }
 
 func implCPHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlags(SUB(cpu.Regs.A, cpu.Regs.TempZ, false))
+	cpu.Regs.SetFlags(SUB(cpu.Regs.A, cpu.Regs.Temp.LSR, false))
 	return nil
 }
 
 // SUB A, r
 
 func implSUBA(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.A) }
-func implSUBB(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.B) }
-func implSUBC(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.C) }
-func implSUBD(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.D) }
-func implSUBE(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.E) }
-func implSUBH(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.H) }
-func implSUBL(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.L) }
+func implSUBB(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.BC.MSR) }
+func implSUBC(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.BC.LSR) }
+func implSUBD(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.DE.MSR) }
+func implSUBE(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.DE.LSR) }
+func implSUBH(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.HL.MSR) }
+func implSUBL(cpu *CPU) CycleHandler { return implSUBr(cpu, cpu.Regs.HL.LSR) }
 
 func implSUBr(cpu *CPU, r Data8) CycleHandler {
 	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, r, false))
@@ -883,36 +876,36 @@ func implSUBr(cpu *CPU, r Data8) CycleHandler {
 // SUB A, n
 
 func implSUBn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implSUBn_2
 }
 
 func implSUBn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, cpu.Regs.TempZ, false))
+	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, cpu.Regs.Temp.LSR, false))
 	return nil
 }
 
 // SUB A, (HL)
 
 func implSUBHL(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implSUBHL_2
 }
 
 func implSUBHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, cpu.Regs.TempZ, false))
+	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, cpu.Regs.Temp.LSR, false))
 	return nil
 }
 
 // SBC A, r
 
 func implSBCA(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.A) }
-func implSBCB(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.B) }
-func implSBCC(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.C) }
-func implSBCD(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.D) }
-func implSBCE(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.E) }
-func implSBCH(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.H) }
-func implSBCL(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.L) }
+func implSBCB(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.BC.MSR) }
+func implSBCC(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.BC.LSR) }
+func implSBCD(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.DE.MSR) }
+func implSBCE(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.DE.LSR) }
+func implSBCH(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.HL.MSR) }
+func implSBCL(cpu *CPU) CycleHandler { return implSBCr(cpu, cpu.Regs.HL.LSR) }
 
 func implSBCr(cpu *CPU, r Data8) CycleHandler {
 	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, r, cpu.Regs.GetFlagC()))
@@ -922,36 +915,36 @@ func implSBCr(cpu *CPU, r Data8) CycleHandler {
 // SBC A, n
 
 func implSBCn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implSBCn_2
 }
 
 func implSBCn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, cpu.Regs.TempZ, cpu.Regs.GetFlagC()))
+	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, cpu.Regs.Temp.LSR, cpu.Regs.GetFlagC()))
 	return nil
 }
 
 // SBC A, (HL)
 
 func implSBCHL(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implSBCHL_2
 }
 
 func implSBCHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, cpu.Regs.TempZ, cpu.Regs.GetFlagC()))
+	cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, cpu.Regs.Temp.LSR, cpu.Regs.GetFlagC()))
 	return nil
 }
 
 // ADD A, r
 
 func implADDA(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.A) }
-func implADDB(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.B) }
-func implADDC(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.C) }
-func implADDD(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.D) }
-func implADDE(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.E) }
-func implADDH(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.H) }
-func implADDL(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.L) }
+func implADDB(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.BC.MSR) }
+func implADDC(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.BC.LSR) }
+func implADDD(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.DE.MSR) }
+func implADDE(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.DE.LSR) }
+func implADDH(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.HL.MSR) }
+func implADDL(cpu *CPU) CycleHandler { return implADDr(cpu, cpu.Regs.HL.LSR) }
 
 func implADDr(cpu *CPU, r Data8) CycleHandler {
 	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, r, false))
@@ -961,40 +954,40 @@ func implADDr(cpu *CPU, r Data8) CycleHandler {
 // ADD A, n
 
 func implADDn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implADDn_2
 }
 
 func implADDn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.TempZ, false))
+	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.Temp.LSR, false))
 	return nil
 }
 
 // ADD A, (HL)
 
 func implADDHL(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implADDHL_2
 }
 
 func implADDHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.TempZ, false))
+	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.Temp.LSR, false))
 	return nil
 }
 
 // ADD HL, rr'
 
-func implADDHLHL(cpu *CPU) CycleHandler { return implADDHLrr(cpu, cpu.Regs.H, cpu.Regs.L) }
-func implADDHLBC(cpu *CPU) CycleHandler { return implADDHLrr(cpu, cpu.Regs.B, cpu.Regs.C) }
-func implADDHLDE(cpu *CPU) CycleHandler { return implADDHLrr(cpu, cpu.Regs.D, cpu.Regs.E) }
+func implADDHLHL(cpu *CPU) CycleHandler { return implADDHLrr(cpu, cpu.Regs.HL.MSR, cpu.Regs.HL.LSR) }
+func implADDHLBC(cpu *CPU) CycleHandler { return implADDHLrr(cpu, cpu.Regs.BC.MSR, cpu.Regs.BC.LSR) }
+func implADDHLDE(cpu *CPU) CycleHandler { return implADDHLrr(cpu, cpu.Regs.DE.MSR, cpu.Regs.DE.LSR) }
 func implADDHLSP(cpu *CPU) CycleHandler {
 	return implADDHLrr(cpu, cpu.Regs.SP.MSB(), cpu.Regs.SP.LSB())
 }
 
 func implADDHLrr(cpu *CPU, msr, lsr Data8) CycleHandler {
-	result := ADD(cpu.Regs.L, lsr, false)
-	cpu.Regs.TempZ = msr
-	cpu.Regs.L = result.Value
+	result := ADD(cpu.Regs.HL.LSR, lsr, false)
+	cpu.Regs.Temp.LSR = msr
+	cpu.Regs.HL.LSR = result.Value
 	cpu.Regs.SetFlagC(result.C)
 	cpu.Regs.SetFlagH(result.H)
 	cpu.Regs.SetFlagN(result.N)
@@ -1002,8 +995,8 @@ func implADDHLrr(cpu *CPU, msr, lsr Data8) CycleHandler {
 }
 
 func implADDHLrr_2(cpu *CPU) CycleHandler {
-	result := ADD(cpu.Regs.H, cpu.Regs.TempZ, cpu.Regs.GetFlagC())
-	cpu.Regs.H = result.Value
+	result := ADD(cpu.Regs.HL.MSR, cpu.Regs.Temp.LSR, cpu.Regs.GetFlagC())
+	cpu.Regs.HL.MSR = result.Value
 	cpu.Regs.SetFlagC(result.C)
 	cpu.Regs.SetFlagH(result.H)
 	cpu.Regs.SetFlagN(result.N)
@@ -1013,50 +1006,50 @@ func implADDHLrr_2(cpu *CPU) CycleHandler {
 // ADD SP, PC+e
 
 func implADDSPe(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implADDSPe_2
 }
 
 func implADDSPe_2(cpu *CPU) CycleHandler {
-	zSign := cpu.Regs.TempZ&Bit7 != 0
-	result := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
-	cpu.Regs.TempZ = result.Value
-	cpu.Regs.TempW = 0
+	zSign := cpu.Regs.Temp.LSR&Bit7 != 0
+	result := ADD(cpu.Regs.SP.LSB(), cpu.Regs.Temp.LSR, false)
+	cpu.Regs.Temp.LSR = result.Value
+	cpu.Regs.Temp.MSR = 0
 	cpu.Regs.SetFlags(result)
 	cpu.Regs.SetFlagZ(false)
 	if c := cpu.Regs.GetFlagC(); c && !zSign {
-		cpu.Regs.TempW = 1
+		cpu.Regs.Temp.MSR = 1
 	} else if !c && zSign {
-		cpu.Regs.TempW = 0xff
+		cpu.Regs.Temp.MSR = 0xff
 	}
 	return implADDSPe_3
 }
 
 func implADDSPe_3(cpu *CPU) CycleHandler {
 	res := cpu.Regs.SP.MSB()
-	if cpu.Regs.TempW == 1 {
+	if cpu.Regs.Temp.MSR == 1 {
 		res++
-	} else if cpu.Regs.TempW == 0xff {
+	} else if cpu.Regs.Temp.MSR == 0xff {
 		res--
 	}
-	cpu.Regs.TempW = res
+	cpu.Regs.Temp.MSR = res
 	return implADDSPe_4
 }
 
 func implADDSPe_4(cpu *CPU) CycleHandler {
-	cpu.SetSP(Addr(cpu.Regs.GetWZ()))
+	cpu.SetSP(cpu.Regs.Temp.Addr())
 	return nil
 }
 
 // ADC A, r
 
 func implADCA(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.A) }
-func implADCB(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.B) }
-func implADCC(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.C) }
-func implADCD(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.D) }
-func implADCE(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.E) }
-func implADCH(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.H) }
-func implADCL(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.L) }
+func implADCB(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.BC.MSR) }
+func implADCC(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.BC.LSR) }
+func implADCD(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.DE.MSR) }
+func implADCE(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.DE.LSR) }
+func implADCH(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.HL.MSR) }
+func implADCL(cpu *CPU) CycleHandler { return implADCr(cpu, cpu.Regs.HL.LSR) }
 
 func implADCr(cpu *CPU, r Data8) CycleHandler {
 	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, r, cpu.Regs.GetFlagC()))
@@ -1066,36 +1059,36 @@ func implADCr(cpu *CPU, r Data8) CycleHandler {
 // ADC A, n
 
 func implADCn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implADCn_2
 }
 
 func implADCn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.TempZ, cpu.Regs.GetFlagC()))
+	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.Temp.LSR, cpu.Regs.GetFlagC()))
 	return nil
 }
 
 // ADC A, (HL)
 
 func implADCHL(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implADCHL_2
 }
 
 func implADCHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.TempZ, cpu.Regs.GetFlagC()))
+	cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, cpu.Regs.Temp.LSR, cpu.Regs.GetFlagC()))
 	return nil
 }
 
 // OR A, r
 
 func implORA(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.A) }
-func implORB(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.B) }
-func implORC(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.C) }
-func implORD(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.D) }
-func implORE(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.E) }
-func implORH(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.H) }
-func implORL(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.L) }
+func implORB(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.BC.MSR) }
+func implORC(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.BC.LSR) }
+func implORD(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.DE.MSR) }
+func implORE(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.DE.LSR) }
+func implORH(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.HL.MSR) }
+func implORL(cpu *CPU) CycleHandler { return implORr(cpu, cpu.Regs.HL.LSR) }
 
 func implORr(cpu *CPU, r Data8) CycleHandler {
 	cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, r))
@@ -1105,36 +1098,36 @@ func implORr(cpu *CPU, r Data8) CycleHandler {
 // OR A, n
 
 func implORn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implORn_2
 }
 
 func implORn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, cpu.Regs.TempZ))
+	cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, cpu.Regs.Temp.LSR))
 	return nil
 }
 
 // OR A, (HL)
 
 func implORHL(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implORHL_2
 }
 
 func implORHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, cpu.Regs.TempZ))
+	cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, cpu.Regs.Temp.LSR))
 	return nil
 }
 
 // XOR A, r
 
 func implXORA(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.A) }
-func implXORB(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.B) }
-func implXORC(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.C) }
-func implXORD(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.D) }
-func implXORE(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.E) }
-func implXORH(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.H) }
-func implXORL(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.L) }
+func implXORB(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.BC.MSR) }
+func implXORC(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.BC.LSR) }
+func implXORD(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.DE.MSR) }
+func implXORE(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.DE.LSR) }
+func implXORH(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.HL.MSR) }
+func implXORL(cpu *CPU) CycleHandler { return implXORr(cpu, cpu.Regs.HL.LSR) }
 
 func implXORr(cpu *CPU, r Data8) CycleHandler {
 	cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, r))
@@ -1144,36 +1137,36 @@ func implXORr(cpu *CPU, r Data8) CycleHandler {
 // XOR A, n
 
 func implXORn(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 	return implXORn_2
 }
 
 func implXORn_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, cpu.Regs.TempZ))
+	cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, cpu.Regs.Temp.LSR))
 	return nil
 }
 
 // XOR A, (HL)
 
 func implXORHL(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implXORHL_2
 }
 
 func implXORHL_2(cpu *CPU) CycleHandler {
-	cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, cpu.Regs.TempZ))
+	cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, cpu.Regs.Temp.LSR))
 	return nil
 }
 
 // INC r
 
 func implINCA(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.A) }
-func implINCB(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.B) }
-func implINCC(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.C) }
-func implINCD(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.D) }
-func implINCE(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.E) }
-func implINCH(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.H) }
-func implINCL(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.L) }
+func implINCB(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.BC.MSR) }
+func implINCC(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.BC.LSR) }
+func implINCD(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.DE.MSR) }
+func implINCE(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.DE.LSR) }
+func implINCH(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.HL.MSR) }
+func implINCL(cpu *CPU) CycleHandler { return implINCr(cpu, &cpu.Regs.HL.LSR) }
 
 func implINCr(cpu *CPU, r *Data8) CycleHandler {
 	result := ADD(*r, 1, false)
@@ -1187,26 +1180,17 @@ func implINCr(cpu *CPU, r *Data8) CycleHandler {
 // INC rr'
 
 func implINCBC(cpu *CPU) CycleHandler {
-	cpu.Regs.C++
-	if cpu.Regs.C == 0 {
-		cpu.Regs.B++
-	}
+	cpu.Regs.BC.Inc()
 	return implNop
 }
 
 func implINCDE(cpu *CPU) CycleHandler {
-	cpu.Regs.E++
-	if cpu.Regs.E == 0 {
-		cpu.Regs.D++
-	}
+	cpu.Regs.DE.Inc()
 	return implNop
 }
 
 func implINCHL(cpu *CPU) CycleHandler {
-	cpu.Regs.L++
-	if cpu.Regs.L == 0 {
-		cpu.Regs.H++
-	}
+	cpu.Regs.HL.Inc()
 	return implNop
 }
 
@@ -1218,31 +1202,31 @@ func implINCSP(cpu *CPU) CycleHandler {
 // INC (HL)
 
 func implINCHLInd(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implINCHLInd_2
 }
 
 func implINCHLInd_2(cpu *CPU) CycleHandler {
-	res := ADD(cpu.Regs.TempZ, 1, false)
+	res := ADD(cpu.Regs.Temp.LSR, 1, false)
 	// apparently doesn't set C.
 	cpu.Regs.SetFlagH(res.H)
 	cpu.Regs.SetFlagZ(res.Z())
 	cpu.Regs.SetFlagN(res.N)
-	cpu.writeAddressBus(Addr(cpu.GetHL()))
-	cpu.Regs.TempZ = res.Value
-	cpu.Bus.WriteData(cpu.Regs.TempZ)
+	cpu.Bus.WriteAddress(cpu.Regs.HL.Addr())
+	cpu.Regs.Temp.LSR = res.Value
+	cpu.Bus.WriteData(cpu.Regs.Temp.LSR)
 	return implNop
 }
 
 // DEC r
 
 func implDECA(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.A) }
-func implDECB(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.B) }
-func implDECC(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.C) }
-func implDECD(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.D) }
-func implDECE(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.E) }
-func implDECH(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.H) }
-func implDECL(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.L) }
+func implDECB(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.BC.MSR) }
+func implDECC(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.BC.LSR) }
+func implDECD(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.DE.MSR) }
+func implDECE(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.DE.LSR) }
+func implDECH(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.HL.MSR) }
+func implDECL(cpu *CPU) CycleHandler { return implDECr(cpu, &cpu.Regs.HL.LSR) }
 
 func implDECr(cpu *CPU, r *Data8) CycleHandler {
 	result := SUB(*r, 1, false)
@@ -1256,26 +1240,17 @@ func implDECr(cpu *CPU, r *Data8) CycleHandler {
 // DEC rr'
 
 func implDECBC(cpu *CPU) CycleHandler {
-	cpu.Regs.C--
-	if cpu.Regs.C == 0xFF {
-		cpu.Regs.B--
-	}
+	cpu.Regs.BC.Dec()
 	return implNop
 }
 
 func implDECDE(cpu *CPU) CycleHandler {
-	cpu.Regs.E--
-	if cpu.Regs.E == 0xFF {
-		cpu.Regs.D--
-	}
+	cpu.Regs.DE.Dec()
 	return implNop
 }
 
 func implDECHL(cpu *CPU) CycleHandler {
-	cpu.Regs.L--
-	if cpu.Regs.L == 0xFF {
-		cpu.Regs.H--
-	}
+	cpu.Regs.HL.Dec()
 	return implNop
 }
 
@@ -1287,19 +1262,19 @@ func implDECSP(cpu *CPU) CycleHandler {
 // DEC (HL)
 
 func implDECHLInd(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.load(Addr(cpu.GetHL()))
+	cpu.Regs.Temp.LSR = cpu.load(cpu.Regs.HL.Addr())
 	return implDECHLInd_2
 }
 
 func implDECHLInd_2(cpu *CPU) CycleHandler {
-	res := SUB(cpu.Regs.TempZ, 1, false)
+	res := SUB(cpu.Regs.Temp.LSR, 1, false)
 	// apparently doesn't set C.
 	cpu.Regs.SetFlagH(res.H)
 	cpu.Regs.SetFlagZ(res.Z())
 	cpu.Regs.SetFlagN(res.N)
-	cpu.writeAddressBus(Addr(cpu.GetHL()))
-	cpu.Regs.TempZ = res.Value
-	cpu.Bus.WriteData(cpu.Regs.TempZ)
+	cpu.Bus.WriteAddress(cpu.Regs.HL.Addr())
+	cpu.Regs.Temp.LSR = res.Value
+	cpu.Bus.WriteData(cpu.Regs.Temp.LSR)
 	return implNop
 }
 
@@ -1384,34 +1359,41 @@ func implUndefined(cpu *CPU) CycleHandler {
 	return implUndefined
 }
 
+// STOP
+
+func implSTOP(cpu *CPU) CycleHandler {
+	fmt.Printf("WARNING: Emulating STOP with HALT")
+	return implHALT(cpu)
+}
+
 // CB
 
 func implCB(cpu *CPU) CycleHandler {
-	cpu.Regs.TempZ = cpu.fetchByteAtPC()
+	cpu.Regs.Temp.LSR = cpu.fetchByteAtPC()
 
 	return implCB_2
 }
 
 func implCB_2(cpu *CPU) CycleHandler {
-	cbOp := NewCBOp(cpu.Regs.TempZ)
+	cbOp := NewCBOp(cpu.Regs.Temp.LSR)
 
 	if cbOp.Target == CBTargetIndirectHL {
-		cpu.writeAddressBus(Addr(cpu.GetHL()))
+		cpu.Bus.WriteAddress(cpu.Regs.HL.Addr())
 	}
 	var val Data8
 	switch cbOp.Target {
 	case CBTargetB:
-		val = cpu.Regs.B
+		val = cpu.Regs.BC.MSR
 	case CBTargetC:
-		val = cpu.Regs.C
+		val = cpu.Regs.BC.LSR
 	case CBTargetD:
-		val = cpu.Regs.D
+		val = cpu.Regs.DE.MSR
 	case CBTargetE:
-		val = cpu.Regs.E
+		val = cpu.Regs.DE.LSR
 	case CBTargetH:
-		val = cpu.Regs.H
+		val = cpu.Regs.HL.MSR
 	case CBTargetL:
-		val = cpu.Regs.L
+		val = cpu.Regs.HL.LSR
 	case CBTargetIndirectHL:
 		val = cpu.Bus.GetData()
 	case CBTargetA:
@@ -1422,19 +1404,19 @@ func implCB_2(cpu *CPU) CycleHandler {
 	val = cpu.doCBOp(val, cbOp.Op)
 	switch cbOp.Target {
 	case CBTargetB:
-		cpu.Regs.B = val
+		cpu.Regs.BC.MSR = val
 	case CBTargetC:
-		cpu.Regs.C = val
+		cpu.Regs.BC.LSR = val
 	case CBTargetD:
-		cpu.Regs.D = val
+		cpu.Regs.DE.MSR = val
 	case CBTargetE:
-		cpu.Regs.E = val
+		cpu.Regs.DE.LSR = val
 	case CBTargetH:
-		cpu.Regs.H = val
+		cpu.Regs.HL.MSR = val
 	case CBTargetL:
-		cpu.Regs.L = val
+		cpu.Regs.HL.LSR = val
 	case CBTargetIndirectHL:
-		cpu.Regs.TempZ = val
+		cpu.Regs.Temp.LSR = val
 		if cbOp.Op.Is3Cycles() {
 			return implNop
 		}
@@ -1448,8 +1430,8 @@ func implCB_2(cpu *CPU) CycleHandler {
 }
 
 func implCB_3(cpu *CPU) CycleHandler {
-	cpu.writeAddressBus(Addr(cpu.GetHL()))
-	cpu.Bus.WriteData(cpu.Regs.TempZ)
+	cpu.Bus.WriteAddress(cpu.Regs.HL.Addr())
+	cpu.Bus.WriteData(cpu.Regs.Temp.LSR)
 	return implNop
 }
 
@@ -1587,17 +1569,17 @@ func (cpu *CPU) pop() Data8 {
 }
 
 func (cpu *CPU) load(addr Addr) Data8 {
-	cpu.writeAddressBus(addr)
+	cpu.Bus.WriteAddress(addr)
 	return cpu.Bus.GetData()
 }
 
 func (cpu *CPU) fetchByteAtPC() Data8 {
-	cpu.IncPC()
 	data := cpu.load(cpu.Regs.PC)
+	cpu.IncPC()
 	return data
 }
 
 func (cpu *CPU) store(addr Addr, v Data8) {
-	cpu.writeAddressBus(addr)
+	cpu.Bus.WriteAddress(addr)
 	cpu.Bus.WriteData(v)
 }

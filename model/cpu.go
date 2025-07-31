@@ -56,12 +56,9 @@ func (cpu *CPU) Reset() {
 	if cpu.Config.BootROM.Skip {
 		cpu.Regs.A = 0x01
 		cpu.Regs.F = 0xB0
-		cpu.Regs.B = 0x00
-		cpu.Regs.C = 0x13
-		cpu.Regs.D = 0x00
-		cpu.Regs.E = 0xD8
-		cpu.Regs.H = 0x01
-		cpu.Regs.L = 0x4D
+		cpu.Regs.BC = RegisterPair{0x00, 0x13}
+		cpu.Regs.DE = RegisterPair{0x00, 0xD8}
+		cpu.Regs.HL = RegisterPair{0x01, 0x4D}
 		cpu.Regs.PC = 0x00ff
 		cpu.Regs.SP = 0xFFFE
 	}
@@ -72,18 +69,6 @@ type ExecLogEntry struct {
 	BranchResult int
 }
 
-func (cpu *CPU) SetHL(v Data16) {
-	cpu.Regs.H, cpu.Regs.L = v.Split()
-}
-
-func (cpu *CPU) SetBC(v Data16) {
-	cpu.Regs.B, cpu.Regs.C = v.Split()
-}
-
-func (cpu *CPU) SetDE(v Data16) {
-	cpu.Regs.D, cpu.Regs.E = v.Split()
-}
-
 func (cpu *CPU) SetSP(v Addr) {
 	if v == 0 && cpu.Config.Debug.PanicOnStackUnderflow {
 		panic("stack underflow")
@@ -91,29 +76,11 @@ func (cpu *CPU) SetSP(v Addr) {
 	cpu.Regs.SP = v
 }
 
-func (cpu *CPU) GetBC() Data16 {
-	v := join16(cpu.Regs.B, cpu.Regs.C)
-	return v
-}
-
-func (cpu *CPU) GetDE() Data16 {
-	v := join16(cpu.Regs.D, cpu.Regs.E)
-	return v
-}
-
-func (cpu *CPU) GetHL() Data16 {
-	v := join16(cpu.Regs.H, cpu.Regs.L)
-	return v
-}
-
 func join16(msb, lsb Data8) Data16 {
 	return (Data16(msb) << 8) | Data16(lsb)
 }
 
 func (cpu *CPU) SetPC(pc Addr) {
-	if pc > 0xff && cpu.Debug != nil {
-		cpu.Debug.CLK.pauseAfterCycle.Add(1)
-	}
 	cpu.Regs.PC = pc
 }
 
@@ -178,7 +145,7 @@ func (cpu *CPU) fsm(c uint) {
 		fetch = cpu.handler == nil
 	}
 	if fetch {
-		cpu.writeAddressBus(cpu.Regs.PC)
+		cpu.Bus.WriteAddress(cpu.Regs.PC)
 		if cpu.Interrupts == nil || cpu.Interrupts.PendingInterrupt == 0 {
 			cpu.instructionFetch()
 		}
@@ -190,7 +157,9 @@ func (cpu *CPU) fsm(c uint) {
 
 func (cpu *CPU) instructionFetch() {
 	// Reset inter-instruction state
-	cpu.Regs.SetWZ(0)
+	cpu.Regs.Temp = RegisterPair{}
+	clear(cpu.Regs.TempPtr[:])
+	cpu.Regs.TempCond = false
 
 	// Read next instruction opcode
 	rawOp := cpu.Bus.ProbeAddress(cpu.Bus.GetAddress())
@@ -227,12 +196,12 @@ func (cpu *CPU) execTransferToISR() bool {
 	// push MSB of PC to stack
 	case 3:
 		cpu.SetSP(cpu.Regs.SP - 1)
-		cpu.writeAddressBus(cpu.Regs.SP)
+		cpu.Bus.WriteAddress(cpu.Regs.SP)
 		cpu.Bus.WriteData(cpu.Regs.PC.MSB())
 		// push LSB of PC to stack
 	case 4:
 		cpu.SetSP(cpu.Regs.SP - 1)
-		cpu.writeAddressBus(cpu.Regs.SP)
+		cpu.Bus.WriteAddress(cpu.Regs.SP)
 		cpu.Bus.WriteData(cpu.Regs.PC.LSB())
 	case 5:
 		isr := cpu.Interrupts.PendingInterrupt.ISR()
@@ -244,16 +213,6 @@ func (cpu *CPU) execTransferToISR() bool {
 		panicv(cpu.machineCycle)
 	}
 	return false
-}
-
-func (cpu *CPU) writeAddressBus(addr Addr) {
-	if !cpu.Bus.InCoreDump() {
-		if cpu.wroteToAddressBusThisCycle {
-			panic("more than one call to writeAddressBus this cycle")
-		}
-	}
-	cpu.wroteToAddressBusThisCycle = true
-	cpu.Bus.WriteAddress(addr)
 }
 
 func (cpu *CPU) applyPendingIME() {

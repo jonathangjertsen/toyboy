@@ -19,20 +19,48 @@ const (
 type RegisterFile struct {
 	A  Data8
 	F  Data8
-	B  Data8
-	C  Data8
-	D  Data8
-	E  Data8
-	H  Data8
-	L  Data8
+	BC RegisterPair
+	DE RegisterPair
+	HL RegisterPair
 	PC Addr
 	SP Addr
 	IR Opcode
 
-	TempZ    Data8
-	TempW    Data8
+	Temp     RegisterPair
 	TempPtr  [2]*Data8
 	TempCond bool
+}
+
+type RegisterPair struct {
+	MSR Data8
+	LSR Data8
+}
+
+func (rp RegisterPair) Data16() Data16 {
+	return join16(rp.MSR, rp.LSR)
+}
+
+func (rp RegisterPair) Addr() Addr {
+	return Addr(rp.Data16())
+}
+
+func (rp *RegisterPair) Inc() {
+	rp.LSR++
+	if rp.LSR == 0 {
+		rp.MSR++
+	}
+}
+
+func (rp *RegisterPair) Dec() {
+	rp.LSR--
+	if rp.LSR == 0xff {
+		rp.MSR--
+	}
+}
+
+func (rp *RegisterPair) Set(d Data16) {
+	rp.MSR = d.MSB()
+	rp.LSR = d.LSB()
 }
 
 const (
@@ -98,13 +126,4 @@ func (regs *RegisterFile) GetFlagC() bool {
 
 func (regs *RegisterFile) SetFlagC(v bool) {
 	regs.setFlag(FlagBitC, v)
-}
-
-func (regs *RegisterFile) SetWZ(v Data16) {
-	regs.TempW = v.MSB()
-	regs.TempZ = v.LSB()
-}
-
-func (regs *RegisterFile) GetWZ() Data16 {
-	return join16(regs.TempW, regs.TempZ)
 }
