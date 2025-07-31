@@ -14,7 +14,6 @@ type Bus struct {
 	BootROMLock *BootROMLock
 	BootROM     *MemoryRegion
 	VRAM        *MemoryRegion
-	HRAM        *MemoryRegion
 	WRAM        *MemoryRegion
 	APU         *APU
 	OAM         *MemoryRegion
@@ -90,7 +89,7 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		return b.VRAM.Data[addr-AddrVRAMBegin]
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
-		return b.HRAM.Data[addr-AddrHRAMBegin]
+		return b.AddressSpace[addr]
 	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
 		return b.WRAM.Data[addr-AddrWRAMBegin]
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
@@ -140,7 +139,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	} else if begin >= AddrVRAMBegin && end <= AddrVRAMEnd {
 		return b.VRAM.Data[begin-AddrVRAMBegin : end-AddrVRAMBegin+1]
 	} else if begin >= AddrHRAMBegin && end <= AddrHRAMEnd {
-		return b.HRAM.Data[begin-AddrHRAMBegin : end-AddrHRAMBegin+1]
+		return b.AddressSpace[begin : end+1]
 	} else if begin >= AddrWRAMBegin && end <= AddrWRAMEnd {
 		return b.WRAM.Data[begin-AddrWRAMBegin : end-AddrHRAMBegin+1]
 	} else if begin >= AddrAPUBegin && end <= AddrAPUEnd {
@@ -205,7 +204,7 @@ func (b *Bus) WriteData(v Data8) {
 	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
 		b.VRAM.Data[addr-AddrVRAMBegin] = v
 	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
-		b.HRAM.Data[addr-AddrHRAMBegin] = v
+		b.AddressSpace[addr] = v
 	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
 		b.WRAM.Data[addr-AddrWRAMBegin] = v
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
