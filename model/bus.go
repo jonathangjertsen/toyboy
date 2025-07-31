@@ -114,7 +114,7 @@ func (b *Bus) WriteData(v Data8) {
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.APU.Write(addr, v)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		b.PPU.Write(addr, v)
+		b.PPU.Write(addr, v, b.Interrupts)
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
 		b.Timer.Write(addr, v)
 	}

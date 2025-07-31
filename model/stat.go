@@ -3,29 +3,27 @@ package model
 type Stat struct {
 	Reg         Data8
 	PrevStatInt bool
-
-	Interrupts *Interrupts
 }
 
 func (s *Stat) Write(v Data8) {
 	s.Reg = maskedWrite(s.Reg, v, 0xf8)
 }
 
-func (s *Stat) SetMode(mode PPUMode) {
+func (s *Stat) SetMode(ints *Interrupts, mode PPUMode) {
 	s.Reg = maskedWrite(s.Reg, Data8(mode), 0x7)
-	s.CheckInterrupt()
+	s.CheckInterrupt(ints)
 }
 
-func (s *Stat) SetLYCEqLY(equal bool) {
+func (s *Stat) SetLYCEqLY(ints *Interrupts, equal bool) {
 	if equal {
 		s.Reg |= 1 << 2
 	} else {
 		s.Reg &= ^Data8(1 << 2)
 	}
-	s.CheckInterrupt()
+	s.CheckInterrupt(ints)
 }
 
-func (s *Stat) CheckInterrupt() {
+func (s *Stat) CheckInterrupt(ints *Interrupts) {
 	statInt := false
 	if s.Reg&0xb == 0x08 {
 		// Mode 0 int selected and mode is 0
@@ -44,7 +42,7 @@ func (s *Stat) CheckInterrupt() {
 		statInt = true
 	}
 	if !s.PrevStatInt && statInt {
-		s.Interrupts.IRQSet(IntSourceLCD)
+		ints.IRQSet(IntSourceLCD)
 	}
 	s.PrevStatInt = statInt
 }

@@ -57,12 +57,11 @@ func NewGameboy(
 }
 
 func (gb *Gameboy) Init(audio *Audio) {
-	clk := NewRealtimeClock(gb.Config.Clock, audio)
+	mem := NewAddressSpace()
+	interrupts := NewInterrupts(mem)
+	clk := NewRealtimeClock(gb.Config.Clock, audio, interrupts)
 
 	debug := NewDebug(clk, &gb.Config.Debug)
-
-	mem := NewAddressSpace()
-	interrupts := NewInterrupts(clk, mem)
 
 	if gb.Config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)

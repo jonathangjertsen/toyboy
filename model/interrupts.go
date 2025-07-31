@@ -43,7 +43,7 @@ func (is IntSource) ISR() Addr {
 	return 0
 }
 
-func NewInterrupts(clk *ClockRT, mem []Data8) *Interrupts {
+func NewInterrupts(mem []Data8) *Interrupts {
 	return &Interrupts{
 		mem: mem,
 	}

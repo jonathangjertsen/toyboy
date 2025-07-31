@@ -30,7 +30,7 @@ func (ps *Shifter) fsm() {
 	ps.LastShifted = pixel.Color()
 	ps.X++
 
-	ps.PPU.Debug.SetX(ps.X)
+	ps.PPU.debug.SetX(ps.X)
 }
 
 func (ps *Shifter) pixelMixer() (Pixel, bool) {
