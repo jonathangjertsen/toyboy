@@ -228,12 +228,12 @@ func (app *App) startWebSocketServer() {
 						model.PrintPPU(buf, app.GB.PPU.GetDump())
 					}
 					if buf := buffers[DataIDAPURegisters]; buf != nil {
-						model.PrintAPU(buf, app.GB.Bus.AddressSpace[:], app.GB.APU)
+						model.PrintAPU(buf, app.GB.Bus.Mem, app.GB.APU)
 					}
 					if buf := buffers[DataIDHRAM]; buf != nil {
 						model.MemDump(
 							buf,
-							app.GB.Bus.AddressSpace[model.AddrHRAMBegin:model.AddrHRAMEnd+1],
+							app.GB.Bus.Mem,
 							model.AddrHRAMBegin,
 							model.AddrHRAMEnd,
 							app.GB.CPU.Regs.SP,
@@ -242,7 +242,7 @@ func (app *App) startWebSocketServer() {
 					if buf := buffers[DataIDOAM]; buf != nil {
 						model.MemDump(
 							buf,
-							app.GB.Bus.AddressSpace[model.AddrOAMBegin:model.AddrOAMEnd+1],
+							app.GB.Bus.Mem,
 							model.AddrOAMBegin,
 							model.AddrOAMEnd,
 							0,
@@ -264,7 +264,7 @@ func (app *App) startWebSocketServer() {
 						)
 						model.MemDump(
 							buf,
-							app.GB.Bus.AddressSpace[model.AddrWRAMBegin:model.AddrWRAMEnd+1],
+							app.GB.Bus.Mem,
 							model.Addr(rang.Begin),
 							model.Addr(rang.End),
 							app.GB.CPU.Regs.SP,

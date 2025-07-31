@@ -4,10 +4,10 @@ type WaveChannel struct {
 	PeriodCounter PeriodCounter
 	LengthTimer   LengthTimer
 
-	AddressSpace *AddressSpace
-	Index        Addr
-	OutLevel     Data8
-	output       AudioSample
+	Mem      []Data8
+	Index    Addr
+	OutLevel Data8
+	output   AudioSample
 
 	RegDACEn         Data8
 	RegLengthTimer   Data8
@@ -81,7 +81,7 @@ func (wc *WaveChannel) clock() {
 		return
 	}
 
-	data := wc.AddressSpace[AddrWaveRAMBegin+wc.Index>>1]
+	data := wc.Mem[AddrWaveRAMBegin+wc.Index>>1]
 	if wc.Index&1 == 0 {
 		// upper nibble on even index
 		data >>= 4

@@ -15,7 +15,7 @@ type APU struct {
 	canWriteLengthTimersWithAPUOff bool
 }
 
-func NewAPU(clock *ClockRT, config *Config, addressSpace *AddressSpace) *APU {
+func NewAPU(clock *ClockRT, config *Config, addressSpace []Data8) *APU {
 	apu := &APU{
 		canWriteLengthTimersWithAPUOff: true, // on monochrome models
 		Pulse1: PulseChannelWithSweep{
@@ -27,7 +27,7 @@ func NewAPU(clock *ClockRT, config *Config, addressSpace *AddressSpace) *APU {
 			DutyGenerator: NewDutyGenerator(),
 		},
 		Wave: WaveChannel{
-			AddressSpace: addressSpace,
+			Mem: addressSpace,
 		},
 		Mixer: Mixer{},
 	}

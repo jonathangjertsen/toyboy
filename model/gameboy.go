@@ -119,8 +119,8 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bus.Timer = timer
 	bus.Config = gb.Config
 
-	debug.HRAM.Source = bus.AddressSpace[AddrHRAMBegin : AddrHRAMEnd+1]
-	debug.WRAM.Source = bus.AddressSpace[AddrWRAMBegin : AddrWRAMEnd+1]
+	debug.HRAM.Source = bus.Mem[AddrHRAMBegin : AddrHRAMEnd+1]
+	debug.WRAM.Source = bus.Mem[AddrWRAMBegin : AddrWRAMEnd+1]
 
 	gb.Bus = bus
 	gb.CLK = clk
