@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -103,11 +102,14 @@ func (app *App) startGB() {
 	app.GBFPSMeasurement = plugin.NewClockMeasurement(&app.GB.PPU.FrameCount)
 	runtime.LogPrintf(app.ctx, "Started Gameboy FPS Measurement")
 
-	f, err := os.ReadFile("assets/cartridges/tetris.gb")
-	if err != nil {
+	if err := model.LoadROM(
+		"assets/cartridges/tetris.gb",
+		app.GB.Bus.Mem,
+		app.GB.Cartridge,
+		app.GB.Bus.BootROMLock,
+	); err != nil {
 		panic(err)
 	}
-	app.GB.Cartridge.LoadROM(f)
 
 	app.GB.Start()
 }

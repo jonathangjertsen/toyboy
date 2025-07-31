@@ -346,9 +346,9 @@ func NewDisassembler(config *ConfigDisassembler) Disassembler {
 	return dis
 }
 
-func (dis *Disassembler) SetProgram(program []byte) {
+func (dis *Disassembler) SetProgram(program []Data8) {
 	dis.Program.CanExplore = true
-	dis.Program.Source = Data8Slice(program)
+	dis.Program.Source = program
 	dis.Program.Decoded = make([]DisInstruction, len(program))
 }
 

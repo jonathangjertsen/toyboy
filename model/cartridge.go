@@ -5,11 +5,9 @@ import (
 )
 
 type Cartridge struct {
-	ROM             [512][ROMBankSize]uint8
-	RAM             [4][RAMBankSize]uint8
-	CurrROMBank0    MemoryRegion
-	CurrROMBankN    MemoryRegion
-	CurrRAMBank     MemoryRegion
+	Mem             []Data8
+	ROM             [512][ROMBankSize]Data8
+	RAM             [4][RAMBankSize]Data8
 	MBCFeatures     MBCFeatures
 	ExtRAMEnabled   bool
 	BankNo1         Data8
@@ -19,32 +17,16 @@ type Cartridge struct {
 	SelectedROMBank Data8
 }
 
-func NewCartridge(clk *ClockRT) *Cartridge {
+func NewCartridge(clk *ClockRT, mem []Data8) *Cartridge {
 	return &Cartridge{
-		CurrROMBank0:    NewMemoryRegion(clk, AddrZero, SizeCartridgeBank),
-		CurrROMBankN:    NewMemoryRegion(clk, AddrCartridgeBankNBegin, SizeCartridgeBank),
-		CurrRAMBank:     NewMemoryRegion(clk, AddrCartridgeRAMBegin, SizeCartridgeRAM),
+		Mem:             mem,
 		BankNo1:         1,
 		SelectedROMBank: 1,
 	}
 }
 
-func (cart *Cartridge) LoadROM(data []uint8) {
-	if len(data)%ROMBankSize != 0 {
-		panicf("ROM size %d is not a multiple of %d", len(data), ROMBankSize)
-	}
-	for i := range len(data) / ROMBankSize {
-		copy(cart.ROM[i][:], data[i*ROMBankSize:(i+1)*ROMBankSize])
-	}
-	cart.MBCFeatures = GetMBCFeatures(data[AddrCartridgeType], data[AddrROMSize], data[AddrRAMSize])
-	cart.CurrROMBank0.Data = Data8Slice(cart.ROM[0][:])
-	cart.CurrROMBankN.Data = Data8Slice(cart.ROM[1][:])
-}
-
 func (cart *Cartridge) SetROMBank(which Data8) {
-	fmt.Printf("SetROMBank %d\n", which)
-
-	copy(cart.CurrROMBankN.Data, Data8Slice(cart.ROM[which][:]))
+	copy(cart.Mem[AddrCartridgeBankNBegin:AddrCartridgeBankNEnd], cart.ROM[which][:])
 	cart.SelectedROMBank = which
 }
 
@@ -52,35 +34,11 @@ func (cart *Cartridge) SetRAMBank(which Data8) {
 	fmt.Printf("SetRAMBank %d\n", which)
 
 	// Store current RAM contents to bank
-	copy(cart.RAM[cart.SelectedRAMBank][:], U8Slice(cart.CurrRAMBank.Data))
+	copy(cart.RAM[cart.SelectedRAMBank][:], cart.Mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd])
 
 	// Load from bank to RAM
-	copy(cart.CurrRAMBank.Data, Data8Slice(cart.RAM[which][:]))
-
+	copy(cart.Mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd], cart.RAM[which][:])
 	cart.SelectedRAMBank = which
-}
-
-func (cart *Cartridge) Read(addr Addr) Data8 {
-	if addr <= AddrCartridgeBank0End {
-		return cart.CurrROMBank0.Data[addr]
-	}
-	return cart.CurrROMBankN.Data[addr-AddrCartridgeBankNBegin]
-}
-
-func (cart *Cartridge) ReadRange(begin, end Addr) []Data8 {
-	if end <= AddrCartridgeBank0End {
-		// Wholly in bank 0
-		return cart.CurrROMBank0.Data[begin : end+1]
-	} else if begin >= AddrCartridgeBankNBegin {
-		// Wholly in bank N
-		return cart.CurrROMBankN.Data[begin-AddrCartridgeBankNBegin : end-AddrCartridgeBankNBegin+1]
-	} else {
-		// Straddles bank boundary
-		return append(
-			cart.CurrROMBank0.Data[begin:],
-			cart.CurrROMBankN.Data[:end-AddrCartridgeBankNBegin+1]...,
-		)
-	}
 }
 
 func (cart *Cartridge) Write(addr Addr, v Data8) {
