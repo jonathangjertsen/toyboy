@@ -12,7 +12,6 @@ type CoreDump struct {
 	ProgramStart Addr
 	ProgramEnd   Addr
 	Mem          []Data8
-	Program      []Data8
 	PPU          PPUDump
 	Rewind       *Rewind
 	Disassembly  *Disassembly
@@ -65,7 +64,7 @@ func PrintRegs(f io.Writer, regs RegisterFile) {
 }
 
 func (cd *CoreDump) PrintProgram(f io.Writer) {
-	if cd.ProgramEnd >= min(Addr(len(cd.Program)), 0x8000) {
+	if cd.ProgramEnd >= 0x8000 {
 		return
 	}
 	MemDump(f, cd.Mem, cd.ProgramStart, cd.ProgramEnd, cd.Regs.PC-1)
@@ -252,7 +251,6 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 		cd.ProgramEnd = cpu.Regs.PC + 0x40
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
-	cd.Program = bus.ProbeRange(0x0000, AddrCartridgeBank0End)
 	cd.Disassembly = cpu.Debug.Disassembly(0, 0xffff)
 	var ppu *PPU
 	bus.GetPeripheral(&ppu)
