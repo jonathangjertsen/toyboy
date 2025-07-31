@@ -72,44 +72,16 @@ func (b *Bus) WriteAddress(addr Addr) {
 }
 
 func (b *Bus) ProbeAddress(addr Addr) Data8 {
-	if addr <= AddrCartridgeBankNEnd {
-		return b.Mem[addr]
-	} else if addr >= AddrVRAMBegin && addr <= AddrVRAMEnd {
-		return b.Mem[addr]
-	} else if addr >= AddrHRAMBegin && addr <= AddrHRAMEnd {
-		return b.Mem[addr]
-	} else if addr >= AddrWRAMBegin && addr <= AddrWRAMEnd {
-		return b.Mem[addr]
-	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
+	if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		return b.APU.Read(addr)
-	} else if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
-		return b.Mem[addr]
-	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
-		return b.Mem[addr]
-	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		return b.PPU.Read(addr)
-	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
-		return b.Mem[addr]
-	} else if (addr >= 0xff4c && addr <= 0xff4f) || (addr >= 0xff51 && addr <= 0xff70) {
-		return b.Mem[addr]
-	} else if addr >= 0xff71 && addr <= 0xff7f {
-		return b.Mem[addr]
-	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
-		return b.Mem[addr]
-	} else if addr == AddrP1 {
-		return b.Joypad.Read(addr)
-	} else if addr == AddrIF || addr == AddrIE {
-		return b.Mem[addr]
-	} else if addr == AddrBootROMLock {
-		return b.Mem[addr]
-	} else if addr == AddrSB || addr == AddrSC {
-		return b.Mem[addr]
-	} else {
-		if !b.inCoreDump {
-			//panicf("Read from unmapped address %s", addr.Hex())
-		}
 	}
-	return b.Data
+	if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
+		return b.PPU.Read(addr)
+	}
+	if addr == AddrP1 {
+		return b.Joypad.Read(addr)
+	}
+	return b.Mem[addr]
 }
 
 func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
