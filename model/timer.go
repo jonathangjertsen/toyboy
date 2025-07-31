@@ -1,28 +1,21 @@
 package model
 
 type Timer struct {
-	Mem              MemoryRegion
 	APU              *APU
 	Interrupts       *Interrupts
 	DIV              Data16
 	prevAndResult    bool
 	preReloadCounter int
+	mem              []Data8
 }
-
-const (
-	offsDIV  = 0
-	offsTIMA = 1
-	offsTMA  = 2
-	offsTAC  = 3
-)
 
 var timerBitMask = [4]Data16{1 << 9, 1 << 3, 1 << 5, 1 << 7}
 
-func NewTimer(clock *ClockRT, apu *APU, interrupts *Interrupts) *Timer {
+func NewTimer(clock *ClockRT, mem []Data8, apu *APU, interrupts *Interrupts) *Timer {
 	t := &Timer{
-		Mem:        NewMemoryRegion(clock, AddrTimerBegin, SizeTimer),
 		APU:        apu,
 		Interrupts: interrupts,
+		mem:        mem,
 	}
 
 	clock.timer = t
@@ -40,8 +33,8 @@ func (t *Timer) tickDIV() {
 	div++
 	t.DIV = div
 
-	t.Mem.Data[offsDIV] = Data8(div >> 8)
-	tac := t.Mem.Data[offsTAC]
+	t.mem[AddrDIV] = Data8(div >> 8)
+	tac := t.mem[AddrTAC]
 	var andResult bool
 	var clockSelect Data16
 	if tac&Bit2 != 0 {
@@ -49,7 +42,7 @@ func (t *Timer) tickDIV() {
 	}
 	andResult = (div&clockSelect != 0)
 	if t.prevAndResult && !andResult {
-		tima := &t.Mem.Data[offsTIMA]
+		tima := &t.mem[AddrTIMA]
 		if *tima == 0xFF {
 			t.preReloadCounter = 4
 			*tima = 0
@@ -61,7 +54,7 @@ func (t *Timer) tickDIV() {
 	if t.preReloadCounter > 0 {
 		t.preReloadCounter--
 		if t.preReloadCounter == 0 {
-			t.Mem.Data[offsTIMA] = t.Mem.Data[offsTMA]
+			t.mem[AddrTIMA] = t.mem[AddrTMA]
 			t.Interrupts.IRQSet(IntSourceTimer)
 		}
 	}
@@ -90,9 +83,4 @@ func (t *Timer) Write(addr Addr, v Data8) {
 		t.preReloadCounter = 0
 	case AddrTAC:
 	}
-	t.Mem.Write(addr, v)
-}
-
-func (t *Timer) Read(addr Addr) Data8 {
-	return t.Mem.Read(addr)
 }
