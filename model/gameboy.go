@@ -23,6 +23,7 @@ type Gameboy struct {
 	FrameSync  *FrameSync
 	Interrupts *Interrupts
 	Audio      *Audio
+	Timer      *Timer
 }
 
 func (gb *Gameboy) Start() {
@@ -111,8 +112,9 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.FrameSync = fs
 	gb.Interrupts = interrupts
 	gb.Audio = audio
+	gb.Timer = &timer
 
-	go clk.run(gb.Config.Clock.SpeedPercent, interrupts, debug, mem, fs, audio, &apu, ppu, cpu, &timer)
+	go clk.run(gb)
 
 	gb.CPU.Reset()
 

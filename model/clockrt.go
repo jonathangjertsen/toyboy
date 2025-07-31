@@ -101,14 +101,14 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64, audio *Audio) {
 	}
 }
 
-func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts, debug *Debug, mem []Data8, fs *FrameSync, audio *Audio, apu *APU, ppu *PPU, cpu *CPU, timer *Timer) {
+func (clockRT *ClockRT) run(gb *Gameboy) {
 	defer func() {
 		if e := recover(); e != nil {
-			clockRT.Onpanic(mem)
+			clockRT.Onpanic(gb.Mem)
 			panic(e)
 		}
 	}()
-	clockRT.setSpeedPercent(initSpeedPercent, audio)
+	clockRT.setSpeedPercent(gb.Config.Clock.SpeedPercent, gb.Audio)
 
 	exit := clockRT.wait()
 	if exit {
@@ -120,7 +120,7 @@ func (clockRT *ClockRT) run(initSpeedPercent float64, ints *Interrupts, debug *D
 		var exit bool
 		select {
 		case <-clockRT.ticker.C:
-			clockRT.MCycle(clockRT.mCyclesPerTick, ints, debug, mem, fs, audio, apu, ppu, cpu, timer)
+			clockRT.MCycle(clockRT.mCyclesPerTick, gb)
 		case <-uiTicker.C:
 			clockRT.uiCycle()
 		case <-clockRT.resume:
@@ -165,15 +165,7 @@ func (clockRT *ClockRT) Stop() {
 
 func (clockRT *ClockRT) MCycle(
 	n int,
-	ints *Interrupts,
-	debug *Debug,
-	mem []Data8,
-	fs *FrameSync,
-	audio *Audio,
-	apu *APU,
-	ppu *PPU,
-	cpu *CPU,
-	timer *Timer,
+	gb *Gameboy,
 ) {
 	for range n {
 		// Breakpoints will stop here, right before executing next M-cycle
@@ -185,72 +177,64 @@ func (clockRT *ClockRT) MCycle(
 			clockRT.pauseAfterCycle.Add(-1)
 		}
 
-		audio.Clock(apu)
+		gb.Audio.Clock(gb.APU)
 
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
-		cpu.fsm(clockRT, mem)
+		gb.CPU.fsm(clockRT, gb.Mem)
 
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
 		if m&0x3f == 0 {
-			timer.tickDIV(mem, ints, apu)
+			gb.Timer.tickDIV(gb.Mem, gb.Interrupts, gb.APU)
 		}
 
 		// Clock the peripherals.
 		// 99.99% of the time, both PPU and APU are on, so we clock everything
-		if ppu.RegLCDC&apu.MasterCtl&Bit7 != 0 {
+		if gb.PPU.RegLCDC&gb.APU.MasterCtl&Bit7 != 0 {
 			// T0
-			apu.Wave.clock(mem)
+			gb.APU.Wave.clock(gb.Mem)
 			if m&0x1 == 0 {
-				apu.Pulse1.clock()
-				apu.Pulse2.clock()
+				gb.APU.Pulse1.clock()
+				gb.APU.Pulse2.clock()
 			}
 			if clockRT.Cycle&0xf == 0 {
-				apu.Noise.clock()
+				gb.APU.Noise.clock()
 			}
-			ppu.fsm(ints, debug, clockRT, mem, fs)
+			gb.PPU.fsm(gb.Interrupts, gb.Debug, clockRT, gb.Mem, gb.FrameSync)
 
 			// T1
 
 			// T2
-			ppu.fsm(ints, debug, clockRT, mem, fs)
+			gb.PPU.fsm(gb.Interrupts, gb.Debug, clockRT, gb.Mem, gb.FrameSync)
 
 			// T3
 		} else {
-			clockRT.mCycleSlowPath(
-				m,
-				ints,
-				debug,
-				mem,
-				fs,
-				apu,
-				ppu,
-			)
+			clockRT.mCycleSlowPath(m, gb)
 		}
 	}
 }
 
-func (clockRT *ClockRT) mCycleSlowPath(m uint, ints *Interrupts, debug *Debug, mem []Data8, fs *FrameSync, apu *APU, ppu *PPU) {
+func (clockRT *ClockRT) mCycleSlowPath(m uint, gb *Gameboy) {
 	// T0
-	if ppu.RegLCDC&Bit7 != 0 {
-		ppu.fsm(ints, debug, clockRT, mem, fs)
+	if gb.PPU.RegLCDC&Bit7 != 0 {
+		gb.PPU.fsm(gb.Interrupts, gb.Debug, clockRT, gb.Mem, gb.FrameSync)
 	}
-	if apu.MasterCtl&Bit7 != 0 {
-		apu.Wave.clock(mem)
+	if gb.APU.MasterCtl&Bit7 != 0 {
+		gb.APU.Wave.clock(gb.Mem)
 		if m&0x1 == 0 {
-			apu.Pulse1.clock()
-			apu.Pulse2.clock()
+			gb.APU.Pulse1.clock()
+			gb.APU.Pulse2.clock()
 		}
 		if clockRT.Cycle&0xf == 0 {
-			apu.Noise.clock()
+			gb.APU.Noise.clock()
 		}
 	}
 
 	// T1
 
 	// T2
-	if ppu.RegLCDC&Bit7 != 0 {
-		ppu.fsm(ints, debug, clockRT, mem, fs)
+	if gb.PPU.RegLCDC&Bit7 != 0 {
+		gb.PPU.fsm(gb.Interrupts, gb.Debug, clockRT, gb.Mem, gb.FrameSync)
 	}
 
 	// T3
