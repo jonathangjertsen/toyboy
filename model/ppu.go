@@ -57,7 +57,7 @@ type PPU struct {
 	// Outputs
 	FBViewport ViewPort
 
-	FrameSync chan func(*ViewPort)
+	frameSync chan func(*ViewPort)
 }
 
 func NewPPU(rtClock *ClockRT, interrupts *Interrupts, bus CPUBusIF, config *Config, debug *Debug) *PPU {
@@ -68,10 +68,10 @@ func NewPPU(rtClock *ClockRT, interrupts *Interrupts, bus CPUBusIF, config *Conf
 		Stat:       Stat{Interrupts: interrupts},
 		DMA:        DMA{Bus: bus},
 		Config:     config,
-		FrameSync:  make(chan func(*ViewPort), 1),
+		frameSync:  make(chan func(*ViewPort), 1),
 	}
-	ppu.BackgroundFetcher.PPU = ppu
-	ppu.SpriteFetcher.PPU = ppu
+	ppu.BackgroundFetcher.ppu = ppu
+	ppu.SpriteFetcher.ppu = ppu
 	ppu.SpriteFetcher.Suspended = true
 	ppu.SpriteFetcher.DoneX = 0xff
 	ppu.Shifter.PPU = ppu
@@ -108,7 +108,7 @@ func (ppu *PPU) GetDump() PPUDump {
 
 func (ppu *PPU) Sync(f func(*ViewPort)) {
 	done := make(chan struct{})
-	ppu.FrameSync <- func(vp *ViewPort) {
+	ppu.frameSync <- func(vp *ViewPort) {
 		f(vp)
 		done <- struct{}{}
 	}
@@ -373,9 +373,9 @@ func (ppu *PPU) fsmVBlank() {
 		return
 	}
 
-	nSyncers := len(ppu.FrameSync)
+	nSyncers := len(ppu.frameSync)
 	for range nSyncers {
-		f := <-ppu.FrameSync
+		f := <-ppu.frameSync
 		f(&ppu.FBViewport)
 	}
 	ppu.IncRegLY()

@@ -2,8 +2,9 @@ package model
 
 type Stat struct {
 	Reg         Data8
-	Interrupts  *Interrupts
-	prevStatInt bool
+	PrevStatInt bool
+
+	Interrupts *Interrupts
 }
 
 func (s *Stat) Write(v Data8) {
@@ -42,8 +43,8 @@ func (s *Stat) CheckInterrupt() {
 		// LYC==LY int selected and LYC==LY
 		statInt = true
 	}
-	if !s.prevStatInt && statInt {
+	if !s.PrevStatInt && statInt {
 		s.Interrupts.IRQSet(IntSourceLCD)
 	}
-	s.prevStatInt = statInt
+	s.PrevStatInt = statInt
 }

@@ -15,7 +15,7 @@ type Fetcher struct {
 	TileMSB     Data8
 	Suspended   bool
 
-	PPU *PPU
+	ppu *PPU
 }
 
 type BackgroundFetcher struct {
@@ -75,10 +75,10 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 	// and on the bits 3 and 5 of the LCDC register.
 	var addr Addr
 	if bgf.WindowFetching {
-		addr = bgf.PPU.WindowTilemapArea()
+		addr = bgf.ppu.WindowTilemapArea()
 		bgf.WindowPixelRenderedThisScanline = true
 	} else {
-		addr = bgf.PPU.BGTilemapArea()
+		addr = bgf.ppu.BGTilemapArea()
 	}
 
 	// GBEDG: Additionally, the address which the tile number is read from is offset by the fetcher-internal X-Position-Counter,
@@ -87,14 +87,14 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 	if !bgf.WindowFetching {
 		// GBEDG: The value of SCX / 8 is also added if the Fetcher is not fetching Window pixels.
 		//        In order to make the wrap-around with SCX work, this offset is ANDed with 0x1f
-		offsetX += Addr((bgf.PPU.RegSCX / 8))
+		offsetX += Addr((bgf.ppu.RegSCX / 8))
 		offsetX &= 0x1f
 	}
 
 	var offsetY Addr
 	if !bgf.WindowFetching {
 		// GBEDG: An offset of 32 * (((LY + SCY) & 0xFF) / 8) is also added if background pixels are being fetched,
-		offs := (bgf.PPU.RegLY + bgf.PPU.RegSCY) & 0xff
+		offs := (bgf.ppu.RegLY + bgf.ppu.RegSCY) & 0xff
 		offs /= 8
 		offsetY = 32 * Addr(offs)
 	} else {
@@ -108,12 +108,12 @@ func (bgf *BackgroundFetcher) fetchTileNo() {
 	addr += (offsetX + offsetY) & 0x3ff
 
 	bgf.TileIndexAddr = addr
-	bgf.TileIndex = bgf.PPU.Bus.ProbeAddress(addr)
+	bgf.TileIndex = bgf.ppu.Bus.ProbeAddress(addr)
 }
 
 func (bgf *BackgroundFetcher) fetchTileLSB() {
 	idx := bgf.TileIndex
-	signedAddressing := bgf.PPU.RegLCDC&Bit4 == 0
+	signedAddressing := bgf.ppu.RegLCDC&Bit4 == 0
 	var addr Addr
 	if signedAddressing {
 		if idx < 128 {
@@ -127,44 +127,44 @@ func (bgf *BackgroundFetcher) fetchTileLSB() {
 	if bgf.WindowFetching {
 		addr += 2 * Addr(bgf.WindowLineCounter%8)
 	} else {
-		addr += 2 * Addr((bgf.PPU.RegLY+bgf.PPU.RegSCY)%8)
+		addr += 2 * Addr((bgf.ppu.RegLY+bgf.ppu.RegSCY)%8)
 	}
 	bgf.TileLSBAddr = addr
-	bgf.TileLSB = bgf.PPU.Bus.ProbeAddress(addr)
+	bgf.TileLSB = bgf.ppu.Bus.ProbeAddress(addr)
 }
 
 func (bgf *BackgroundFetcher) fetchTileMSB() {
-	bgf.TileMSB = bgf.PPU.Bus.ProbeAddress(bgf.TileLSBAddr + 1)
+	bgf.TileMSB = bgf.ppu.Bus.ProbeAddress(bgf.TileLSBAddr + 1)
 }
 
 func (bgf *BackgroundFetcher) windowReached() bool {
-	if !bgf.PPU.WindowEnable() {
+	if !bgf.ppu.WindowEnable() {
 		return false
 	}
-	if bgf.PPU.RegWY == bgf.PPU.RegLY {
+	if bgf.ppu.RegWY == bgf.ppu.RegLY {
 		bgf.WindowYReached = true
 	}
 	if !bgf.WindowYReached {
 		return false
 	}
-	if bgf.PPU.Shifter.X < bgf.PPU.RegWX-7 {
+	if bgf.ppu.Shifter.X < bgf.ppu.RegWX-7 {
 		return false
 	}
 	return true
 }
 
 func (bgf *BackgroundFetcher) pushFIFO() bool {
-	if bgf.PPU.BackgroundFIFO.Level > 0 {
+	if bgf.ppu.BackgroundFIFO.Level > 0 {
 		return false
 	}
-	if bgf.PPU.BGWindowEnable() {
+	if bgf.ppu.BGWindowEnable() {
 		line := DecodeTileLine(bgf.TileMSB, bgf.TileLSB)
 		for i := range 8 {
-			line[i].Palette = bgf.PPU.BGPalette
+			line[i].Palette = bgf.ppu.BGPalette
 		}
-		bgf.PPU.BackgroundFIFO.Write8(line)
+		bgf.ppu.BackgroundFIFO.Write8(line)
 	} else {
-		bgf.PPU.BackgroundFIFO.Write8(TileLine{})
+		bgf.ppu.BackgroundFIFO.Write8(TileLine{})
 	}
 	return true
 }
@@ -208,23 +208,23 @@ func (sf *SpriteFetcher) fsm() {
 		if sf.pushFIFO() {
 			sf.State = FetcherStateFetchTileNo
 			sf.Suspended = true
-			sf.DoneX = sf.PPU.Shifter.X
+			sf.DoneX = sf.ppu.Shifter.X
 		}
 	}
 }
 
 func (sf *SpriteFetcher) fetchTileNo() {
-	sf.TileIndex = sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX].TileIndex
+	sf.TileIndex = sf.ppu.OAMBuffer.Buffer[sf.SpriteIDX].TileIndex
 }
 
 func (sf *SpriteFetcher) fetchTileLSB() {
-	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
+	obj := sf.ppu.OAMBuffer.Buffer[sf.SpriteIDX]
 
-	screenY := sf.PPU.RegLY + sf.PPU.RegSCY
+	screenY := sf.ppu.RegLY + sf.ppu.RegSCY
 	offsetInObj := screenY - obj.Y
 
 	addr := Addr(0x8000)
-	if sf.PPU.ObjHeight() == 8 {
+	if sf.ppu.ObjHeight() == 8 {
 		addr += 16 * Addr(sf.TileIndex)
 		if obj.Attributes&Bit6 != 0 {
 			addr -= 2 * Addr(offsetInObj%8)
@@ -247,16 +247,16 @@ func (sf *SpriteFetcher) fetchTileLSB() {
 	}
 
 	sf.TileLSBAddr = addr
-	sf.TileLSB = sf.PPU.Bus.ProbeAddress(addr)
+	sf.TileLSB = sf.ppu.Bus.ProbeAddress(addr)
 }
 
 func (sf *SpriteFetcher) fetchTileMSB() {
-	sf.TileMSB = sf.PPU.Bus.ProbeAddress(sf.TileLSBAddr + 1)
+	sf.TileMSB = sf.ppu.Bus.ProbeAddress(sf.TileLSBAddr + 1)
 }
 
 func (sf *SpriteFetcher) pushFIFO() bool {
-	obj := sf.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
-	palette := sf.PPU.ObjPalette(obj.Attributes)
+	obj := sf.ppu.OAMBuffer.Buffer[sf.SpriteIDX]
+	palette := sf.ppu.ObjPalette(obj.Attributes)
 	line := DecodeTileLine(sf.TileMSB, sf.TileLSB)
 	if obj.Attributes&Bit5 != 0 {
 		for i := range 4 {
@@ -266,7 +266,7 @@ func (sf *SpriteFetcher) pushFIFO() bool {
 	for i := range 8 {
 		line[i].Palette = palette
 	}
-	if !sf.PPU.OBJEnable() {
+	if !sf.ppu.OBJEnable() {
 		for i := range 8 {
 			line[i].ColorIDXBGPriority = 0
 		}
@@ -276,18 +276,18 @@ func (sf *SpriteFetcher) pushFIFO() bool {
 			line[i].SetBGPriority()
 		}
 	}
-	offsetInSprite := sf.PPU.Shifter.X + 8 - obj.X
+	offsetInSprite := sf.ppu.Shifter.X + 8 - obj.X
 	pixelsToPush := 8 - offsetInSprite
-	pos := sf.PPU.SpriteFIFO.ShiftPos
+	pos := sf.ppu.SpriteFIFO.ShiftPos
 	for i := range int(pixelsToPush) {
-		incLevel := i >= sf.PPU.SpriteFIFO.Level
-		pushPixel := incLevel || sf.PPU.SpriteFIFO.Slots[pos].ColorIDX() == 0
+		incLevel := i >= sf.ppu.SpriteFIFO.Level
+		pushPixel := incLevel || sf.ppu.SpriteFIFO.Slots[pos].ColorIDX() == 0
 		if pushPixel {
 			pixel := line[int(offsetInSprite)+i]
-			sf.PPU.SpriteFIFO.Slots[pos] = pixel
+			sf.ppu.SpriteFIFO.Slots[pos] = pixel
 		}
 		if incLevel {
-			sf.PPU.SpriteFIFO.Level++
+			sf.ppu.SpriteFIFO.Level++
 		}
 		pos++
 		if pos == 8 {
