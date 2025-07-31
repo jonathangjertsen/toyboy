@@ -242,7 +242,7 @@ func (app *App) startWebSocketServer() {
 					if buf := buffers[DataIDOAM]; buf != nil {
 						model.MemDump(
 							buf,
-							app.GB.Bus.OAM.Data,
+							app.GB.Bus.AddressSpace[model.AddrOAMBegin:model.AddrOAMEnd+1],
 							model.AddrOAMBegin,
 							model.AddrOAMEnd,
 							0,
