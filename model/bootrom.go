@@ -1,9 +1,5 @@
 package model
 
-import (
-	"github.com/jonathangjertsen/toyboy/assets"
-)
-
 type BootROMLock struct {
 	MemoryRegion
 
@@ -36,15 +32,4 @@ func (brl *BootROMLock) Lock() {
 	if brl.OnLock != nil {
 		brl.OnLock()
 	}
-}
-
-func NewBootROM(clk *ClockRT, config ConfigBootROM) MemoryRegion {
-	bootrom := NewMemoryRegion(clk, AddrZero, SizeBootROM)
-
-	if config.Variant == "DMGBoot" {
-		bootrom.Data = Data8Slice(assets.DMGBoot)
-	} else {
-		panic("unknown boot ROM")
-	}
-	return bootrom
 }
