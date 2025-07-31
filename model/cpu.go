@@ -13,7 +13,7 @@ type CPU struct {
 	machineCycle int
 
 	clockCycle                 uint
-	wroteToAddressBusThisCycle bool
+	wroteToAddressBusThisCycle bool // deprecated
 
 	rewind *Rewind
 
@@ -24,15 +24,12 @@ type CPU struct {
 
 type CPUBusIF interface {
 	Reset()
-	BeginCoreDump() func()
-	InCoreDump() bool
 	WriteAddress(Addr)
 	WriteData(Data8)
 	GetAddress() Addr
 	GetData() Data8
 	ProbeAddress(Addr) Data8
 	ProbeRange(Addr, Addr) []Data8
-	GetPeripheral(any)
 }
 
 func (cpu *CPU) CurrInstruction() (DisInstruction, int) {

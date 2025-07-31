@@ -45,15 +45,6 @@ func (gb *Gameboy) SoftReset() {
 	})
 }
 
-func (gb *Gameboy) GetCoreDump() CoreDump {
-	var cd CoreDump
-	gb.CLK.Sync(func() {
-		cd = gb.CPU.GetCoreDump()
-		cd.Cycle = gb.CLK.Cycle
-	})
-	return cd
-}
-
 func NewGameboy(
 	config *Config,
 	audio *Audio,
@@ -85,7 +76,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bootROMLock := NewBootROMLock(mem, cartridge, debug)
 	apu := NewAPU(clk, gb.Config, mem)
 	joypad := NewJoypad(clk, interrupts, mem)
-	serial := NewSerial(clk)
 	timer := NewTimer(clk, mem, apu, interrupts)
 
 	bus := NewBus(mem)
@@ -100,7 +90,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bus.Cartridge = cartridge
 	bus.Joypad = joypad
 	bus.Interrupts = interrupts
-	bus.Serial = serial
 	bus.Timer = timer
 	bus.Config = gb.Config
 
