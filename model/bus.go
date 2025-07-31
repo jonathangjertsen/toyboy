@@ -3,6 +3,8 @@ package model
 import "fmt"
 
 type Bus struct {
+	AddressSpace *AddressSpace
+
 	Data    Data8
 	Address Addr
 	Config  *Config
@@ -23,6 +25,12 @@ type Bus struct {
 	Serial      *Serial
 	Prohibited  *Prohibited
 	Timer       *Timer
+}
+
+func NewBus(as *AddressSpace) *Bus {
+	return &Bus{
+		AddressSpace: as,
+	}
 }
 
 func (b *Bus) GetPeripheral(ptr any) {
