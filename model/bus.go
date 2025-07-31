@@ -110,7 +110,7 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	} else if addr == AddrIF || addr == AddrIE {
 		return b.Interrupts.Read(addr)
 	} else if addr == AddrBootROMLock {
-		return b.BootROMLock.Read(addr)
+		return b.AddressSpace[addr]
 	} else if addr == AddrSB || addr == AddrSC {
 		return b.Serial.Read(addr)
 	} else {
@@ -160,7 +160,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	} else if len == 1 && (begin == AddrIF || begin == AddrIE) {
 		return readRange(b.Interrupts, begin, end)
 	} else if len == 1 && begin == AddrBootROMLock {
-		return readRange(b.BootROMLock, begin, end)
+		return b.AddressSpace[begin : end+1]
 	} else if len == 1 && (begin == AddrSB || begin == AddrSC) {
 		return readRange(b.Serial, begin, end)
 	} else {
@@ -194,6 +194,7 @@ func (b *Bus) WriteData(v Data8) {
 	} else if addr <= AddrCartridgeBankNEnd {
 		b.Cartridge.Write(addr, v)
 	} else if addr == AddrBootROMLock {
+		b.AddressSpace[b.Address] = v
 		b.BootROMLock.Write(addr, v)
 	} else if addr == AddrP1 {
 		b.Joypad.Write(addr, v)
