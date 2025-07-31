@@ -50,4 +50,4 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 Verbatim copies of GPL v2.0 and GPL v3.0 are provided as text files (`gpl-2.0.txt` and `gpl-3.0.txt` respectively) in this repository.
 
-A component in this project, `model/blip.go`, is derived from Blargg's Blip_Buffer library, which is subject to LGPL v2.1 or later. The original license text for that library is provided in the mentioned file.
+A component in this project, `blip/`, is derived from Blargg's Blip_Buffer library, which is subject to LGPL v2.1 or later. The original license text for that library is provided in the mentioned file.
