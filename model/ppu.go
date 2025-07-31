@@ -47,15 +47,20 @@ type PPU struct {
 
 	// Outputs
 	FBViewport ViewPort
+}
 
-	// Memory access
-	frameSync chan func(*ViewPort)
+type FrameSync struct {
+	ch chan func(*ViewPort)
+}
+
+func NewFrameSync() *FrameSync {
+	return &FrameSync{
+		ch: make(chan func(*ViewPort), 1),
+	}
 }
 
 func NewPPU(rtClock *ClockRT, ints *Interrupts) *PPU {
-	ppu := &PPU{
-		frameSync: make(chan func(*ViewPort), 1),
-	}
+	ppu := &PPU{}
 	ppu.SpriteFetcher.Suspended = true
 	ppu.SpriteFetcher.DoneX = 0xff
 
@@ -80,9 +85,9 @@ func (ppu *PPU) GetDump() PPUDump {
 	return dump
 }
 
-func (ppu *PPU) Sync(f func(*ViewPort)) {
+func (ppu *PPU) Sync(fs *FrameSync, f func(*ViewPort)) {
 	done := make(chan struct{})
-	ppu.frameSync <- func(vp *ViewPort) {
+	fs.ch <- func(vp *ViewPort) {
 		f(vp)
 		done <- struct{}{}
 	}
@@ -173,13 +178,13 @@ func (ppu *PPU) SetOBP1(v Data8) {
 	ppu.OBJPalette1 = v
 }
 
-func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT, mem []Data8) {
+func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT, mem []Data8, fs *FrameSync) {
 	if ppu.DMA.Source != 0 {
 		ppu.DMA.fsm(mem)
 	}
 	switch ppu.Mode {
 	case PPUModeVBlank:
-		ppu.fsmVBlank(ints, debug)
+		ppu.fsmVBlank(ints, debug, fs)
 	case PPUModeHBlank:
 		ppu.fsmHBlank(ints, debug)
 	case PPUModePixelDraw:
@@ -335,15 +340,15 @@ func (ppu *PPU) fsmPixelDraw(ints *Interrupts, debug *Debug, clk *ClockRT, mem [
 	ppu.PixelDrawCycle++
 }
 
-func (ppu *PPU) fsmVBlank(ints *Interrupts, debug *Debug) {
+func (ppu *PPU) fsmVBlank(ints *Interrupts, debug *Debug, fs *FrameSync) {
 	if ppu.VBlankLineRemainingCycles > 0 {
 		ppu.VBlankLineRemainingCycles--
 		return
 	}
 
-	nSyncers := len(ppu.frameSync)
+	nSyncers := len(fs.ch)
 	for range nSyncers {
-		f := <-ppu.frameSync
+		f := <-fs.ch
 		f(&ppu.FBViewport)
 	}
 	ppu.IncRegLY(ints, debug)

@@ -19,6 +19,7 @@ type Gameboy struct {
 	APU       *APU
 	Cartridge *Cartridge
 	Joypad    *Joypad
+	FrameSync *FrameSync
 }
 
 func (gb *Gameboy) Start() {
@@ -60,7 +61,8 @@ func (gb *Gameboy) Init(audio *Audio) {
 	mem := NewAddressSpace()
 	interrupts := NewInterrupts(mem)
 	debug := NewDebug(&gb.Config.Debug)
-	clk := NewRealtimeClock(gb.Config.Clock, audio, interrupts, debug, mem)
+	fs := NewFrameSync()
+	clk := NewRealtimeClock(gb.Config.Clock, audio, interrupts, debug, mem, fs)
 
 	if gb.Config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
@@ -102,6 +104,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.PPU = ppu
 	gb.Debug = debug
 	gb.Joypad = joypad
+	gb.FrameSync = fs
 
 	gb.CPU.Reset()
 

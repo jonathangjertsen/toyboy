@@ -70,7 +70,7 @@ func NewApp(config *Config) *App {
 func (app *App) startup(ctx context.Context) {
 	app.ctx = ctx
 	app.startGB()
-	app.startWebSocketServer()
+	app.startWebSocketServer(app.GB.FrameSync)
 }
 
 func (app App) domReady(ctx context.Context) {
@@ -153,7 +153,7 @@ func (ts *TimeoutState) Update() {
 	ts.Next = time.Now().Add(ts.Interval)
 }
 
-func (app *App) startWebSocketServer() {
+func (app *App) startWebSocketServer(fs *model.FrameSync) {
 	http.HandleFunc("/data", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -180,7 +180,7 @@ func (app *App) startWebSocketServer() {
 		// Hammer the websocket with frames from the PPU
 		go func() {
 			for {
-				app.GB.PPU.Sync(func(vp *model.ViewPort) {
+				app.GB.PPU.Sync(fs, func(vp *model.ViewPort) {
 					grayscale := vp.Grayscale()
 					if !sendData(conn, mu, DataIDViewport, grayscale[:]) {
 						exit <- struct{}{}

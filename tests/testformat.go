@@ -233,7 +233,7 @@ func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
 
 	apu := model.NewAPU(clock, &model.DefaultConfig, testBus.RAM[:])
 	model.NewTimer(clock, testBus.RAM[:], apu, ints)
-	model.NewPPU(clock, ints, testBus.RAM[:], &model.DefaultConfig, nil)
+	model.NewPPU(clock, ints)
 
 	config := model.DefaultConfig
 	config.Debug.PanicOnStackUnderflow = false
