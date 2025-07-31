@@ -234,9 +234,6 @@ func (cpu *CPU) GetCoreDump() CoreDump {
 		return CoreDump{}
 	}
 
-	end := cpu.Bus.BeginCoreDump()
-	defer end()
-
 	var cd CoreDump
 	cd.Mem = bus.Mem
 	cd.Regs = cpu.Regs

@@ -15,7 +15,7 @@ type CPU struct {
 	machineCycle int
 
 	clockCycle                 uint
-	wroteToAddressBusThisCycle bool
+	wroteToAddressBusThisCycle bool // deprecated
 
 	handlers [256]InstructionHandling
 
@@ -26,8 +26,6 @@ type CPU struct {
 
 type CPUBusIF interface {
 	Reset()
-	BeginCoreDump() func()
-	InCoreDump() bool
 	WriteAddress(Addr)
 	WriteData(Data8)
 	GetAddress() Addr
@@ -241,12 +239,6 @@ func (cpu *CPU) execTransferToISR() bool {
 }
 
 func (cpu *CPU) writeAddressBus(addr Addr) {
-	if !cpu.Bus.InCoreDump() {
-		if cpu.wroteToAddressBusThisCycle {
-			panic("more than one call to writeAddressBus this cycle")
-		}
-	}
-	cpu.wroteToAddressBusThisCycle = true
 	cpu.Bus.WriteAddress(addr)
 }
 

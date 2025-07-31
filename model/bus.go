@@ -40,22 +40,10 @@ func (b *Bus) GetPeripheral(ptr any) {
 func (b *Bus) Reset() {
 	b.Address = 0
 	b.Data = 0
-	b.inCoreDump = false
 
 	if b.Config.BootROM.Skip {
 		b.BootROMLock.Lock()
 	}
-}
-
-func (b *Bus) BeginCoreDump() func() {
-	b.inCoreDump = true
-	return func() {
-		b.inCoreDump = false
-	}
-}
-
-func (b *Bus) InCoreDump() bool {
-	return b.inCoreDump
 }
 
 func (b *Bus) GetAddress() Addr {
