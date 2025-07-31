@@ -14,7 +14,6 @@ type Bus struct {
 	BootROMLock *BootROMLock
 	VRAM        *MemoryRegion
 	APU         *APU
-	OAM         *MemoryRegion
 	PPU         *PPU
 	Cartridge   *Cartridge
 	Joypad      *Joypad
@@ -93,7 +92,7 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		return b.APU.Read(addr)
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
-		return b.OAM.Data[addr-AddrOAMBegin]
+		return b.AddressSpace[addr]
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		return b.PPU.Read(addr)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
@@ -143,7 +142,7 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	} else if begin >= AddrAPUBegin && end <= AddrAPUEnd {
 		return readRange(b.APU, begin, end)
 	} else if begin >= AddrOAMBegin && end <= AddrOAMEnd {
-		return b.OAM.Data[begin-AddrOAMBegin : end-AddrOAMBegin+1]
+		return b.AddressSpace[begin : end+1]
 	} else if begin >= AddrPPUBegin && end <= AddrPPUEnd {
 		return readRange(b.PPU, begin, end)
 	} else if begin >= AddrProhibitedBegin && end <= AddrProhibitedEnd {
@@ -209,7 +208,7 @@ func (b *Bus) WriteData(v Data8) {
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.APU.Write(addr, v)
 	} else if addr >= AddrOAMBegin && addr <= AddrOAMEnd {
-		b.OAM.Data[addr-AddrOAMBegin] = v
+		b.AddressSpace[addr] = v
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		b.PPU.Write(addr, v)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {

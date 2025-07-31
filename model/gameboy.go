@@ -85,7 +85,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 
 	vram := NewMemoryRegion(clk, AddrVRAMBegin, SizeVRAM)
 	apu := NewAPU(clk, gb.Config)
-	oam := NewMemoryRegion(clk, AddrOAMBegin, SizeOAM)
 	cartridge := NewCartridge(clk)
 	joypad := NewJoypad(clk, interrupts)
 	serial := NewSerial(clk)
@@ -113,7 +112,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	bus.BootROMLock = bootROMLock
 	bus.VRAM = &vram
 	bus.APU = apu
-	bus.OAM = &oam
 	bus.PPU = ppu
 	bus.Cartridge = cartridge
 	bus.Joypad = joypad
