@@ -21,7 +21,7 @@ type PPU struct {
 	DMA     DMA
 
 	// Memory access
-	Bus *Bus
+	Bus CPUBusIF
 
 	// For setting the VBlank interrupt
 	// ppu.Stat deals with STAT interrupt
@@ -63,7 +63,7 @@ type PPU struct {
 	FrameSync chan func(*ViewPort)
 }
 
-func NewPPU(rtClock *ClockRT, interrupts *Interrupts, bus *Bus, config *Config, debug *Debug) *PPU {
+func NewPPU(rtClock *ClockRT, interrupts *Interrupts, bus CPUBusIF, config *Config, debug *Debug) *PPU {
 	ppu := &PPU{
 		MemoryRegion: NewMemoryRegion(rtClock, AddrPPUBegin, SizePPU),
 		Bus:          bus,
@@ -310,7 +310,7 @@ func (ppu *PPU) fsmOAMScan() {
 	// Read sprite out of OAM
 	spriteData := make([]Data8, 4)
 	for offs := Addr(0); offs < 4; offs++ {
-		spriteData[offs] = ppu.Bus.OAM.Read(AddrOAMBegin + index*4 + offs)
+		spriteData[offs] = ppu.Bus.ProbeAddress(AddrOAMBegin + index*4 + offs)
 	}
 	sprite := DecodeObject(spriteData)
 

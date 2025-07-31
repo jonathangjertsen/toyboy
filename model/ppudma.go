@@ -4,7 +4,7 @@ type DMA struct {
 	Reg    Data8
 	Source Addr
 	Dest   Addr
-	Bus    *Bus
+	Bus    CPUBusIF
 }
 
 func (d *DMA) Write(v Data8) {
@@ -21,7 +21,7 @@ func (d *DMA) fsm() {
 	// Write next data
 	// TODO: presumably this is not actually how it works
 	d.Bus.WriteAddress(d.Source)
-	v := d.Bus.Data
+	v := d.Bus.GetData()
 	d.Bus.WriteAddress(d.Dest)
 	d.Bus.WriteData(v)
 
