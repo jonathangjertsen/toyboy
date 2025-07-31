@@ -3,8 +3,7 @@ package model
 //go:generate go-enum --marshal --flag --values --nocomments
 
 type Interrupts struct {
-	MemIF MemoryRegion
-	MemIE MemoryRegion
+	mem []Data8
 
 	IME bool
 
@@ -44,34 +43,9 @@ func (is IntSource) ISR() Addr {
 	return 0
 }
 
-func NewInterrupts(clk *ClockRT) *Interrupts {
+func NewInterrupts(clk *ClockRT, mem []Data8) *Interrupts {
 	return &Interrupts{
-		MemIF: NewMemoryRegion(clk, AddrIF, 1),
-		MemIE: NewMemoryRegion(clk, AddrIE, 1),
-	}
-}
-
-func (ints *Interrupts) Read(addr Addr) Data8 {
-	switch Addr(addr) {
-	case AddrIF:
-		return ints.MemIF.Read(addr)
-	case AddrIE:
-		return ints.MemIE.Read(addr)
-	}
-	panicv(addr)
-	return 0
-}
-
-func (ints *Interrupts) Write(addr Addr, v Data8) {
-	switch Addr(addr) {
-	case AddrIF:
-		ints.MemIF.Write(addr, v)
-		ints.IRQCheck()
-	case AddrIE:
-		ints.MemIE.Write(addr, v)
-		ints.IRQCheck()
-	default:
-		panicv(addr)
+		mem: mem,
 	}
 }
 
@@ -84,15 +58,15 @@ func (ints *Interrupts) SetIME(v bool) {
 
 func (ints *Interrupts) PendInterrupt(in IntSource) {
 	ints.IME = false
-	ints.MemIF.Data[0] &= ^in.Mask()
+	ints.mem[AddrIF] &= ^in.Mask()
 	ints.PendingInterrupt = in
 }
 
 func (ints *Interrupts) IRQSet(in IntSource) {
-	if ints.MemIF.Data[0]&in.Mask() != 0 {
+	if ints.mem[AddrIF]&in.Mask() != 0 {
 		return
 	}
-	ints.MemIF.Data[0] |= in.Mask()
+	ints.mem[AddrIF] |= in.Mask()
 	ints.IRQCheck()
 }
 
@@ -100,8 +74,8 @@ func (ints *Interrupts) IRQCheck() {
 	if !ints.IME {
 		return
 	}
-	regIF := ints.MemIF.Data[0]
-	regIE := ints.MemIE.Data[0]
+	regIF := ints.mem[AddrIF]
+	regIE := ints.mem[AddrIE]
 	for is := IntSource(0); is < 5; is++ {
 		if (regIF & regIE & is.Mask()) != 0 {
 			ints.PendInterrupt(is)
