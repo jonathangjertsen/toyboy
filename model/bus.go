@@ -18,7 +18,6 @@ type Bus struct {
 	Joypad      *Joypad
 	Interrupts  *Interrupts
 	Serial      *Serial
-	Prohibited  *Prohibited
 	Timer       *Timer
 }
 
@@ -91,12 +90,11 @@ func (b *Bus) ProbeAddress(addr Addr) Data8 {
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
 		return b.PPU.Read(addr)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
-		return b.Prohibited.Read(addr)
+		return b.Mem[addr]
 	} else if (addr >= 0xff4c && addr <= 0xff4f) || (addr >= 0xff51 && addr <= 0xff70) {
-		// GBC stuff
-		return 0
+		return b.Mem[addr]
 	} else if addr >= 0xff71 && addr <= 0xff7f {
-		return b.Prohibited.Read(addr)
+		return b.Mem[addr]
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
 		return b.Timer.Read(addr)
 	} else if addr == AddrP1 {
@@ -137,12 +135,12 @@ func (b *Bus) ProbeRange(begin, end Addr) []Data8 {
 	} else if begin >= AddrPPUBegin && end <= AddrPPUEnd {
 		return readRange(b.PPU, begin, end)
 	} else if begin >= AddrProhibitedBegin && end <= AddrProhibitedEnd {
-		return b.Prohibited.FEA0toFEFF.Data[begin-AddrProhibitedBegin : end-AddrProhibitedBegin+1]
+		return b.Mem[begin : end+1]
 	} else if (begin >= 0xff4c && end <= 0xff4f) || (begin >= 0xff51 && end <= 0xff70) {
 		// GBC stuff
-		return nil
+		return b.Mem[begin : end+1]
 	} else if begin >= 0xff71 && end <= 0xff7f {
-		return b.Prohibited.FF71toFF7F.Data[begin-0xff71 : end-0xff7f+1]
+		return b.Mem[begin : end+1]
 	} else if begin >= AddrTimerBegin && end <= AddrTimerEnd {
 		return readRange(b.Timer, begin, end)
 	} else if len == 1 && begin == AddrP1 {
@@ -206,13 +204,13 @@ func (b *Bus) WriteData(v Data8) {
 		b.Mem[addr] = v
 		b.PPU.Write(addr, v)
 	} else if addr >= AddrProhibitedBegin && addr <= AddrProhibitedEnd {
-		b.Prohibited.Write(addr, v)
+		b.Mem[addr] = v
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
 		b.Timer.Write(addr, v)
 	} else if (addr >= 0xff4c && addr <= 0xff4f) || (addr >= 0xff51 && addr <= 0xff70) {
 		// GBC stuff
 	} else if addr >= 0xff71 && addr <= 0xff7f {
-		b.Prohibited.Write(addr, v)
+		b.Mem[addr] = v
 	} else if addr == AddrSB || addr == AddrSC {
 		b.Serial.Write(addr, v)
 	} else {
