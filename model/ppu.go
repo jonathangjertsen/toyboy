@@ -55,9 +55,7 @@ type PPU struct {
 	VBlankLineRemainingCycles uint64
 
 	// Outputs
-	FBBackground FrameBuffer
-	FBWindow     FrameBuffer
-	FBViewport   ViewPort
+	FBViewport ViewPort
 
 	FrameSync chan func(*ViewPort)
 }
