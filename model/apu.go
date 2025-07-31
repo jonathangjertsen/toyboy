@@ -1,7 +1,6 @@
 package model
 
 type APU struct {
-	MemoryRegion
 	MasterCtl Data8
 
 	Pulse1 PulseChannelWithSweep
@@ -16,9 +15,8 @@ type APU struct {
 	canWriteLengthTimersWithAPUOff bool
 }
 
-func NewAPU(clock *ClockRT, config *Config) *APU {
+func NewAPU(clock *ClockRT, config *Config, addressSpace *AddressSpace) *APU {
 	apu := &APU{
-		MemoryRegion:                   NewMemoryRegion(clock, AddrAPUBegin, SizeAPU),
 		canWriteLengthTimersWithAPUOff: true, // on monochrome models
 		Pulse1: PulseChannelWithSweep{
 			PulseChannel: PulseChannel{
@@ -28,7 +26,9 @@ func NewAPU(clock *ClockRT, config *Config) *APU {
 		Pulse2: PulseChannel{
 			DutyGenerator: NewDutyGenerator(),
 		},
-		Wave:  WaveChannel{},
+		Wave: WaveChannel{
+			AddressSpace: addressSpace,
+		},
 		Mixer: Mixer{},
 	}
 	if config.BootROM.Skip {
@@ -75,10 +75,6 @@ func (apu *APU) incDIVAPU() {
 }
 
 func (apu *APU) Read(addr Addr) Data8 {
-	if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
-		return apu.MemoryRegion.Data[addr-AddrAPUBegin]
-	}
-
 	switch Addr(addr) {
 	case AddrNR10:
 		return apu.Pulse1.Sweep.RegSweep
@@ -132,13 +128,6 @@ func (apu *APU) Read(addr Addr) Data8 {
 }
 
 func (apu *APU) Write(addr Addr, v Data8) {
-	apu.MemoryRegion.Data[addr-AddrAPUBegin] = v
-
-	if addr >= AddrWaveRAMBegin && addr <= AddrWaveRAMEnd {
-		apu.Wave.WaveGenerator.WaveRAM[addr-AddrWaveRAMBegin] = v
-		return
-	}
-
 	switch Addr(addr) {
 	case AddrNR10:
 		apu.SetPulse1Sweep(v)
