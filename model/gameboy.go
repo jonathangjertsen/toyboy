@@ -7,17 +7,18 @@ import (
 )
 
 type Gameboy struct {
-	Mem        []Data8
-	Bus        Bus
-	Debug      Debug
-	CPU        CPU
-	PPU        PPU
-	APU        APU
-	Cartridge  Cartridge
-	Joypad     Joypad
-	FrameSync  FrameSync
-	Interrupts Interrupts
-	Timer      Timer
+	Mem         []Data8
+	Bus         Bus
+	Debug       Debug
+	CPU         CPU
+	PPU         PPU
+	APU         APU
+	Cartridge   Cartridge
+	Joypad      Joypad
+	FrameSync   FrameSync
+	Interrupts  Interrupts
+	Timer       Timer
+	BootROMLock BootROMLock
 }
 
 func Start(clk *ClockRT, runFlag *atomic.Bool) {
@@ -60,7 +61,11 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 		BankNo1:         1,
 		SelectedROMBank: 1,
 	}
-	bootROMLock := NewBootROMLock(gb.Mem, &gb.Cartridge, &gb.Debug)
+	gb.BootROMLock = BootROMLock{
+		mem:       gb.Mem,
+		cartridge: &gb.Cartridge,
+		debug:     &gb.Debug,
+	}
 	gb.Joypad.Action = 0xf
 	gb.Joypad.Direction = 0xf
 	gb.Mem[AddrP1] = 0x1f
@@ -77,7 +82,7 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 	gb.PPU.SpriteFetcher.DoneX = 0xff
 	gb.PPU.beginFrame(gb.Mem, &gb.Interrupts)
 
-	gb.Bus.BootROMLock = bootROMLock
+	gb.Bus.BootROMLock = &gb.BootROMLock
 	gb.Bus.APU = &gb.APU
 	gb.Bus.PPU = &gb.PPU
 	gb.Bus.Cartridge = &gb.Cartridge

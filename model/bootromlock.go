@@ -8,14 +8,6 @@ type BootROMLock struct {
 	debug     *Debug
 }
 
-func NewBootROMLock(mem []Data8, cartridge *Cartridge, debug *Debug) *BootROMLock {
-	return &BootROMLock{
-		mem:       mem,
-		cartridge: cartridge,
-		debug:     debug,
-	}
-}
-
 func (brl *BootROMLock) Write(addr Addr, v Data8) {
 	if brl.BootOff {
 		return
