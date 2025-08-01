@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-type InstructionHandling func(gb *Gameboy, e int) bool
+type InstructionHandling any
 
 const MaxOpcodesPerInsr = 6
 
