@@ -19,7 +19,7 @@ type Gameboy struct {
 	PPU        PPU
 	APU        APU
 	Cartridge  Cartridge
-	Joypad     *Joypad
+	Joypad     Joypad
 	FrameSync  *FrameSync
 	Interrupts *Interrupts
 	Audio      *Audio
@@ -96,7 +96,9 @@ func (gb *Gameboy) Init(audio *Audio) {
 		SelectedROMBank: 1,
 	}
 	bootROMLock := NewBootROMLock(mem, &gb.Cartridge, &gb.Debug)
-	joypad := NewJoypad(interrupts, mem)
+	gb.Joypad.Action = 0xf
+	gb.Joypad.Direction = 0xf
+	mem[AddrP1] = 0x1f
 	var timer Timer
 
 	gb.CPU = CPU{
@@ -116,13 +118,12 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Bus.APU = &gb.APU
 	gb.Bus.PPU = &gb.PPU
 	gb.Bus.Cartridge = &gb.Cartridge
-	gb.Bus.Joypad = joypad
+	gb.Bus.Joypad = &gb.Joypad
 	gb.Bus.Interrupts = interrupts
 	gb.Bus.Timer = &timer
 	gb.Bus.Config = gb.Config
 
 	gb.Mem = mem
-	gb.Joypad = joypad
 	gb.FrameSync = fs
 	gb.Interrupts = interrupts
 	gb.Audio = audio

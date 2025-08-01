@@ -16,15 +16,6 @@ type JoypadState struct {
 	Select bool
 }
 
-func NewJoypad(ints *Interrupts, mem []Data8) *Joypad {
-	jp := &Joypad{
-		Action:    0xf,
-		Direction: 0xf,
-	}
-	mem[AddrP1] = 0x1f
-	return jp
-}
-
 func (jp *Joypad) Write(addr Addr, v Data8) {
 	// TODO: this can trigger an interrupt
 }
