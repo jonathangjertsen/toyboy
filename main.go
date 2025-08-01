@@ -44,7 +44,7 @@ func main() {
 		if err := model.LoadROM(
 			"assets/cartridges/tetris.gb",
 			gb.Mem,
-			gb.Cartridge,
+			&gb.Cartridge,
 			gb.Bus.BootROMLock,
 		); err != nil {
 			panic(err)

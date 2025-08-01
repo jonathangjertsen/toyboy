@@ -18,14 +18,6 @@ type Cartridge struct {
 	mem []Data8
 }
 
-func NewCartridge(clk *ClockRT, mem []Data8) *Cartridge {
-	return &Cartridge{
-		mem:             mem,
-		BankNo1:         1,
-		SelectedROMBank: 1,
-	}
-}
-
 func (cart *Cartridge) LoadSave(save *SaveState, mem []Data8) {
 	*cart = save.Cartridge
 	cart.mem = mem

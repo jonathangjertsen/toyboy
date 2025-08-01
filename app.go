@@ -105,7 +105,7 @@ func (app *App) startGB() {
 	if err := model.LoadROM(
 		"assets/cartridges/tetris.gb",
 		app.GB.Mem,
-		app.GB.Cartridge,
+		&app.GB.Cartridge,
 		app.GB.Bus.BootROMLock,
 	); err != nil {
 		panic(err)
