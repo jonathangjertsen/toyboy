@@ -23,7 +23,7 @@ type Gameboy struct {
 	FrameSync  FrameSync
 	Interrupts Interrupts
 	Audio      *Audio
-	Timer      *Timer
+	Timer      Timer
 }
 
 func (gb *Gameboy) Start() {
@@ -99,7 +99,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Joypad.Action = 0xf
 	gb.Joypad.Direction = 0xf
 	mem[AddrP1] = 0x1f
-	var timer Timer
 
 	gb.CPU = CPU{
 		Config:     gb.Config,
@@ -120,12 +119,11 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Bus.Cartridge = &gb.Cartridge
 	gb.Bus.Joypad = &gb.Joypad
 	gb.Bus.Interrupts = &gb.Interrupts
-	gb.Bus.Timer = &timer
+	gb.Bus.Timer = &gb.Timer
 	gb.Bus.Config = gb.Config
 
 	gb.Mem = mem
 	gb.Audio = audio
-	gb.Timer = &timer
 
 	go gb.CLK.run(gb)
 
