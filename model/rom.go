@@ -36,7 +36,7 @@ func LoadROM(
 	}
 
 	// Map in initial Bank 1
-	cart.SetROMBank(1)
+	cart.SetROMBank(mem, 1)
 
 	// Configure cartridge MCB features
 	cart.MBCFeatures = GetMBCFeatures(

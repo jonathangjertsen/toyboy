@@ -10,14 +10,6 @@ type APU struct {
 	Noise     NoiseChannel
 }
 
-func (apu *APU) LoadSave(save *SaveState) {
-	*apu = save.APU
-}
-
-func (apu *APU) Save(save *SaveState) {
-	save.APU = *apu
-}
-
 func (apu *APU) Reset() {
 	apu.SetMasterCtl(0x80)
 	apu.Pulse1.SetLengthDuty(0x80)

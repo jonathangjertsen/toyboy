@@ -91,7 +91,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Debug.WRAM.Source = mem[AddrWRAMBegin : AddrWRAMEnd+1]
 
 	gb.Cartridge = Cartridge{
-		mem:             mem,
 		BankNo1:         1,
 		SelectedROMBank: 1,
 	}

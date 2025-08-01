@@ -14,16 +14,6 @@ type Bus struct {
 	Timer       *Timer
 }
 
-func (bus *Bus) LoadSave(save *SaveState) {
-	bus.Data = save.BusData
-	bus.Address = save.BusAddress
-}
-
-func (bus *Bus) Save(save *SaveState) {
-	save.BusData = bus.Data
-	save.BusAddress = bus.Address
-}
-
 func (b *Bus) Reset() {
 	b.Address = 0
 	b.Data = 0
@@ -82,12 +72,12 @@ func (b *Bus) WriteData(mem []Data8, v Data8) {
 
 	if addr <= AddrBootROMEnd {
 		if b.BootROMLock.BootOff {
-			b.Cartridge.Write(addr, v)
+			b.Cartridge.Write(mem, addr, v)
 		}
 		return
 	}
 	if addr <= AddrCartridgeBankNEnd {
-		b.Cartridge.Write(addr, v)
+		b.Cartridge.Write(mem, addr, v)
 		return
 	}
 	mem[addr] = v
