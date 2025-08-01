@@ -68,7 +68,7 @@ func (cpu *CPU) IncPC() {
 	cpu.SetPC(cpu.Regs.PC + 1)
 }
 
-func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy, handlers *HandlerArray) {
+func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy) {
 	cpu.WroteToAddressBusThisCycle = false
 	cpu.ClockCycle = clk.Cycle
 	cpu.applyPendingIME(gb)
@@ -85,18 +85,7 @@ func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy, handlers *HandlerArray) {
 		if gb.Interrupts.PendingInterrupt != 0 {
 			fetch = cpu.execTransferToISR(clk, gb)
 		} else {
-			handler := handlers[cpu.Regs.IR][cpu.MachineCycle-1]
-			if h1, ok := handler.(func(gb *Gameboy, e int) bool); ok {
-				// patch
-				for i := 1; i < 6; i++ {
-					handlers[cpu.Regs.IR][i] = handler
-				}
-				fetch = h1(gb, cpu.MachineCycle)
-			} else if h2, ok := handler.(func(gb *Gameboy) bool); ok {
-				fetch = h2(gb)
-			} else {
-				panicf("%T @ %s %d", handler, cpu.Regs.IR, cpu.MachineCycle-1)
-			}
+			fetch = Handlers[cpu.Regs.IR][cpu.MachineCycle-1](gb)
 		}
 		if fetch {
 			gb.WriteAddress(cpu.Regs.PC)

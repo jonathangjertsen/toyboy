@@ -105,8 +105,7 @@ func (app *App) shutdown(ctx context.Context) {
 
 func (app *App) startGB(gb *model.Gameboy) {
 	app.GB = gb
-	handlers := model.Handlers(app.GB)
-	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio, &handlers, app.FrameSync)
+	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio, app.FrameSync)
 	app.GBFPSMeasurement.SetCounter(&app.GB.PPU.FrameCount)
 
 	if err := model.LoadROM(

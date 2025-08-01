@@ -100,7 +100,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64, audio *Audio) {
 	}
 }
 
-func (clockRT *ClockRT) Run(gb *Gameboy, config *Config, audio *Audio, handlers *HandlerArray, fs *FrameSync) {
+func (clockRT *ClockRT) Run(gb *Gameboy, config *Config, audio *Audio, fs *FrameSync) {
 	defer func() {
 		if e := recover(); e != nil {
 			clockRT.Onpanic(gb)
@@ -119,7 +119,7 @@ func (clockRT *ClockRT) Run(gb *Gameboy, config *Config, audio *Audio, handlers 
 		var exit bool
 		select {
 		case <-clockRT.ticker.C:
-			clockRT.MCycle(clockRT.mCyclesPerTick, gb, audio, handlers, fs)
+			clockRT.MCycle(clockRT.mCyclesPerTick, gb, audio, fs)
 		case <-uiTicker.C:
 			clockRT.uiCycle()
 		case <-clockRT.resume:
@@ -170,7 +170,6 @@ func (clockRT *ClockRT) MCycle(
 	n int,
 	gb *Gameboy,
 	audio *Audio,
-	handlers *HandlerArray,
 	fs *FrameSync,
 ) {
 	for range n {
@@ -186,7 +185,7 @@ func (clockRT *ClockRT) MCycle(
 		audio.Clock(&gb.APU)
 
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
-		gb.CPU.fsm(clockRT, gb, handlers)
+		gb.CPU.fsm(clockRT, gb)
 
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
