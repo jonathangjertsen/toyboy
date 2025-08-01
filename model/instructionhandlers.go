@@ -35,7 +35,7 @@ func (cb CBOp) String() string {
 
 func Handlers(gb *Gameboy) HandlerArray {
 	return HandlerArray{
-		OpcodeNop:      {singleCycle("NOP", func(gb *Gameboy) {})},
+		OpcodeNop:      {func(gb *Gameboy) bool { return true }},
 		OpcodeLDAA:     {ld(&gb.CPU.Regs.A, &gb.CPU.Regs.A)},
 		OpcodeLDAB:     {ld(&gb.CPU.Regs.A, &gb.CPU.Regs.B)},
 		OpcodeLDAC:     {ld(&gb.CPU.Regs.A, &gb.CPU.Regs.C)},
@@ -94,93 +94,103 @@ func Handlers(gb *Gameboy) HandlerArray {
 		OpcodeLDLH:     {ld(&gb.CPU.Regs.L, &gb.CPU.Regs.H)},
 		OpcodeLDLL:     {ld(&gb.CPU.Regs.L, &gb.CPU.Regs.L)},
 		OpcodeLDLHL:    {ldrhl(&gb.CPU.Regs.L)},
-		OpcodeRLA:      {singleCycle("RLA", func(gb *Gameboy) { gb.CPU.Regs.SetFlagsAndA(RLA(gb.CPU.Regs.A, gb.CPU.Regs.GetFlagC())) })},
-		OpcodeRRA:      {singleCycle("RRA", func(gb *Gameboy) { gb.CPU.Regs.SetFlagsAndA(RRA(gb.CPU.Regs.A, gb.CPU.Regs.GetFlagC())) })},
-		OpcodeRLCA:     {singleCycle("RLCA", func(gb *Gameboy) { gb.CPU.Regs.SetFlagsAndA(RLCA(gb.CPU.Regs.A)) })},
-		OpcodeRRCA:     {singleCycle("RRCA", func(gb *Gameboy) { gb.CPU.Regs.SetFlagsAndA(RRCA(gb.CPU.Regs.A)) })},
-		OpcodeORA:      {orreg(&gb.CPU.Regs.A)},
-		OpcodeORB:      {orreg(&gb.CPU.Regs.B)},
-		OpcodeORC:      {orreg(&gb.CPU.Regs.C)},
-		OpcodeORD:      {orreg(&gb.CPU.Regs.D)},
-		OpcodeORE:      {orreg(&gb.CPU.Regs.E)},
-		OpcodeORH:      {orreg(&gb.CPU.Regs.H)},
-		OpcodeORL:      {orreg(&gb.CPU.Regs.L)},
-		OpcodeORHL:     {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(OR(gb.CPU.Regs.A, v)) })},
-		OpcodeANDA:     {andreg(&gb.CPU.Regs.A)},
-		OpcodeANDB:     {andreg(&gb.CPU.Regs.B)},
-		OpcodeANDC:     {andreg(&gb.CPU.Regs.C)},
-		OpcodeANDD:     {andreg(&gb.CPU.Regs.D)},
-		OpcodeANDE:     {andreg(&gb.CPU.Regs.E)},
-		OpcodeANDH:     {andreg(&gb.CPU.Regs.H)},
-		OpcodeANDL:     {andreg(&gb.CPU.Regs.L)},
-		OpcodeANDHL:    {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(AND(gb.CPU.Regs.A, v)) })},
-		OpcodeXORA:     {xorreg(&gb.CPU.Regs.A)},
-		OpcodeXORB:     {xorreg(&gb.CPU.Regs.B)},
-		OpcodeXORC:     {xorreg(&gb.CPU.Regs.C)},
-		OpcodeXORD:     {xorreg(&gb.CPU.Regs.D)},
-		OpcodeXORE:     {xorreg(&gb.CPU.Regs.E)},
-		OpcodeXORH:     {xorreg(&gb.CPU.Regs.H)},
-		OpcodeXORL:     {xorreg(&gb.CPU.Regs.L)},
-		OpcodeXORHL:    {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(XOR(gb.CPU.Regs.A, v)) })},
-		OpcodeSUBA:     {subreg(&gb.CPU.Regs.A)},
-		OpcodeSUBB:     {subreg(&gb.CPU.Regs.B)},
-		OpcodeSUBC:     {subreg(&gb.CPU.Regs.C)},
-		OpcodeSUBD:     {subreg(&gb.CPU.Regs.D)},
-		OpcodeSUBE:     {subreg(&gb.CPU.Regs.E)},
-		OpcodeSUBH:     {subreg(&gb.CPU.Regs.H)},
-		OpcodeSUBL:     {subreg(&gb.CPU.Regs.L)},
-		OpcodeSUBHL:    {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, v, false)) })},
-		OpcodeSBCA:     {sbcreg(&gb.CPU.Regs.A)},
-		OpcodeSBCB:     {sbcreg(&gb.CPU.Regs.B)},
-		OpcodeSBCC:     {sbcreg(&gb.CPU.Regs.C)},
-		OpcodeSBCD:     {sbcreg(&gb.CPU.Regs.D)},
-		OpcodeSBCE:     {sbcreg(&gb.CPU.Regs.E)},
-		OpcodeSBCH:     {sbcreg(&gb.CPU.Regs.H)},
-		OpcodeSBCL:     {sbcreg(&gb.CPU.Regs.L)},
-		OpcodeSBCHL:    {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, v, gb.CPU.Regs.GetFlagC())) })},
-		OpcodeCPA:      {cpreg(&gb.CPU.Regs.A)},
-		OpcodeCPB:      {cpreg(&gb.CPU.Regs.B)},
-		OpcodeCPC:      {cpreg(&gb.CPU.Regs.C)},
-		OpcodeCPD:      {cpreg(&gb.CPU.Regs.D)},
-		OpcodeCPE:      {cpreg(&gb.CPU.Regs.E)},
-		OpcodeCPH:      {cpreg(&gb.CPU.Regs.H)},
-		OpcodeCPL:      {cpreg(&gb.CPU.Regs.L)},
-		OpcodeCPHL:     {aluhl(func(v Data8) { gb.CPU.Regs.SetFlags(SUB(gb.CPU.Regs.A, v, false)) })},
-		OpcodeADDA:     {addreg(&gb.CPU.Regs.A)},
-		OpcodeADDB:     {addreg(&gb.CPU.Regs.B)},
-		OpcodeADDC:     {addreg(&gb.CPU.Regs.C)},
-		OpcodeADDD:     {addreg(&gb.CPU.Regs.D)},
-		OpcodeADDE:     {addreg(&gb.CPU.Regs.E)},
-		OpcodeADDH:     {addreg(&gb.CPU.Regs.H)},
-		OpcodeADDL:     {addreg(&gb.CPU.Regs.L)},
-		OpcodeADDHL:    {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, v, false)) })},
-		OpcodeADDSPe:   {addspe},
-		OpcodeADCA:     {adcreg(&gb.CPU.Regs.A)},
-		OpcodeADCB:     {adcreg(&gb.CPU.Regs.B)},
-		OpcodeADCC:     {adcreg(&gb.CPU.Regs.C)},
-		OpcodeADCD:     {adcreg(&gb.CPU.Regs.D)},
-		OpcodeADCE:     {adcreg(&gb.CPU.Regs.E)},
-		OpcodeADCH:     {adcreg(&gb.CPU.Regs.H)},
-		OpcodeADCL:     {adcreg(&gb.CPU.Regs.L)},
-		OpcodeADCHL:    {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, v, gb.CPU.Regs.GetFlagC())) })},
-		OpcodeDAA: {singleCycle("DAA", func(gb *Gameboy) {
+		OpcodeRLA: {func(gb *Gameboy) bool {
+			gb.CPU.Regs.SetFlagsAndA(RLA(gb.CPU.Regs.A, gb.CPU.Regs.GetFlagC()))
+			return true
+		}},
+		OpcodeRRA: {func(gb *Gameboy) bool {
+			gb.CPU.Regs.SetFlagsAndA(RRA(gb.CPU.Regs.A, gb.CPU.Regs.GetFlagC()))
+			return true
+		}},
+		OpcodeRLCA:   {func(gb *Gameboy) bool { gb.CPU.Regs.SetFlagsAndA(RLCA(gb.CPU.Regs.A)); return true }},
+		OpcodeRRCA:   {func(gb *Gameboy) bool { gb.CPU.Regs.SetFlagsAndA(RRCA(gb.CPU.Regs.A)); return true }},
+		OpcodeORA:    {orreg(&gb.CPU.Regs.A)},
+		OpcodeORB:    {orreg(&gb.CPU.Regs.B)},
+		OpcodeORC:    {orreg(&gb.CPU.Regs.C)},
+		OpcodeORD:    {orreg(&gb.CPU.Regs.D)},
+		OpcodeORE:    {orreg(&gb.CPU.Regs.E)},
+		OpcodeORH:    {orreg(&gb.CPU.Regs.H)},
+		OpcodeORL:    {orreg(&gb.CPU.Regs.L)},
+		OpcodeORHL:   {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(OR(gb.CPU.Regs.A, v)) })},
+		OpcodeANDA:   {andreg(&gb.CPU.Regs.A)},
+		OpcodeANDB:   {andreg(&gb.CPU.Regs.B)},
+		OpcodeANDC:   {andreg(&gb.CPU.Regs.C)},
+		OpcodeANDD:   {andreg(&gb.CPU.Regs.D)},
+		OpcodeANDE:   {andreg(&gb.CPU.Regs.E)},
+		OpcodeANDH:   {andreg(&gb.CPU.Regs.H)},
+		OpcodeANDL:   {andreg(&gb.CPU.Regs.L)},
+		OpcodeANDHL:  {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(AND(gb.CPU.Regs.A, v)) })},
+		OpcodeXORA:   {xorreg(&gb.CPU.Regs.A)},
+		OpcodeXORB:   {xorreg(&gb.CPU.Regs.B)},
+		OpcodeXORC:   {xorreg(&gb.CPU.Regs.C)},
+		OpcodeXORD:   {xorreg(&gb.CPU.Regs.D)},
+		OpcodeXORE:   {xorreg(&gb.CPU.Regs.E)},
+		OpcodeXORH:   {xorreg(&gb.CPU.Regs.H)},
+		OpcodeXORL:   {xorreg(&gb.CPU.Regs.L)},
+		OpcodeXORHL:  {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(XOR(gb.CPU.Regs.A, v)) })},
+		OpcodeSUBA:   {subreg(&gb.CPU.Regs.A)},
+		OpcodeSUBB:   {subreg(&gb.CPU.Regs.B)},
+		OpcodeSUBC:   {subreg(&gb.CPU.Regs.C)},
+		OpcodeSUBD:   {subreg(&gb.CPU.Regs.D)},
+		OpcodeSUBE:   {subreg(&gb.CPU.Regs.E)},
+		OpcodeSUBH:   {subreg(&gb.CPU.Regs.H)},
+		OpcodeSUBL:   {subreg(&gb.CPU.Regs.L)},
+		OpcodeSUBHL:  {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, v, false)) })},
+		OpcodeSBCA:   {sbcreg(&gb.CPU.Regs.A)},
+		OpcodeSBCB:   {sbcreg(&gb.CPU.Regs.B)},
+		OpcodeSBCC:   {sbcreg(&gb.CPU.Regs.C)},
+		OpcodeSBCD:   {sbcreg(&gb.CPU.Regs.D)},
+		OpcodeSBCE:   {sbcreg(&gb.CPU.Regs.E)},
+		OpcodeSBCH:   {sbcreg(&gb.CPU.Regs.H)},
+		OpcodeSBCL:   {sbcreg(&gb.CPU.Regs.L)},
+		OpcodeSBCHL:  {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, v, gb.CPU.Regs.GetFlagC())) })},
+		OpcodeCPA:    {cpreg(&gb.CPU.Regs.A)},
+		OpcodeCPB:    {cpreg(&gb.CPU.Regs.B)},
+		OpcodeCPC:    {cpreg(&gb.CPU.Regs.C)},
+		OpcodeCPD:    {cpreg(&gb.CPU.Regs.D)},
+		OpcodeCPE:    {cpreg(&gb.CPU.Regs.E)},
+		OpcodeCPH:    {cpreg(&gb.CPU.Regs.H)},
+		OpcodeCPL:    {cpreg(&gb.CPU.Regs.L)},
+		OpcodeCPHL:   {aluhl(func(v Data8) { gb.CPU.Regs.SetFlags(SUB(gb.CPU.Regs.A, v, false)) })},
+		OpcodeADDA:   {addreg(&gb.CPU.Regs.A)},
+		OpcodeADDB:   {addreg(&gb.CPU.Regs.B)},
+		OpcodeADDC:   {addreg(&gb.CPU.Regs.C)},
+		OpcodeADDD:   {addreg(&gb.CPU.Regs.D)},
+		OpcodeADDE:   {addreg(&gb.CPU.Regs.E)},
+		OpcodeADDH:   {addreg(&gb.CPU.Regs.H)},
+		OpcodeADDL:   {addreg(&gb.CPU.Regs.L)},
+		OpcodeADDHL:  {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, v, false)) })},
+		OpcodeADDSPe: {addspe},
+		OpcodeADCA:   {adcreg(&gb.CPU.Regs.A)},
+		OpcodeADCB:   {adcreg(&gb.CPU.Regs.B)},
+		OpcodeADCC:   {adcreg(&gb.CPU.Regs.C)},
+		OpcodeADCD:   {adcreg(&gb.CPU.Regs.D)},
+		OpcodeADCE:   {adcreg(&gb.CPU.Regs.E)},
+		OpcodeADCH:   {adcreg(&gb.CPU.Regs.H)},
+		OpcodeADCL:   {adcreg(&gb.CPU.Regs.L)},
+		OpcodeADCHL:  {aluhl(func(v Data8) { gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, v, gb.CPU.Regs.GetFlagC())) })},
+		OpcodeDAA: {func(gb *Gameboy) bool {
 			gb.CPU.Regs.SetFlagsAndA(DAA(gb.CPU.Regs.A, gb.CPU.Regs.GetFlagC(), gb.CPU.Regs.GetFlagN(), gb.CPU.Regs.GetFlagH()))
-		})},
-		OpcodeCPLaka2f: {singleCycle("CPL", func(gb *Gameboy) {
+			return true
+		}},
+		OpcodeCPLaka2f: {func(gb *Gameboy) bool {
 			gb.CPU.Regs.A ^= 0xff
 			gb.CPU.Regs.SetFlagN(true)
 			gb.CPU.Regs.SetFlagH(true)
-		})},
-		OpcodeCCF: {singleCycle("CCF", func(gb *Gameboy) {
+			return true
+		}},
+		OpcodeCCF: {func(gb *Gameboy) bool {
 			gb.CPU.Regs.SetFlagC(!gb.CPU.Regs.GetFlagC())
 			gb.CPU.Regs.SetFlagN(false)
 			gb.CPU.Regs.SetFlagH(false)
-		})},
-		OpcodeSCF: {singleCycle("SCF", func(gb *Gameboy) {
+			return true
+		}},
+		OpcodeSCF: {func(gb *Gameboy) bool {
 			gb.CPU.Regs.SetFlagC(true)
 			gb.CPU.Regs.SetFlagN(false)
 			gb.CPU.Regs.SetFlagH(false)
-		})},
+			return true
+		}},
 		OpcodeDECA:     {decreg(&gb.CPU.Regs.A)},
 		OpcodeDECB:     {decreg(&gb.CPU.Regs.B)},
 		OpcodeDECC:     {decreg(&gb.CPU.Regs.C)},
@@ -319,23 +329,9 @@ func notImplemented(gb *Gameboy, e int) bool {
 	return false
 }
 
-func checkCycleNamed(name string, e, max int) {
-	if e == 0 || e > max {
-		panicf("%s: %v", name, e)
-	}
-}
-
 func checkCycle(e, max int) {
 	if e == 0 || e > max {
 		panicf("%v", e)
-	}
-}
-
-func singleCycle(name string, f func(gb *Gameboy)) func(gb *Gameboy, e int) bool {
-	return func(gb *Gameboy, e int) bool {
-		checkCycleNamed(name, e, 1)
-		f(gb)
-		return true
 	}
 }
 
@@ -657,40 +653,46 @@ func retcc(cond func() bool) func(gb *Gameboy, e int) bool {
 	}
 }
 
-func ld(dst *Data8, src *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("LD r, r", func(gb *Gameboy) {
+func ld(dst *Data8, src *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		*dst = *src
-	})
+		return true
+	}
 }
 
-func andreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("AND r", func(gb *Gameboy) {
+func andreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		gb.CPU.Regs.SetFlagsAndA(AND(gb.CPU.Regs.A, *reg))
-	})
+		return true
+	}
 }
 
-func xorreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("XOR r", func(gb *Gameboy) {
+func xorreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		gb.CPU.Regs.SetFlagsAndA(XOR(gb.CPU.Regs.A, *reg))
-	})
+		return true
+	}
 }
 
-func orreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("OR r", func(gb *Gameboy) {
+func orreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		gb.CPU.Regs.SetFlagsAndA(OR(gb.CPU.Regs.A, *reg))
-	})
+		return true
+	}
 }
 
-func addreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("ADD r", func(gb *Gameboy) {
+func addreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, *reg, false))
-	})
+		return true
+	}
 }
 
-func adcreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("ADC r", func(gb *Gameboy) {
+func adcreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, *reg, gb.CPU.Regs.GetFlagC()))
-	})
+		return true
+	}
 }
 
 func inchlind(gb *Gameboy, e int) bool {
@@ -750,42 +752,47 @@ func aluhl(f func(v Data8)) func(gb *Gameboy, e int) bool {
 	}
 }
 
-func subreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("SUB r", func(gb *Gameboy) {
+func subreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, *reg, false))
-	})
+		return true
+	}
 }
 
-func sbcreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("SBC r", func(gb *Gameboy) {
+func sbcreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, *reg, gb.CPU.Regs.GetFlagC()))
-	})
+		return true
+	}
 }
 
-func cpreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("CP r", func(gb *Gameboy) {
+func cpreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		gb.CPU.Regs.SetFlags(SUB(gb.CPU.Regs.A, *reg, false))
-	})
+		return true
+	}
 }
 
-func decreg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("DEC r", func(gb *Gameboy) {
+func decreg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		result := SUB(*reg, 1, false)
 		*reg = result.Value
 		gb.CPU.Regs.SetFlagZ(result.Z())
 		gb.CPU.Regs.SetFlagH(result.H)
 		gb.CPU.Regs.SetFlagN(result.N)
-	})
+		return true
+	}
 }
 
-func increg(reg *Data8) func(gb *Gameboy, e int) bool {
-	return singleCycle("INC r", func(gb *Gameboy) {
+func increg(reg *Data8) func(gb *Gameboy) bool {
+	return func(gb *Gameboy) bool {
 		result := ADD(*reg, 1, false)
 		*reg = result.Value
 		gb.CPU.Regs.SetFlagZ(result.Z())
 		gb.CPU.Regs.SetFlagH(result.H)
 		gb.CPU.Regs.SetFlagN(result.N)
-	})
+		return true
+	}
 }
 
 func iduOp(f func()) func(gb *Gameboy, e int) bool {

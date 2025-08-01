@@ -88,6 +88,8 @@ func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy, handlers *HandlerArray) {
 				fetch = h1(gb, cpu.MachineCycle)
 			} else if h2, ok := handler.(func(gb *Gameboy) bool); ok {
 				fetch = h2(gb)
+			} else {
+				panicf("%T", handler)
 			}
 		}
 		if fetch {
