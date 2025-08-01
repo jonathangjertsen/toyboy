@@ -14,10 +14,6 @@ type Bus struct {
 	Timer       *Timer
 }
 
-func NewBus() *Bus {
-	return &Bus{}
-}
-
 func (bus *Bus) LoadSave(save *SaveState) {
 	bus.Data = save.BusData
 	bus.Address = save.BusAddress
