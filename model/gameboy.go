@@ -15,7 +15,7 @@ type Gameboy struct {
 	CLK        ClockRT
 	Bus        Bus
 	Debug      Debug
-	CPU        *CPU
+	CPU        CPU
 	PPU        *PPU
 	APU        *APU
 	Cartridge  *Cartridge
@@ -96,7 +96,14 @@ func (gb *Gameboy) Init(audio *Audio) {
 	joypad := NewJoypad(interrupts, mem)
 	var timer Timer
 
-	cpu := NewCPU(&gb.CLK, interrupts, &gb.Bus, gb.Config, &gb.Debug)
+	gb.CPU = CPU{
+		Config:     gb.Config,
+		Bus:        &gb.Bus,
+		Debug:      &gb.Debug,
+		Interrupts: interrupts,
+		rewind:     NewRewind(8192),
+	}
+	gb.CPU.handlers = handlers(&gb.CPU)
 
 	ppu := NewPPU(interrupts)
 
@@ -110,7 +117,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Bus.Config = gb.Config
 
 	gb.Mem = mem
-	gb.CPU = cpu
 	gb.APU = &apu
 	gb.Cartridge = cartridge
 	gb.PPU = ppu

@@ -133,25 +133,6 @@ func (cpu *CPU) IncPC() {
 	cpu.SetPC(cpu.Regs.PC + 1)
 }
 
-// Must call Reset before starting
-func NewCPU(
-	clk *ClockRT,
-	interrupts *Interrupts,
-	bus CPUBusIF,
-	config *Config,
-	debug *Debug,
-) *CPU {
-	cpu := &CPU{
-		Config:     config,
-		Bus:        bus,
-		Debug:      debug,
-		Interrupts: interrupts,
-		rewind:     NewRewind(8192),
-	}
-	cpu.handlers = handlers(cpu)
-	return cpu
-}
-
 func (cpu *CPU) fsm(clk *ClockRT, mem []Data8) {
 	cpu.wroteToAddressBusThisCycle = false
 	cpu.clockCycle = clk.Cycle
