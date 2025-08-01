@@ -74,8 +74,6 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 	gb.PPU.SpriteFetcher.DoneX = 0xff
 	gb.PPU.beginFrame(gb.Mem, &gb.Interrupts)
 
-	gb.Bus.GB = &gb
-
 	clk.Onpanic = gb.CPU.Dump
 
 	//mustTriviallySerialize(&gb)

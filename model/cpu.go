@@ -143,12 +143,12 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT, gb *Gameboy) bool {
 	case 3:
 		cpu.SetSP(cpu.Regs.SP - 1)
 		cpu.writeAddressBus(gb, cpu.Regs.SP)
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.MSB())
+		gb.Bus.WriteData(gb, cpu.Regs.PC.MSB())
 		// push LSB of PC to stack
 	case 4:
 		cpu.SetSP(cpu.Regs.SP - 1)
 		cpu.writeAddressBus(gb, cpu.Regs.SP)
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.LSB())
+		gb.Bus.WriteData(gb, cpu.Regs.PC.LSB())
 	case 5:
 		isr := gb.Interrupts.PendingInterrupt.ISR()
 		cpu.SetPC(isr)
@@ -162,7 +162,7 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT, gb *Gameboy) bool {
 }
 
 func (cpu *CPU) writeAddressBus(gb *Gameboy, addr Addr) {
-	gb.Bus.WriteAddress(gb.Mem, addr)
+	gb.Bus.WriteAddress(gb, addr)
 }
 
 func (cpu *CPU) applyPendingIME(gb *Gameboy) {

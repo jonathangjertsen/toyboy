@@ -453,11 +453,11 @@ func (cpu *CPU) push(msb, lsb *Data8) func(gb *Gameboy, e int) bool {
 		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(gb, cpu.Regs.SP)
-			gb.Bus.WriteData(gb.Mem, *msb)
+			gb.Bus.WriteData(gb, *msb)
 		case 2:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(gb, cpu.Regs.SP)
-			gb.Bus.WriteData(gb.Mem, *lsb)
+			gb.Bus.WriteData(gb, *lsb)
 		case 3:
 		case 4:
 			return true
@@ -507,10 +507,10 @@ func (cpu *CPU) callnn(gb *Gameboy, e int) bool {
 	case 4:
 		cpu.writeAddressBus(gb, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP - 1)
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.MSB())
+		gb.Bus.WriteData(gb, cpu.Regs.PC.MSB())
 	case 5:
 		cpu.writeAddressBus(gb, cpu.Regs.SP)
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.LSB())
+		gb.Bus.WriteData(gb, cpu.Regs.PC.LSB())
 	case 6:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 		return true
@@ -546,7 +546,7 @@ func (cpu *CPU) callccnn(f func() bool) func(gb *Gameboy, e int) bool {
 				panicv(e)
 			}
 			if cpu.lastBranchResult == +1 {
-				gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.MSB())
+				gb.Bus.WriteData(gb, cpu.Regs.PC.MSB())
 			} else {
 				panicv(e)
 			}
@@ -557,7 +557,7 @@ func (cpu *CPU) callccnn(f func() bool) func(gb *Gameboy, e int) bool {
 				panicv(e)
 			}
 			if cpu.lastBranchResult == +1 {
-				gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.LSB())
+				gb.Bus.WriteData(gb, cpu.Regs.PC.LSB())
 			} else {
 				panicv(e)
 			}
@@ -703,7 +703,7 @@ func (cpu *CPU) inchlind(gb *Gameboy, e int) bool {
 		cpu.Regs.SetFlagN(res.N)
 		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 		cpu.Regs.TempZ = res.Value
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.TempZ)
+		gb.Bus.WriteData(gb, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
@@ -724,7 +724,7 @@ func (cpu *CPU) dechlind(gb *Gameboy, e int) bool {
 		cpu.Regs.SetFlagN(res.N)
 		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 		cpu.Regs.TempZ = res.Value
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.TempZ)
+		gb.Bus.WriteData(gb, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
@@ -880,7 +880,7 @@ func (cpu *CPU) ldhlr(reg *Data8, inc int) func(gb *Gameboy, e int) bool {
 			} else if inc == -1 {
 				cpu.SetHL(cpu.GetHL() - 1)
 			}
-			gb.Bus.WriteData(gb.Mem, *reg)
+			gb.Bus.WriteData(gb, *reg)
 		case 2:
 			return true
 		}
@@ -894,7 +894,7 @@ func (cpu *CPU) ldrra(msb, lsb *Data8) func(gb *Gameboy, e int) bool {
 		switch e {
 		case 1:
 			cpu.writeAddressBus(gb, Addr(join16(*msb, *lsb)))
-			gb.Bus.WriteData(gb.Mem, cpu.Regs.A)
+			gb.Bus.WriteData(gb, cpu.Regs.A)
 		case 2:
 			return true
 		}
@@ -907,7 +907,7 @@ func (cpu *CPU) ldhca(gb *Gameboy, e int) bool {
 	switch e {
 	case 1:
 		cpu.writeAddressBus(gb, Addr(join16(0xff, cpu.Regs.C)))
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.A)
+		gb.Bus.WriteData(gb, cpu.Regs.A)
 	case 2:
 		return true
 	}
@@ -939,11 +939,11 @@ func (cpu *CPU) ldnnsp(gb *Gameboy, e int) bool {
 		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
 		cpu.writeAddressBus(gb, Addr(cpu.Regs.GetWZ()))
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.SP.LSB())
+		gb.Bus.WriteData(gb, cpu.Regs.SP.LSB())
 		cpu.Regs.SetWZ(cpu.Regs.GetWZ() + 1)
 	case 4:
 		cpu.writeAddressBus(gb, Addr(cpu.Regs.GetWZ()))
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.SP.MSB())
+		gb.Bus.WriteData(gb, cpu.Regs.SP.MSB())
 	case 5:
 		return true
 	}
@@ -963,7 +963,7 @@ func (cpu *CPU) ldnna(gb *Gameboy, e int) bool {
 		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
 		cpu.writeAddressBus(gb, Addr(cpu.Regs.GetWZ()))
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.A)
+		gb.Bus.WriteData(gb, cpu.Regs.A)
 	case 4:
 		return true
 	}
@@ -999,7 +999,7 @@ func (cpu *CPU) ldhna(gb *Gameboy, e int) bool {
 	case 2:
 		cpu.writeAddressBus(gb, Addr(join16(0xff, cpu.Regs.TempZ)))
 		cpu.IncPC()
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.A)
+		gb.Bus.WriteData(gb, cpu.Regs.A)
 	case 3:
 		return true
 	}
@@ -1143,7 +1143,7 @@ func (cpu *CPU) ldhln(gb *Gameboy, e int) bool {
 		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.TempZ)
+		gb.Bus.WriteData(gb, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
@@ -1192,11 +1192,11 @@ func (cpu *CPU) rst(vec Data8) func(gb *Gameboy, e int) bool {
 		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(gb, cpu.Regs.SP)
-			gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.MSB())
+			gb.Bus.WriteData(gb, cpu.Regs.PC.MSB())
 		case 2:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(gb, cpu.Regs.SP)
-			gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.LSB())
+			gb.Bus.WriteData(gb, cpu.Regs.PC.LSB())
 		case 3:
 			cpu.SetPC(Addr(join16(0x00, vec)))
 		case 4:
@@ -1273,7 +1273,7 @@ func (cpu *CPU) cb(gb *Gameboy, e int) bool {
 			return true
 		}
 		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
-		gb.Bus.WriteData(gb.Mem, cpu.Regs.TempZ)
+		gb.Bus.WriteData(gb, cpu.Regs.TempZ)
 	case 4:
 		if cpu.CBOp.Target != CBTargetIndirectHL {
 			panicv(e)
