@@ -37,17 +37,6 @@ func (r *ClockRT) SetSpeedPercent(pct float64, audio *Audio) {
 	})
 }
 
-func NewRealtimeClock() *ClockRT {
-	clockRT := ClockRT{
-		resume:  make(chan struct{}),
-		pause:   make(chan struct{}),
-		stop:    make(chan struct{}),
-		jobs:    make(chan func()),
-		Onpanic: func(mem []Data8) {},
-	}
-	return &clockRT
-}
-
 func (clockRT *ClockRT) AttachUIDevice(dev func()) {
 	clockRT.uiDevices = append(clockRT.uiDevices, dev)
 }

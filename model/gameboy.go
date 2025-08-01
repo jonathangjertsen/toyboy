@@ -12,7 +12,7 @@ type Gameboy struct {
 	Running atomic.Bool
 
 	Mem        []Data8
-	CLK        *ClockRT
+	CLK        ClockRT
 	Bus        Bus
 	Debug      *Debug
 	CPU        *CPU
@@ -66,23 +66,29 @@ func (gb *Gameboy) Init(audio *Audio) {
 	interrupts := NewInterrupts(mem)
 	debug := NewDebug(&gb.Config.Debug)
 	fs := NewFrameSync()
-	clk := NewRealtimeClock()
+	gb.CLK = ClockRT{
+		resume:  make(chan struct{}),
+		pause:   make(chan struct{}),
+		stop:    make(chan struct{}),
+		jobs:    make(chan func()),
+		Onpanic: func(mem []Data8) {},
+	}
 
 	if gb.Config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
 		copy(mem[:SizeBootROM], bootROM)
 		debug.SetProgram(bootROM)
-		debug.SetPC(0, clk)
+		debug.SetPC(0, &gb.CLK)
 	} else {
 		panic("unknown boot ROM")
 	}
-	cartridge := NewCartridge(clk, mem)
+	cartridge := NewCartridge(&gb.CLK, mem)
 	bootROMLock := NewBootROMLock(mem, cartridge, debug)
 	var apu APU
 	joypad := NewJoypad(interrupts, mem)
 	var timer Timer
 
-	cpu := NewCPU(clk, interrupts, &gb.Bus, gb.Config, debug)
+	cpu := NewCPU(&gb.CLK, interrupts, &gb.Bus, gb.Config, debug)
 
 	ppu := NewPPU(interrupts)
 
@@ -99,7 +105,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	debug.WRAM.Source = mem[AddrWRAMBegin : AddrWRAMEnd+1]
 
 	gb.Mem = mem
-	gb.CLK = clk
 	gb.CPU = cpu
 	gb.APU = &apu
 	gb.Cartridge = cartridge
@@ -111,9 +116,9 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Audio = audio
 	gb.Timer = &timer
 
-	go clk.run(gb)
+	go gb.CLK.run(gb)
 
 	gb.CPU.Reset()
 
-	clk.Onpanic = gb.CPU.Dump
+	gb.CLK.Onpanic = gb.CPU.Dump
 }
