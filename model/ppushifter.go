@@ -45,9 +45,9 @@ func (ps *Shifter) pixelMixer(gb *Gameboy) (Pixel, bool) {
 	spritePixel, haveSpritePixel := gb.PPU.SpriteFIFO.ShiftOut()
 	bgPixel, haveBGPixel := gb.PPU.BackgroundFIFO.ShiftOut()
 	if haveSpritePixel && haveBGPixel {
-		if (spritePixel & 0x3) == 0 {
+		if (spritePixel & PXMaskColor) == 0 {
 			return bgPixel, true
-		} else if (spritePixel&PxMaskPriority != 0) && (bgPixel&0x3 != 0) {
+		} else if (spritePixel&PxMaskPriority != 0) && (bgPixel&PXMaskColor != 0) {
 			return bgPixel, true
 		} else {
 			return spritePixel, true

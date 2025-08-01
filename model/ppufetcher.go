@@ -1,5 +1,7 @@
 package model
 
+import "math/bits"
+
 //go:generate go-enum --marshal --flag --values --nocomments
 
 // ENUM(FetchTileNo, FetchTileLSB, FetchTileMSB, PushFIFO)
@@ -158,11 +160,12 @@ func (bgf *BackgroundFetcher) pushFIFO(gb *Gameboy) bool {
 		return false
 	}
 	if gb.PPU.BGWindowEnable() {
-		line := DecodeTileLineBG(bgf.TileMSB, bgf.TileLSB, gb.PPU.BGPalette)
-		gb.PPU.BackgroundFIFO.Write8(line)
+		line := DecodeLineBG(bgf.TileMSB, bgf.TileLSB, gb.PPU.BGPalette)
+		gb.PPU.BackgroundFIFO.Slots = line
 	} else {
 		gb.PPU.BackgroundFIFO.Slots = 0
 	}
+	gb.PPU.BackgroundFIFO.Level = 8
 	return true
 }
 
@@ -204,11 +207,10 @@ func (gb *Gameboy) spriteFetcherFSM() {
 		sf.fetchTileMSB(gb)
 		sf.State = FetcherStatePushFIFO
 	case FetcherStatePushFIFO:
-		if sf.pushFIFO(gb) {
-			sf.State = FetcherStateFetchTileNo
-			sf.Suspended = true
-			sf.DoneX = gb.PPU.Shifter.X
-		}
+		sf.pushFIFO(gb)
+		sf.State = FetcherStateFetchTileNo
+		sf.Suspended = true
+		sf.DoneX = gb.PPU.Shifter.X
 	}
 }
 
@@ -253,40 +255,47 @@ func (sf *SpriteFetcher) fetchTileMSB(gb *Gameboy) {
 	sf.TileMSB = gb.Mem[sf.TileLSBAddr+1]
 }
 
-func (sf *SpriteFetcher) pushFIFO(gb *Gameboy) bool {
+func (sf *SpriteFetcher) pushFIFO(gb *Gameboy) {
 	obj := gb.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
 	palette := gb.PPU.ObjPalette(obj.Attributes)
-	line := DecodeTileLineSprite(sf.TileMSB, sf.TileLSB, palette)
+
+	line := DecodeLineSprite(sf.TileMSB, sf.TileLSB, palette)
 	if obj.Attributes&Bit5 != 0 {
-		for i := range 4 {
-			line[i], line[7-i] = line[7-i], line[i]
-		}
+		line = bits.ReverseBytes64(line)
 	}
 	if !gb.PPU.OBJEnable() {
-		clear(line[:])
+		line = 0
 	}
 	if obj.Attributes&Bit7 != 0 {
-		for i := range 8 {
-			line[i] |= PxMaskPriority
+		line |= PxMaskPriority8
+	}
+
+	offset := gb.PPU.Shifter.X + 8 - obj.X
+	pixelsToPush := int(8 - offset)
+	level := gb.PPU.SpriteFIFO.Level
+
+	existing := gb.PPU.SpriteFIFO.Slots & PXMaskColor8
+	newPixels := line >> (offset * 8)
+
+	// Overwrite transparent pixels
+	N := min(pixelsToPush, level) * 8
+	var mask, replacement uint64
+	for i := 0; i < N; i += 8 {
+		if (existing>>(i))&0xFF == 0 {
+			p := (newPixels >> i) & 0xFF
+			mask |= 0xFF << i
+			replacement |= p << i
 		}
 	}
-	offsetInSprite := gb.PPU.Shifter.X + 8 - obj.X
-	pixelsToPush := 8 - offsetInSprite
-	pos := gb.PPU.SpriteFIFO.ShiftPos
-	for i := range int(pixelsToPush) {
-		incLevel := i >= gb.PPU.SpriteFIFO.Level
-		pushPixel := incLevel || (gb.PPU.SpriteFIFO.Slot(pos)&0x3) == 0
-		if pushPixel {
-			pixel := line[int(offsetInSprite)+i]
-			gb.PPU.SpriteFIFO.SetSlot(pos, pixel)
-		}
-		if incLevel {
-			gb.PPU.SpriteFIFO.Level++
-		}
-		pos++
-		if pos == 8 {
-			pos = 0
-		}
+	gb.PPU.SpriteFIFO.Slots = (gb.PPU.SpriteFIFO.Slots & ^mask) | replacement
+
+	// Append new pixels if level < pixelsToPush
+	if level < pixelsToPush {
+		count := pixelsToPush - level
+		appendMask := (uint64(1) << (count * 8)) - 1
+		appendData := (line >> (offset * 8)) & appendMask
+		gb.PPU.SpriteFIFO.Slots |= appendData << (level * 8)
+		gb.PPU.SpriteFIFO.Level = pixelsToPush
 	}
-	return true
+
 }
