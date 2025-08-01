@@ -224,9 +224,9 @@ func Handlers(gb *Gameboy) HandlerArray {
 		OpcodePOPDE:    {pop1, pop2, popDE_3},
 		OpcodePOPHL:    {pop1, pop2, popHL_3},
 		OpcodePOPAF:    {pop1, pop2, popAF_3},
-		OpcodeADDHLHL:  {addhlrr(&gb.CPU.Regs.H, &gb.CPU.Regs.L)},
-		OpcodeADDHLBC:  {addhlrr(&gb.CPU.Regs.B, &gb.CPU.Regs.C)},
-		OpcodeADDHLDE:  {addhlrr(&gb.CPU.Regs.D, &gb.CPU.Regs.E)},
+		OpcodeADDHLHL:  {addhlHL_1, addhlHL_2},
+		OpcodeADDHLBC:  {addhlBC_1, addhlBC_2},
+		OpcodeADDHLDE:  {addhlDE_1, addhlDE_2},
 		OpcodeADDHLSP:  {addhlsp_1, addhlsp_2},
 		OpcodeLDBCnn:   {ldxxnn_1, ldxxnn_2, ldBCnn_3},
 		OpcodeLDDEnn:   {ldxxnn_1, ldxxnn_2, ldDEnn_3},
@@ -235,41 +235,41 @@ func Handlers(gb *Gameboy) HandlerArray {
 		OpcodeLDHLn:    {ldhln_1, ldhln_2, ldhln_3},
 		OpcodeLDHLSPe:  {ldhlspe_1, ldhlspe_2, ldhlspe_3},
 		OpcodeLDSPHL:   {ldsphl_1, ldsphl_2},
-		OpcodeLDHLAInc: {ldhlr(&gb.CPU.Regs.A, +1)},
-		OpcodeLDHLADec: {ldhlr(&gb.CPU.Regs.A, -1)},
-		OpcodeLDHLA:    {ldhlr(&gb.CPU.Regs.A, 0)},
-		OpcodeLDHLB:    {ldhlr(&gb.CPU.Regs.B, 0)},
-		OpcodeLDHLC:    {ldhlr(&gb.CPU.Regs.C, 0)},
-		OpcodeLDHLD:    {ldhlr(&gb.CPU.Regs.D, 0)},
-		OpcodeLDHLE:    {ldhlr(&gb.CPU.Regs.E, 0)},
-		OpcodeLDHLH:    {ldhlr(&gb.CPU.Regs.H, 0)},
-		OpcodeLDHLL:    {ldhlr(&gb.CPU.Regs.L, 0)},
-		OpcodeLDBCA:    {ldrra(&gb.CPU.Regs.B, &gb.CPU.Regs.C)},
-		OpcodeLDDEA:    {ldrra(&gb.CPU.Regs.D, &gb.CPU.Regs.E)},
+		OpcodeLDHLAInc: {ldhlAinc_1, ldhlr_2},
+		OpcodeLDHLADec: {ldhlAdec_1, ldhlr_2},
+		OpcodeLDHLA:    {ldhlA_1, ldhlr_2},
+		OpcodeLDHLB:    {ldhlB_1, ldhlr_2},
+		OpcodeLDHLC:    {ldhlC_1, ldhlr_2},
+		OpcodeLDHLD:    {ldhlD_1, ldhlr_2},
+		OpcodeLDHLE:    {ldhlE_1, ldhlr_2},
+		OpcodeLDHLH:    {ldhlH_1, ldhlr_2},
+		OpcodeLDHLL:    {ldhlL_1, ldhlr_2},
+		OpcodeLDBCA:    {ldBCA_1, ldrra_2},
+		OpcodeLDDEA:    {ldDEA_1, ldrra_2},
 		OpcodeLDHCA:    {ldhca_1, ldhca_2},
 		OpcodeLDHAC:    {ldhac_1, ldhac_2},
 		OpcodeLDnnSP:   {ldnnsp_1, ldnnsp_2, ldnnsp_3, ldnnsp_4, ldnnsp_5},
 		OpcodeLDnnA:    {ldnna_1, ldnna_2, ldnna_3, ldnna_4},
 		OpcodeLDAnn:    {ldann_1, ldann_2, ldann_3, ldann_4},
-		OpcodeCPn:      {alun(func(imm Data8) { gb.CPU.Regs.SetFlags(SUB(gb.CPU.Regs.A, imm, false)) })},
-		OpcodeSUBn:     {alun(func(imm Data8) { gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, imm, false)) })},
-		OpcodeORn:      {alun(func(imm Data8) { gb.CPU.Regs.SetFlagsAndA(OR(gb.CPU.Regs.A, imm)) })},
-		OpcodeANDn:     {alun(func(imm Data8) { gb.CPU.Regs.SetFlagsAndA(AND(gb.CPU.Regs.A, imm)) })},
-		OpcodeADDn:     {alun(func(imm Data8) { gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, imm, false)) })},
-		OpcodeADCn:     {alun(func(imm Data8) { gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, imm, gb.CPU.Regs.GetFlagC())) })},
-		OpcodeSBCn:     {alun(func(imm Data8) { gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, imm, gb.CPU.Regs.GetFlagC())) })},
-		OpcodeXORn:     {alun(func(imm Data8) { gb.CPU.Regs.SetFlagsAndA(XOR(gb.CPU.Regs.A, imm)) })},
+		OpcodeCPn:      {alun_1, CPn_2},
+		OpcodeSUBn:     {alun_1, SUBn_2},
+		OpcodeORn:      {alun_1, ORn_2},
+		OpcodeANDn:     {alun_1, ANDn_2},
+		OpcodeADDn:     {alun_1, ADDn_2},
+		OpcodeADCn:     {alun_1, ADCn_2},
+		OpcodeSBCn:     {alun_1, SBCn_2},
+		OpcodeXORn:     {alun_1, XORn_2},
 		OpcodeLDHnA:    {ldhna_1, ldhna_2, ldhna_3},
 		OpcodeLDHAn:    {ldhan_1, ldhan_2, ldhan_3},
-		OpcodeLDADE:    {ldarr(&gb.CPU.Regs.D, &gb.CPU.Regs.E)},
-		OpcodeLDABC:    {ldarr(&gb.CPU.Regs.B, &gb.CPU.Regs.C)},
-		OpcodeLDAn:     {ldrn(&gb.CPU.Regs.A)},
-		OpcodeLDBn:     {ldrn(&gb.CPU.Regs.B)},
-		OpcodeLDCn:     {ldrn(&gb.CPU.Regs.C)},
-		OpcodeLDDn:     {ldrn(&gb.CPU.Regs.D)},
-		OpcodeLDEn:     {ldrn(&gb.CPU.Regs.E)},
-		OpcodeLDHn:     {ldrn(&gb.CPU.Regs.H)},
-		OpcodeLDLn:     {ldrn(&gb.CPU.Regs.L)},
+		OpcodeLDADE:    {ldaDE_1, ldarr_2},
+		OpcodeLDABC:    {ldaBC_1, ldarr_2},
+		OpcodeLDAn:     {ldrn_1, ldAn_2},
+		OpcodeLDBn:     {ldrn_1, ldBn_2},
+		OpcodeLDCn:     {ldrn_1, ldCn_2},
+		OpcodeLDDn:     {ldrn_1, ldDn_2},
+		OpcodeLDEn:     {ldrn_1, ldEn_2},
+		OpcodeLDHn:     {ldrn_1, ldHn_2},
+		OpcodeLDLn:     {ldrn_1, ldLn_2},
 		OpcodeCB:       {runCB_1, runCB_2, runCB_3, runCB_4},
 		OpcodeRST0x00:  {rst_1, rst_2, rst_3_00, rst_4},
 		OpcodeRST0x08:  {rst_1, rst_2, rst_3_08, rst_4},
@@ -317,12 +317,6 @@ func rrca(gb *Gameboy) bool { gb.CPU.Regs.SetFlagsAndA(RRCA(gb.CPU.Regs.A)); ret
 func notImplemented(gb *Gameboy) bool {
 	panicf("not implemented opcode %v", gb.CPU.Regs.IR)
 	return false
-}
-
-func checkCycle(e, max int) {
-	if e == 0 || e > max {
-		panicf("%v", e)
-	}
 }
 
 func jphl(gb *Gameboy) bool {
@@ -1047,36 +1041,71 @@ func DECSP_1(gb *Gameboy) bool { gb.CPU.Regs.SP--; return true }
 
 var iduOp_2 = endNoop
 
-func alun(f func(imm Data8)) func(gb *Gameboy, e int) bool {
-	return func(gb *Gameboy, e int) bool {
-		checkCycle(e, 2)
-		switch e {
-		case 1:
-			gb.WriteAddress(gb.CPU.Regs.PC)
-			gb.CPU.IncPC()
-			gb.CPU.Regs.TempZ = gb.Data
-		case 2:
-			f(gb.CPU.Regs.TempZ)
-			return true
-		}
-		return false
-	}
+func alun_1(gb *Gameboy) bool {
+	gb.WriteAddress(gb.CPU.Regs.PC)
+	gb.CPU.IncPC()
+	gb.CPU.Regs.TempZ = gb.Data
+	return false
 }
 
-func ldrn(reg *Data8) func(gb *Gameboy, e int) bool {
-	return func(gb *Gameboy, e int) bool {
-		checkCycle(e, 2)
-		switch e {
-		case 1:
-			gb.WriteAddress(gb.CPU.Regs.PC)
-			gb.CPU.Regs.TempZ = gb.Data
-		case 2:
-			gb.CPU.IncPC()
-			*reg = gb.CPU.Regs.TempZ
-			return true
-		}
-		return false
-	}
+func ORn_2(gb *Gameboy) bool {
+	gb.CPU.Regs.SetFlagsAndA(OR(gb.CPU.Regs.A, gb.CPU.Regs.TempZ))
+	return true
+}
+
+func ANDn_2(gb *Gameboy) bool {
+	gb.CPU.Regs.SetFlagsAndA(AND(gb.CPU.Regs.A, gb.CPU.Regs.TempZ))
+	return true
+}
+
+func XORn_2(gb *Gameboy) bool {
+	gb.CPU.Regs.SetFlagsAndA(XOR(gb.CPU.Regs.A, gb.CPU.Regs.TempZ))
+	return true
+}
+
+func SUBn_2(gb *Gameboy) bool {
+	gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, false))
+	return true
+}
+
+func SBCn_2(gb *Gameboy) bool {
+	gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.GetFlagC()))
+	return true
+}
+
+func CPn_2(gb *Gameboy) bool {
+	gb.CPU.Regs.SetFlags(SUB(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, false))
+	return true
+}
+
+func ADDn_2(gb *Gameboy) bool {
+	gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, false))
+	return true
+}
+
+func ADCn_2(gb *Gameboy) bool {
+	gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.GetFlagC()))
+	return true
+}
+
+func ldrn_1(gb *Gameboy) bool {
+	gb.WriteAddress(gb.CPU.Regs.PC)
+	gb.CPU.Regs.TempZ = gb.Data
+	return false
+}
+
+func ldAn_2(gb *Gameboy) bool { return ldrn_2(gb, &gb.CPU.Regs.A) }
+func ldBn_2(gb *Gameboy) bool { return ldrn_2(gb, &gb.CPU.Regs.B) }
+func ldCn_2(gb *Gameboy) bool { return ldrn_2(gb, &gb.CPU.Regs.C) }
+func ldDn_2(gb *Gameboy) bool { return ldrn_2(gb, &gb.CPU.Regs.D) }
+func ldEn_2(gb *Gameboy) bool { return ldrn_2(gb, &gb.CPU.Regs.E) }
+func ldHn_2(gb *Gameboy) bool { return ldrn_2(gb, &gb.CPU.Regs.H) }
+func ldLn_2(gb *Gameboy) bool { return ldrn_2(gb, &gb.CPU.Regs.L) }
+
+func ldrn_2(gb *Gameboy, reg *Data8) bool {
+	gb.CPU.IncPC()
+	*reg = gb.CPU.Regs.TempZ
+	return true
 }
 
 func ldrhl_1(gb *Gameboy) bool {
@@ -1114,38 +1143,38 @@ func ldahldec_2(gb *Gameboy) bool {
 	return true
 }
 
-func ldhlr(reg *Data8, inc int) func(gb *Gameboy, e int) bool {
-	return func(gb *Gameboy, e int) bool {
-		checkCycle(e, 2)
-		switch e {
-		case 1:
-			gb.WriteAddress(Addr(gb.CPU.GetHL()))
-			if inc == +1 {
-				gb.CPU.SetHL(gb.CPU.GetHL() + 1)
-			} else if inc == -1 {
-				gb.CPU.SetHL(gb.CPU.GetHL() - 1)
-			}
-			gb.WriteData(*reg)
-		case 2:
-			return true
-		}
-		return false
-	}
+func ldhlAinc_1(gb *Gameboy) bool { return ldhlr_1(gb, gb.CPU.Regs.A, +1) }
+func ldhlAdec_1(gb *Gameboy) bool { return ldhlr_1(gb, gb.CPU.Regs.A, -1) }
+func ldhlA_1(gb *Gameboy) bool    { return ldhlr_1(gb, gb.CPU.Regs.A, 0) }
+func ldhlB_1(gb *Gameboy) bool    { return ldhlr_1(gb, gb.CPU.Regs.B, 0) }
+func ldhlC_1(gb *Gameboy) bool    { return ldhlr_1(gb, gb.CPU.Regs.C, 0) }
+func ldhlD_1(gb *Gameboy) bool    { return ldhlr_1(gb, gb.CPU.Regs.D, 0) }
+func ldhlE_1(gb *Gameboy) bool    { return ldhlr_1(gb, gb.CPU.Regs.E, 0) }
+func ldhlH_1(gb *Gameboy) bool    { return ldhlr_1(gb, gb.CPU.Regs.H, 0) }
+func ldhlL_1(gb *Gameboy) bool    { return ldhlr_1(gb, gb.CPU.Regs.L, 0) }
+
+func ldhlr_1(gb *Gameboy, reg Data8, inc int16) bool {
+	gb.WriteAddress(Addr(gb.CPU.GetHL()))
+	gb.CPU.SetHL(Data16(int16(gb.CPU.GetHL()) + inc))
+	gb.WriteData(reg)
+	return false
 }
 
-func ldrra(msb, lsb *Data8) func(gb *Gameboy, e int) bool {
-	return func(gb *Gameboy, e int) bool {
-		checkCycle(e, 2)
-		switch e {
-		case 1:
-			gb.WriteAddress(Addr(join16(*msb, *lsb)))
-			gb.WriteData(gb.CPU.Regs.A)
-		case 2:
-			return true
-		}
-		return false
-	}
+var ldhlr_2 = endNoop
+
+func ldBCA_1(gb *Gameboy) bool {
+	gb.WriteAddress(Addr(gb.CPU.GetBC()))
+	gb.WriteData(gb.CPU.Regs.A)
+	return false
 }
+func ldDEA_1(gb *Gameboy) bool {
+	gb.WriteAddress(Addr(gb.CPU.GetDE()))
+	gb.WriteData(gb.CPU.Regs.A)
+	return false
+}
+
+var ldrra_2 = endNoop
+
 func ldhca_1(gb *Gameboy) bool {
 	gb.WriteAddress(Addr(join16(0xff, gb.CPU.Regs.C)))
 	gb.WriteData(gb.CPU.Regs.A)
@@ -1280,42 +1309,49 @@ func ldhan_3(gb *Gameboy) bool {
 	return true
 }
 
-func ldarr(msb, lsb *Data8) func(gb *Gameboy, e int) bool {
-	return func(gb *Gameboy, e int) bool {
-		checkCycle(e, 2)
-		switch e {
-		case 1:
-			gb.WriteAddress(Addr(join16(*msb, *lsb)))
-			gb.CPU.Regs.TempZ = gb.Data
-		case 2:
-			gb.CPU.Regs.A = gb.CPU.Regs.TempZ
-			return true
-		}
-		return false
-	}
+func ldaBC_1(gb *Gameboy) bool {
+	gb.WriteAddress(Addr(gb.CPU.GetBC()))
+	gb.CPU.Regs.TempZ = gb.Data
+	return false
 }
 
-func addhlrr(hi, lo *Data8) func(gb *Gameboy, e int) bool {
-	return func(gb *Gameboy, e int) bool {
-		checkCycle(e, 2)
-		switch e {
-		case 1:
-			result := ADD(gb.CPU.Regs.L, *lo, false)
-			gb.CPU.Regs.L = result.Value
-			gb.CPU.Regs.SetFlagC(result.C)
-			gb.CPU.Regs.SetFlagH(result.H)
-			gb.CPU.Regs.SetFlagN(result.N)
-		case 2:
-			result := ADD(gb.CPU.Regs.H, *hi, gb.CPU.Regs.GetFlagC())
-			gb.CPU.Regs.H = result.Value
-			gb.CPU.Regs.SetFlagC(result.C)
-			gb.CPU.Regs.SetFlagH(result.H)
-			gb.CPU.Regs.SetFlagN(result.N)
-			return true
-		}
-		return false
-	}
+func ldaDE_1(gb *Gameboy) bool {
+	gb.WriteAddress(Addr(gb.CPU.GetDE()))
+	gb.CPU.Regs.TempZ = gb.Data
+	return false
 }
+
+func ldarr_2(gb *Gameboy) bool {
+	gb.CPU.Regs.A = gb.CPU.Regs.TempZ
+	return true
+}
+
+func addhlBC_1(gb *Gameboy) bool { return addhlrr_1(gb, gb.CPU.Regs.C) }
+func addhlDE_1(gb *Gameboy) bool { return addhlrr_1(gb, gb.CPU.Regs.E) }
+func addhlHL_1(gb *Gameboy) bool { return addhlrr_1(gb, gb.CPU.Regs.L) }
+
+func addhlrr_1(gb *Gameboy, lo Data8) bool {
+	result := ADD(gb.CPU.Regs.L, lo, false)
+	gb.CPU.Regs.L = result.Value
+	gb.CPU.Regs.SetFlagC(result.C)
+	gb.CPU.Regs.SetFlagH(result.H)
+	gb.CPU.Regs.SetFlagN(result.N)
+	return false
+}
+
+func addhlBC_2(gb *Gameboy) bool { return addhlrr_2(gb, gb.CPU.Regs.B) }
+func addhlDE_2(gb *Gameboy) bool { return addhlrr_2(gb, gb.CPU.Regs.D) }
+func addhlHL_2(gb *Gameboy) bool { return addhlrr_2(gb, gb.CPU.Regs.H) }
+
+func addhlrr_2(gb *Gameboy, hi Data8) bool {
+	result := ADD(gb.CPU.Regs.H, hi, gb.CPU.Regs.GetFlagC())
+	gb.CPU.Regs.H = result.Value
+	gb.CPU.Regs.SetFlagC(result.C)
+	gb.CPU.Regs.SetFlagH(result.H)
+	gb.CPU.Regs.SetFlagN(result.N)
+	return true
+}
+
 func addhlsp_1(gb *Gameboy) bool {
 	result := ADD(gb.CPU.Regs.L, gb.CPU.Regs.SP.LSB(), false)
 	gb.CPU.Regs.L = result.Value
