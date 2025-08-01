@@ -161,7 +161,7 @@ func (bgf *BackgroundFetcher) pushFIFO(gb *Gameboy) bool {
 		line := DecodeTileLineBG(bgf.TileMSB, bgf.TileLSB, gb.PPU.BGPalette)
 		gb.PPU.BackgroundFIFO.Write8(line)
 	} else {
-		gb.PPU.BackgroundFIFO.Write8(TileLine{})
+		gb.PPU.BackgroundFIFO.Slots = 0
 	}
 	return true
 }
