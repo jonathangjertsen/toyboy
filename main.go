@@ -36,10 +36,7 @@ func main() {
 	}
 
 	if len(os.Args) == 2 && os.Args[1] == "debug" {
-		audio, devnull := model.AudioStub()
-		defer func() { close(devnull) }()
-
-		gb := model.NewGameboy(&config.Model, audio)
+		gb := model.NewGameboy(&config.Model)
 
 		if err := model.LoadROM(
 			"assets/cartridges/tetris.gb",

@@ -36,6 +36,7 @@ type App struct {
 	config  *Config
 	reqChan chan MachineStateRequest
 	Audio   *AudioInterface
+	GBAudio *model.Audio
 
 	needStateUpdate chan struct{}
 
@@ -64,6 +65,12 @@ func NewApp(config *Config) *App {
 		config:          config,
 		Audio:           NewAudio(),
 	}
+	app.GBAudio = &model.Audio{
+		SampleInterval: time.Second / 44100,
+		SampleBuffers:  model.NewSampleBuffers(512),
+		SubSampling:    1024,
+		Out:            app.Audio.In,
+	}
 	return app
 }
 
@@ -85,13 +92,8 @@ func (app *App) shutdown(ctx context.Context) {
 }
 
 func (app *App) startGB() {
-	audio := &model.Audio{
-		SampleInterval: time.Second / 44100,
-		SampleBuffers:  model.NewSampleBuffers(512),
-		SubSampling:    1024,
-		Out:            app.Audio.In,
-	}
-	app.GB = model.NewGameboy(&app.config.Model, audio)
+	app.GB = model.NewGameboy(&app.config.Model)
+	go app.GB.CLK.Run(app.GB, app.GBAudio)
 
 	runtime.LogPrintf(app.ctx, "Started gameboy")
 
@@ -135,7 +137,7 @@ var upgrader = websocket.Upgrader{
 
 func (app *App) MachineStateRequest(req MachineStateRequest) {
 	if req.ClickedNumber == "TargetSpeed" {
-		app.GB.CLK.SetSpeedPercent(req.Numbers["TargetSpeed"], app.GB.Audio)
+		app.GB.CLK.SetSpeedPercent(req.Numbers["TargetSpeed"], app.GBAudio)
 		fmt.Printf("Updated speed to %f\n", req.Numbers["TargetSpeed"])
 	}
 	app.reqChan <- req

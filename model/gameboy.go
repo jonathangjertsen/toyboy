@@ -22,7 +22,6 @@ type Gameboy struct {
 	Joypad     Joypad
 	FrameSync  FrameSync
 	Interrupts Interrupts
-	Audio      *Audio
 	Timer      Timer
 }
 
@@ -43,16 +42,15 @@ func (gb *Gameboy) Step() {
 
 func NewGameboy(
 	config *Config,
-	audio *Audio,
 ) *Gameboy {
 	gameboy := &Gameboy{
 		Config: config,
 	}
-	gameboy.Init(audio)
+	gameboy.Init()
 	return gameboy
 }
 
-func (gb *Gameboy) Init(audio *Audio) {
+func (gb *Gameboy) Init() {
 	gb.Mem = NewAddressSpace()
 	gb.Debug = Debug{
 		Debugger:     NewDebugger(),
@@ -110,10 +108,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Bus.Interrupts = &gb.Interrupts
 	gb.Bus.Timer = &gb.Timer
 	gb.Bus.Config = gb.Config
-
-	gb.Audio = audio
-
-	go gb.CLK.run(gb)
 
 	gb.CLK.Onpanic = gb.CPU.Dump
 }

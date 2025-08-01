@@ -90,14 +90,14 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64, audio *Audio) {
 	}
 }
 
-func (clockRT *ClockRT) run(gb *Gameboy) {
+func (clockRT *ClockRT) Run(gb *Gameboy, audio *Audio) {
 	defer func() {
 		if e := recover(); e != nil {
 			clockRT.Onpanic(gb.Mem)
 			panic(e)
 		}
 	}()
-	clockRT.setSpeedPercent(gb.Config.Clock.SpeedPercent, gb.Audio)
+	clockRT.setSpeedPercent(gb.Config.Clock.SpeedPercent, audio)
 
 	exit := clockRT.wait()
 	if exit {
@@ -109,7 +109,7 @@ func (clockRT *ClockRT) run(gb *Gameboy) {
 		var exit bool
 		select {
 		case <-clockRT.ticker.C:
-			clockRT.MCycle(clockRT.mCyclesPerTick, gb)
+			clockRT.MCycle(clockRT.mCyclesPerTick, gb, audio)
 		case <-uiTicker.C:
 			clockRT.uiCycle()
 		case <-clockRT.resume:
@@ -155,6 +155,7 @@ func (clockRT *ClockRT) Stop() {
 func (clockRT *ClockRT) MCycle(
 	n int,
 	gb *Gameboy,
+	audio *Audio,
 ) {
 	for range n {
 		// Breakpoints will stop here, right before executing next M-cycle
@@ -166,7 +167,7 @@ func (clockRT *ClockRT) MCycle(
 			clockRT.pauseAfterCycle.Add(-1)
 		}
 
-		gb.Audio.Clock(&gb.APU)
+		audio.Clock(&gb.APU)
 
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
 		gb.CPU.fsm(clockRT, gb.Mem)
