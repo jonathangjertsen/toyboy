@@ -16,7 +16,7 @@ type Gameboy struct {
 	Bus        Bus
 	Debug      Debug
 	CPU        CPU
-	PPU        *PPU
+	PPU        PPU
 	APU        *APU
 	Cartridge  *Cartridge
 	Joypad     *Joypad
@@ -105,11 +105,13 @@ func (gb *Gameboy) Init(audio *Audio) {
 	}
 	gb.CPU.handlers = handlers(&gb.CPU)
 
-	ppu := NewPPU(interrupts)
+	gb.PPU.SpriteFetcher.Suspended = true
+	gb.PPU.SpriteFetcher.DoneX = 0xff
+	gb.PPU.beginFrame(gb.Interrupts)
 
 	gb.Bus.BootROMLock = bootROMLock
 	gb.Bus.APU = &apu
-	gb.Bus.PPU = ppu
+	gb.Bus.PPU = &gb.PPU
 	gb.Bus.Cartridge = cartridge
 	gb.Bus.Joypad = joypad
 	gb.Bus.Interrupts = interrupts
@@ -119,7 +121,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Mem = mem
 	gb.APU = &apu
 	gb.Cartridge = cartridge
-	gb.PPU = ppu
 	gb.Joypad = joypad
 	gb.FrameSync = fs
 	gb.Interrupts = interrupts

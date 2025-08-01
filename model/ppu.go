@@ -59,15 +59,6 @@ func NewFrameSync() *FrameSync {
 	}
 }
 
-func NewPPU(ints *Interrupts) *PPU {
-	ppu := &PPU{}
-	ppu.SpriteFetcher.Suspended = true
-	ppu.SpriteFetcher.DoneX = 0xff
-
-	ppu.beginFrame(ints)
-	return ppu
-}
-
 func (ppu *PPU) GetDump() PPUDump {
 	var dump PPUDump
 	dump.BGFIFO = ppu.BackgroundFIFO.Dump()
