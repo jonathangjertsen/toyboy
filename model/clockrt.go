@@ -90,14 +90,14 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64, audio *Audio) {
 	}
 }
 
-func (clockRT *ClockRT) Run(gb *Gameboy, audio *Audio) {
+func (clockRT *ClockRT) Run(gb *Gameboy, config *Config, audio *Audio) {
 	defer func() {
 		if e := recover(); e != nil {
 			clockRT.Onpanic(gb.Mem)
 			panic(e)
 		}
 	}()
-	clockRT.setSpeedPercent(gb.Config.Clock.SpeedPercent, audio)
+	clockRT.setSpeedPercent(config.Clock.SpeedPercent, audio)
 
 	exit := clockRT.wait()
 	if exit {

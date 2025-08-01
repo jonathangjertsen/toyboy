@@ -7,8 +7,6 @@ import (
 )
 
 type Gameboy struct {
-	Config *Config
-
 	Running atomic.Bool
 
 	Mem        []Data8
@@ -40,21 +38,12 @@ func (gb *Gameboy) Step() {
 	gb.CLK.Start()
 }
 
-func NewGameboy(
-	config *Config,
-) *Gameboy {
-	gameboy := &Gameboy{
-		Config: config,
-	}
-	gameboy.Init()
-	return gameboy
-}
-
-func (gb *Gameboy) Init() {
+func NewGameboy(config *Config) *Gameboy {
+	var gb Gameboy
 	gb.Mem = NewAddressSpace()
 	gb.Debug = Debug{
 		Debugger:     NewDebugger(),
-		Disassembler: NewDisassembler(&gb.Config.Debug.Disassembler),
+		Disassembler: NewDisassembler(&config.Debug.Disassembler),
 		Warnings:     map[string]UserMessage{},
 	}
 	gb.Debug.Init()
@@ -67,7 +56,7 @@ func (gb *Gameboy) Init() {
 		Onpanic: func(mem []Data8) {},
 	}
 
-	if gb.Config.BootROM.Variant == "DMGBoot" {
+	if config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
 		copy(gb.Mem[:SizeBootROM], bootROM)
 		gb.Debug.SetProgram(bootROM)
@@ -88,7 +77,7 @@ func (gb *Gameboy) Init() {
 	gb.Mem[AddrP1] = 0x1f
 
 	gb.CPU = CPU{
-		Config:     gb.Config,
+		Config:     config,
 		Bus:        &gb.Bus,
 		Debug:      &gb.Debug,
 		Interrupts: &gb.Interrupts,
@@ -107,7 +96,9 @@ func (gb *Gameboy) Init() {
 	gb.Bus.Joypad = &gb.Joypad
 	gb.Bus.Interrupts = &gb.Interrupts
 	gb.Bus.Timer = &gb.Timer
-	gb.Bus.Config = gb.Config
+	gb.Bus.Config = config
 
 	gb.CLK.Onpanic = gb.CPU.Dump
+
+	return &gb
 }

@@ -93,7 +93,7 @@ func (app *App) shutdown(ctx context.Context) {
 
 func (app *App) startGB() {
 	app.GB = model.NewGameboy(&app.config.Model)
-	go app.GB.CLK.Run(app.GB, app.GBAudio)
+	go app.GB.CLK.Run(app.GB, &app.config.Model, app.GBAudio)
 
 	runtime.LogPrintf(app.ctx, "Started gameboy")
 
