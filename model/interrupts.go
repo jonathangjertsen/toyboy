@@ -41,36 +41,36 @@ func (is IntSource) ISR() Addr {
 	return 0
 }
 
-func (ints *Interrupts) SetIME(mem []Data8, v bool) {
+func (ints *Interrupts) SetIME(gb *Gameboy, v bool) {
 	ints.IME = v
 	if v {
-		ints.IRQCheck(mem)
+		ints.IRQCheck(gb)
 	}
 }
 
-func (ints *Interrupts) PendInterrupt(mem []Data8, in IntSource) {
+func (ints *Interrupts) PendInterrupt(gb *Gameboy, in IntSource) {
 	ints.IME = false
-	mem[AddrIF] &= ^in.Mask()
+	gb.Mem[AddrIF] &= ^in.Mask()
 	ints.PendingInterrupt = in
 }
 
-func (ints *Interrupts) IRQSet(mem []Data8, in IntSource) {
-	if mem[AddrIF]&in.Mask() != 0 {
+func (ints *Interrupts) IRQSet(gb *Gameboy, in IntSource) {
+	if gb.Mem[AddrIF]&in.Mask() != 0 {
 		return
 	}
-	mem[AddrIF] |= in.Mask()
-	ints.IRQCheck(mem)
+	gb.Mem[AddrIF] |= in.Mask()
+	ints.IRQCheck(gb)
 }
 
-func (ints *Interrupts) IRQCheck(mem []Data8) {
+func (ints *Interrupts) IRQCheck(gb *Gameboy) {
 	if !ints.IME {
 		return
 	}
-	regIF := mem[AddrIF]
-	regIE := mem[AddrIE]
+	regIF := gb.Mem[AddrIF]
+	regIE := gb.Mem[AddrIE]
 	for is := IntSource(0); is < 5; is++ {
 		if (regIF & regIE & is.Mask()) != 0 {
-			ints.PendInterrupt(mem, is)
+			ints.PendInterrupt(gb, is)
 			break
 		}
 	}

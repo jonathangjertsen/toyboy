@@ -190,7 +190,7 @@ func (clockRT *ClockRT) MCycle(
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
 		if m&0x3f == 0 {
-			gb.Timer.tickDIV(gb.Mem, &gb.Interrupts, &gb.APU)
+			gb.Timer.tickDIV(gb)
 		}
 
 		// Clock the peripherals.
@@ -205,12 +205,12 @@ func (clockRT *ClockRT) MCycle(
 			if clockRT.Cycle&0xf == 0 {
 				gb.APU.Noise.clock()
 			}
-			gb.PPU.fsm(&gb.Interrupts, &gb.Debug, clockRT, gb.Mem, fs)
+			gb.PPU.fsm(gb, clockRT, fs)
 
 			// T1
 
 			// T2
-			gb.PPU.fsm(&gb.Interrupts, &gb.Debug, clockRT, gb.Mem, fs)
+			gb.PPU.fsm(gb, clockRT, fs)
 
 			// T3
 		} else {
@@ -222,7 +222,7 @@ func (clockRT *ClockRT) MCycle(
 func (clockRT *ClockRT) mCycleSlowPath(m uint, gb *Gameboy, fs *FrameSync) {
 	// T0
 	if gb.PPU.RegLCDC&Bit7 != 0 {
-		gb.PPU.fsm(&gb.Interrupts, &gb.Debug, clockRT, gb.Mem, fs)
+		gb.PPU.fsm(gb, clockRT, fs)
 	}
 	if gb.APU.MasterCtl&Bit7 != 0 {
 		gb.APU.Wave.clock(gb.Mem)
@@ -239,7 +239,7 @@ func (clockRT *ClockRT) mCycleSlowPath(m uint, gb *Gameboy, fs *FrameSync) {
 
 	// T2
 	if gb.PPU.RegLCDC&Bit7 != 0 {
-		gb.PPU.fsm(&gb.Interrupts, &gb.Debug, clockRT, gb.Mem, fs)
+		gb.PPU.fsm(gb, clockRT, fs)
 	}
 
 	// T3

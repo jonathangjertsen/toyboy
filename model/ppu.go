@@ -142,9 +142,9 @@ func (ppu *PPU) SetLY(v Data8) {
 	ppu.RegLY = v
 }
 
-func (ppu *PPU) SetLYC(mem []Data8, ints *Interrupts, v Data8) {
+func (ppu *PPU) SetLYC(gb *Gameboy, v Data8) {
 	ppu.RegLYC = v
-	ints.IRQCheck(mem)
+	gb.Interrupts.IRQCheck(gb)
 }
 
 func (ppu *PPU) SetBGP(v Data8) {
@@ -162,41 +162,41 @@ func (ppu *PPU) SetOBP1(v Data8) {
 	ppu.OBJPalette1 = v
 }
 
-func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT, mem []Data8, fs *FrameSync) {
+func (ppu *PPU) fsm(gb *Gameboy, clk *ClockRT, fs *FrameSync) {
 	if ppu.DMA.Source != 0 {
-		ppu.DMA.fsm(mem)
+		ppu.DMA.fsm(gb)
 	}
 	switch ppu.Mode {
 	case PPUModeVBlank:
-		ppu.fsmVBlank(mem, ints, debug, fs)
+		ppu.fsmVBlank(gb, fs)
 	case PPUModeHBlank:
-		ppu.fsmHBlank(mem, ints, debug)
+		ppu.fsmHBlank(gb)
 	case PPUModePixelDraw:
-		ppu.fsmPixelDraw(ints, debug, clk, mem)
+		ppu.fsmPixelDraw(gb, clk)
 	case PPUModeOAMScan:
-		ppu.fsmOAMScan(ints, mem)
+		ppu.fsmOAMScan(gb)
 	}
 }
 
-func (ppu *PPU) setMode(mem []Data8, ints *Interrupts, mode PPUMode) {
+func (ppu *PPU) setMode(gb *Gameboy, mode PPUMode) {
 	ppu.Mode = mode
-	ppu.Stat.SetMode(mem, ints, mode)
+	ppu.Stat.SetMode(gb, mode)
 }
 
-func (ppu *PPU) beginFrame(mem []Data8, ints *Interrupts) {
-	ppu.beginOAMScan(mem, ints)
+func (ppu *PPU) beginFrame(gb *Gameboy) {
+	ppu.beginOAMScan(gb)
 	ppu.BackgroundFetcher.WindowYReached = false
 }
 
-func (ppu *PPU) beginOAMScan(mem []Data8, ints *Interrupts) {
-	ppu.setMode(mem, ints, PPUModeOAMScan)
+func (ppu *PPU) beginOAMScan(gb *Gameboy) {
+	ppu.setMode(gb, PPUModeOAMScan)
 	ppu.OAMScanCycle = 0
 	ppu.OAMBuffer.Level = 0
 }
 
 // start of scanline after 7OAM scan
-func (ppu *PPU) beginPixelDraw(mem []Data8, ints *Interrupts) {
-	ppu.setMode(mem, ints, PPUModePixelDraw)
+func (ppu *PPU) beginPixelDraw(gb *Gameboy) {
+	ppu.setMode(gb, PPUModePixelDraw)
 	ppu.BackgroundFetcher.Cycle = 0
 	ppu.BackgroundFetcher.State = FetcherStateFetchTileNo
 	ppu.BackgroundFetcher.WindowFetching = false
@@ -218,8 +218,8 @@ func (ppu *PPU) beginPixelDraw(mem []Data8, ints *Interrupts) {
 	ppu.Shifter.Discard = ppu.RegSCX % 8
 }
 
-func (ppu *PPU) beginHBlank(mem []Data8, ints *Interrupts) {
-	ppu.setMode(mem, ints, PPUModeHBlank)
+func (ppu *PPU) beginHBlank(gb *Gameboy) {
+	ppu.setMode(gb, PPUModeHBlank)
 	if ppu.PixelDrawCycle > 376 {
 		ppu.HBlankRemainingCycles = 1
 	} else {
@@ -238,24 +238,24 @@ func (ppu *PPU) ObjPalette(attribs Data8) Data8 {
 	return palette
 }
 
-func (ppu *PPU) beginVBlank(mem []Data8, ints *Interrupts) {
+func (ppu *PPU) beginVBlank(gb *Gameboy) {
 	ppu.BackgroundFetcher.WindowLineCounter = 0
 
-	ppu.setMode(mem, ints, PPUModeVBlank)
+	ppu.setMode(gb, PPUModeVBlank)
 
 	ppu.VBlankLineRemainingCycles = 456
 
 	// TODO: do we ever clear the VBlank interrupt?
-	ints.IRQSet(mem, IntSourceVBlank)
+	gb.Interrupts.IRQSet(gb, IntSourceVBlank)
 
 	ppu.FrameCount++
 }
 
-func (ppu *PPU) fsmOAMScan(ints *Interrupts, mem []Data8) {
+func (ppu *PPU) fsmOAMScan(gb *Gameboy) {
 	cycle := ppu.OAMScanCycle
 	ppu.OAMScanCycle++
 	if ppu.OAMScanCycle == 80 {
-		ppu.beginPixelDraw(mem, ints)
+		ppu.beginPixelDraw(gb)
 	}
 
 	// PPU checks the OAM entry every 2 cycles
@@ -265,7 +265,7 @@ func (ppu *PPU) fsmOAMScan(ints *Interrupts, mem []Data8) {
 	index := Addr((cycle - 1) / 2)
 
 	// Read sprite out of OAM
-	sprite := DecodeObject(mem[AddrOAMBegin+index*4 : AddrOAMBegin+(index+1)*4])
+	sprite := DecodeObject(gb.Mem[AddrOAMBegin+index*4 : AddrOAMBegin+(index+1)*4])
 
 	// Check if sprite should be added to buffer
 	if !(sprite.X > 0) {
@@ -284,7 +284,7 @@ func (ppu *PPU) fsmOAMScan(ints *Interrupts, mem []Data8) {
 	ppu.OAMBuffer.Add(sprite)
 }
 
-func (ppu *PPU) fsmPixelDraw(ints *Interrupts, debug *Debug, clk *ClockRT, mem []Data8) {
+func (ppu *PPU) fsmPixelDraw(gb *Gameboy, clk *ClockRT) {
 	if ppu.SpriteFetcher.Suspended && ppu.SpriteFetcher.DoneX != ppu.Shifter.X {
 		for idx := range ppu.OAMBuffer.Level {
 			obj := ppu.OAMBuffer.Buffer[idx]
@@ -305,26 +305,26 @@ func (ppu *PPU) fsmPixelDraw(ints *Interrupts, debug *Debug, clk *ClockRT, mem [
 		}
 	}
 
-	ppu.SpriteFetcher.fsm(ppu, mem)
-	ppu.BackgroundFetcher.fsm(ppu, mem)
-	ppu.Shifter.fsm(ppu, debug, clk)
+	ppu.SpriteFetcher.fsm(gb)
+	ppu.BackgroundFetcher.fsm(gb)
+	ppu.Shifter.fsm(gb, clk)
 
 	// GBEDG: After each pixel shifted out, the PPU checks if it has reached the window
-	if !ppu.BackgroundFetcher.WindowFetching && ppu.BackgroundFetcher.windowReached(ppu) {
+	if !ppu.BackgroundFetcher.WindowFetching && ppu.BackgroundFetcher.windowReached(gb) {
 		ppu.BackgroundFetcher.WindowFetching = true
 		ppu.BackgroundFIFO.Clear()
 		ppu.BackgroundFetcher.X = 0
 	}
 
 	if ppu.Shifter.X >= 160 {
-		ppu.beginHBlank(mem, ints)
+		ppu.beginHBlank(gb)
 		ppu.Shifter.X = 0
 	}
 
 	ppu.PixelDrawCycle++
 }
 
-func (ppu *PPU) fsmVBlank(mem []Data8, ints *Interrupts, debug *Debug, fs *FrameSync) {
+func (ppu *PPU) fsmVBlank(gb *Gameboy, fs *FrameSync) {
 	if ppu.VBlankLineRemainingCycles > 0 {
 		ppu.VBlankLineRemainingCycles--
 		return
@@ -335,40 +335,40 @@ func (ppu *PPU) fsmVBlank(mem []Data8, ints *Interrupts, debug *Debug, fs *Frame
 		f := <-fs.Ch
 		f(&ppu.FBViewport)
 	}
-	ppu.IncRegLY(mem, ints, debug)
+	ppu.IncRegLY(gb)
 
 	if ppu.RegLY == 0 {
-		ppu.beginFrame(mem, ints)
+		ppu.beginFrame(gb)
 	}
 }
 
-func (ppu *PPU) fsmHBlank(mem []Data8, ints *Interrupts, debug *Debug) {
+func (ppu *PPU) fsmHBlank(gb *Gameboy) {
 	if ppu.HBlankRemainingCycles > 0 {
 		ppu.HBlankRemainingCycles--
 		return
 	}
 
-	ppu.IncRegLY(mem, ints, debug)
+	ppu.IncRegLY(gb)
 	if ppu.BackgroundFetcher.WindowPixelRenderedThisScanline {
 		ppu.BackgroundFetcher.WindowLineCounter++
 	}
 
 	if ppu.RegLY < 144 {
-		ppu.beginOAMScan(mem, ints)
+		ppu.beginOAMScan(gb)
 	} else if ppu.RegLY == 144 {
-		ppu.beginVBlank(mem, ints)
+		ppu.beginVBlank(gb)
 	} else {
 		panicv(ppu.RegLY)
 	}
 }
 
-func (ppu *PPU) IncRegLY(mem []Data8, ints *Interrupts, debug *Debug) {
+func (ppu *PPU) IncRegLY(gb *Gameboy) {
 	ppu.RegLY++
 	if ppu.RegLY >= 153 {
 		ppu.RegLY = 0
 	}
-	ppu.Stat.SetLYCEqLY(mem, ints, ppu.RegLY == ppu.RegLYC)
-	debug.SetY(ppu.RegLY)
+	ppu.Stat.SetLYCEqLY(gb, ppu.RegLY == ppu.RegLYC)
+	gb.Debug.SetY(ppu.RegLY)
 }
 
 func (ppu *PPU) Read(addr Addr) Data8 {
@@ -401,7 +401,7 @@ func (ppu *PPU) Read(addr Addr) Data8 {
 	return 0
 }
 
-func (ppu *PPU) Write(mem []Data8, addr Addr, v Data8, ints *Interrupts) {
+func (ppu *PPU) Write(gb *Gameboy, addr Addr, v Data8) {
 	switch Addr(addr) {
 	case AddrLCDC:
 		ppu.SetLCDC(v)
@@ -414,7 +414,7 @@ func (ppu *PPU) Write(mem []Data8, addr Addr, v Data8, ints *Interrupts) {
 	case AddrLY:
 		ppu.SetLY(v)
 	case AddrLYC:
-		ppu.SetLYC(mem, ints, v)
+		ppu.SetLYC(gb, v)
 	case AddrBGP:
 		ppu.SetBGP(v)
 	case AddrOBP0:

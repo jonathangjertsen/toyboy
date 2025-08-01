@@ -71,7 +71,7 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 
 	gb.PPU.SpriteFetcher.Suspended = true
 	gb.PPU.SpriteFetcher.DoneX = 0xff
-	gb.PPU.beginFrame(gb.Mem, &gb.Interrupts)
+	gb.PPU.beginFrame(&gb)
 
 	clk.Onpanic = gb.CPU.Dump
 
@@ -119,11 +119,11 @@ func (gb *Gameboy) WriteData(v Data8) {
 	} else if addr == AddrP1 {
 		gb.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {
-		gb.Interrupts.IRQCheck(gb.Mem)
+		gb.Interrupts.IRQCheck(gb)
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		gb.APU.Write(addr, v)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		gb.PPU.Write(gb.Mem, addr, v, &gb.Interrupts)
+		gb.PPU.Write(gb, addr, v)
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
 		gb.Timer.Write(addr, v)
 	}

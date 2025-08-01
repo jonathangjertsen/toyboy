@@ -32,7 +32,7 @@ func (jp *Joypad) Read(written Data8, addr Addr) Data8 {
 	return out
 }
 
-func (jp *Joypad) SetState(clk *ClockRT, ints *Interrupts, jps JoypadState, mem []Data8) {
+func (jp *Joypad) SetState(clk *ClockRT, gb *Gameboy, jps JoypadState) {
 	clk.Sync(func() {
 		actionMask := Data8(0b0000)
 		directionMask := Data8(0b0000)
@@ -65,7 +65,7 @@ func (jp *Joypad) SetState(clk *ClockRT, ints *Interrupts, jps JoypadState, mem 
 		newDirection := 0xf ^ directionMask
 
 		doJoypadInterrupt := false
-		if mem[AddrP1]&0x20 == 0 {
+		if gb.Mem[AddrP1]&0x20 == 0 {
 			doJoypadInterrupt = (jp.Action & ^newAction) != 0
 		} else {
 			doJoypadInterrupt = (jp.Direction & ^newDirection) != 0
@@ -75,7 +75,7 @@ func (jp *Joypad) SetState(clk *ClockRT, ints *Interrupts, jps JoypadState, mem 
 		jp.Direction = newDirection
 
 		if doJoypadInterrupt {
-			ints.IRQSet(mem, IntSourceJoypad)
+			gb.Interrupts.IRQSet(gb, IntSourceJoypad)
 		}
 	})
 }

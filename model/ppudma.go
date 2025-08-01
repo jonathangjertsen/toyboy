@@ -12,14 +12,14 @@ func (d *DMA) Write(v Data8) {
 	d.Dest = AddrOAMBegin
 }
 
-func (d *DMA) fsm(mem []Data8) {
+func (d *DMA) fsm(gb *Gameboy) {
 	if d.Source == 0 {
 		return
 	}
 
 	// Write next data
 	// TODO: presumably this is not actually how it works
-	mem[d.Dest] = mem[d.Source]
+	gb.Mem[d.Dest] = gb.Mem[d.Source]
 
 	if d.Dest == AddrOAMEnd {
 		// Done

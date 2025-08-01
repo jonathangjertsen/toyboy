@@ -167,6 +167,6 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT, gb *Gameboy) bool {
 func (cpu *CPU) applyPendingIME(gb *Gameboy) {
 	if gb.Interrupts.SetIMENextCycle {
 		gb.Interrupts.SetIMENextCycle = false
-		gb.Interrupts.SetIME(gb.Mem, true)
+		gb.Interrupts.SetIME(gb, true)
 	}
 }

@@ -29,7 +29,7 @@ type BackgroundFetcher struct {
 	WindowPixelRenderedThisScanline bool
 }
 
-func (bgf *BackgroundFetcher) fsm(ppu *PPU, mem []Data8) {
+func (bgf *BackgroundFetcher) fsm(gb *Gameboy) {
 	if bgf.Suspended {
 		return
 	}
@@ -43,40 +43,40 @@ func (bgf *BackgroundFetcher) fsm(ppu *PPU, mem []Data8) {
 		if bgfCycle&1 == 0 {
 			return
 		}
-		bgf.fetchTileNo(ppu, mem)
+		bgf.fetchTileNo(gb)
 		bgf.State = FetcherStateFetchTileLSB
 	case FetcherStateFetchTileLSB:
 		// Takes 2 cycles
 		if bgfCycle&1 == 0 {
 			return
 		}
-		bgf.fetchTileLSB(ppu, mem)
+		bgf.fetchTileLSB(gb)
 		bgf.State = FetcherStateFetchTileMSB
 	case FetcherStateFetchTileMSB:
 		// Takes 2 cycles
 		if bgfCycle&1 == 0 {
 			return
 		}
-		bgf.fetchTileMSB(ppu, mem)
+		bgf.fetchTileMSB(gb)
 		bgf.State = FetcherStatePushFIFO
 	case FetcherStatePushFIFO:
-		if bgf.pushFIFO(ppu) {
+		if bgf.pushFIFO(gb) {
 			bgf.State = FetcherStateFetchTileNo
 			bgf.X++
 		}
 	}
 }
 
-func (bgf *BackgroundFetcher) fetchTileNo(ppu *PPU, mem []Data8) {
+func (bgf *BackgroundFetcher) fetchTileNo(gb *Gameboy) {
 	// GBEDG: During the first step the fetcher fetches and stores the tile number of the tile which should be used.
 	// Which Tilemap is used depends on whether the PPU is currently rendering Background or Window pixels
 	// and on the bits 3 and 5 of the LCDC register.
 	var addr Addr
 	if bgf.WindowFetching {
-		addr = ppu.WindowTilemapArea()
+		addr = gb.PPU.WindowTilemapArea()
 		bgf.WindowPixelRenderedThisScanline = true
 	} else {
-		addr = ppu.BGTilemapArea()
+		addr = gb.PPU.BGTilemapArea()
 	}
 
 	// GBEDG: Additionally, the address which the tile number is read from is offset by the fetcher-internal X-Position-Counter,
@@ -85,14 +85,14 @@ func (bgf *BackgroundFetcher) fetchTileNo(ppu *PPU, mem []Data8) {
 	if !bgf.WindowFetching {
 		// GBEDG: The value of SCX / 8 is also added if the Fetcher is not fetching Window pixels.
 		//        In order to make the wrap-around with SCX work, this offset is ANDed with 0x1f
-		offsetX += Addr((ppu.RegSCX / 8))
+		offsetX += Addr((gb.PPU.RegSCX / 8))
 		offsetX &= 0x1f
 	}
 
 	var offsetY Addr
 	if !bgf.WindowFetching {
 		// GBEDG: An offset of 32 * (((LY + SCY) & 0xFF) / 8) is also added if background pixels are being fetched,
-		offs := (ppu.RegLY + ppu.RegSCY) & 0xff
+		offs := (gb.PPU.RegLY + gb.PPU.RegSCY) & 0xff
 		offs /= 8
 		offsetY = 32 * Addr(offs)
 	} else {
@@ -106,12 +106,12 @@ func (bgf *BackgroundFetcher) fetchTileNo(ppu *PPU, mem []Data8) {
 	addr += (offsetX + offsetY) & 0x3ff
 
 	bgf.TileIndexAddr = addr
-	bgf.TileIndex = mem[addr]
+	bgf.TileIndex = gb.Mem[addr]
 }
 
-func (bgf *BackgroundFetcher) fetchTileLSB(ppu *PPU, mem []Data8) {
+func (bgf *BackgroundFetcher) fetchTileLSB(gb *Gameboy) {
 	idx := bgf.TileIndex
-	signedAddressing := ppu.RegLCDC&Bit4 == 0
+	signedAddressing := gb.PPU.RegLCDC&Bit4 == 0
 	var addr Addr
 	if signedAddressing {
 		if idx < 128 {
@@ -125,44 +125,44 @@ func (bgf *BackgroundFetcher) fetchTileLSB(ppu *PPU, mem []Data8) {
 	if bgf.WindowFetching {
 		addr += 2 * Addr(bgf.WindowLineCounter%8)
 	} else {
-		addr += 2 * Addr((ppu.RegLY+ppu.RegSCY)%8)
+		addr += 2 * Addr((gb.PPU.RegLY+gb.PPU.RegSCY)%8)
 	}
 	bgf.TileLSBAddr = addr
-	bgf.TileLSB = mem[addr]
+	bgf.TileLSB = gb.Mem[addr]
 }
 
-func (bgf *BackgroundFetcher) fetchTileMSB(ppu *PPU, mem []Data8) {
-	bgf.TileMSB = mem[bgf.TileLSBAddr+1]
+func (bgf *BackgroundFetcher) fetchTileMSB(gb *Gameboy) {
+	bgf.TileMSB = gb.Mem[bgf.TileLSBAddr+1]
 }
 
-func (bgf *BackgroundFetcher) windowReached(ppu *PPU) bool {
-	if !ppu.WindowEnable() {
+func (bgf *BackgroundFetcher) windowReached(gb *Gameboy) bool {
+	if !gb.PPU.WindowEnable() {
 		return false
 	}
-	if ppu.RegWY == ppu.RegLY {
+	if gb.PPU.RegWY == gb.PPU.RegLY {
 		bgf.WindowYReached = true
 	}
 	if !bgf.WindowYReached {
 		return false
 	}
-	if ppu.Shifter.X < ppu.RegWX-7 {
+	if gb.PPU.Shifter.X < gb.PPU.RegWX-7 {
 		return false
 	}
 	return true
 }
 
-func (bgf *BackgroundFetcher) pushFIFO(ppu *PPU) bool {
-	if ppu.BackgroundFIFO.Level > 0 {
+func (bgf *BackgroundFetcher) pushFIFO(gb *Gameboy) bool {
+	if gb.PPU.BackgroundFIFO.Level > 0 {
 		return false
 	}
-	if ppu.BGWindowEnable() {
+	if gb.PPU.BGWindowEnable() {
 		line := DecodeTileLine(bgf.TileMSB, bgf.TileLSB)
 		for i := range 8 {
-			line[i].Palette = ppu.BGPalette
+			line[i].Palette = gb.PPU.BGPalette
 		}
-		ppu.BackgroundFIFO.Write8(line)
+		gb.PPU.BackgroundFIFO.Write8(line)
 	} else {
-		ppu.BackgroundFIFO.Write8(TileLine{})
+		gb.PPU.BackgroundFIFO.Write8(TileLine{})
 	}
 	return true
 }
@@ -173,7 +173,7 @@ type SpriteFetcher struct {
 	DoneX     Data8
 }
 
-func (sf *SpriteFetcher) fsm(ppu *PPU, mem []Data8) {
+func (sf *SpriteFetcher) fsm(gb *Gameboy) {
 	sfCycle := sf.Cycle
 	sf.Cycle++
 
@@ -186,43 +186,43 @@ func (sf *SpriteFetcher) fsm(ppu *PPU, mem []Data8) {
 		if sfCycle&1 == 0 {
 			return
 		}
-		sf.fetchTileNo(ppu)
+		sf.fetchTileNo(gb)
 		sf.State = FetcherStateFetchTileLSB
 	case FetcherStateFetchTileLSB:
 		// Takes 2 cycles
 		if sfCycle&1 == 0 {
 			return
 		}
-		sf.fetchTileLSB(ppu, mem)
+		sf.fetchTileLSB(gb)
 		sf.State = FetcherStateFetchTileMSB
 	case FetcherStateFetchTileMSB:
 		// Takes 2 cycles
 		if sfCycle&1 == 0 {
 			return
 		}
-		sf.fetchTileMSB(ppu, mem)
+		sf.fetchTileMSB(gb)
 		sf.State = FetcherStatePushFIFO
 	case FetcherStatePushFIFO:
-		if sf.pushFIFO(ppu) {
+		if sf.pushFIFO(gb) {
 			sf.State = FetcherStateFetchTileNo
 			sf.Suspended = true
-			sf.DoneX = ppu.Shifter.X
+			sf.DoneX = gb.PPU.Shifter.X
 		}
 	}
 }
 
-func (sf *SpriteFetcher) fetchTileNo(ppu *PPU) {
-	sf.TileIndex = ppu.OAMBuffer.Buffer[sf.SpriteIDX].TileIndex
+func (sf *SpriteFetcher) fetchTileNo(gb *Gameboy) {
+	sf.TileIndex = gb.PPU.OAMBuffer.Buffer[sf.SpriteIDX].TileIndex
 }
 
-func (sf *SpriteFetcher) fetchTileLSB(ppu *PPU, mem []Data8) {
-	obj := ppu.OAMBuffer.Buffer[sf.SpriteIDX]
+func (sf *SpriteFetcher) fetchTileLSB(gb *Gameboy) {
+	obj := gb.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
 
-	screenY := ppu.RegLY + ppu.RegSCY
+	screenY := gb.PPU.RegLY + gb.PPU.RegSCY
 	offsetInObj := screenY - obj.Y
 
 	addr := Addr(0x8000)
-	if ppu.ObjHeight() == 8 {
+	if gb.PPU.ObjHeight() == 8 {
 		addr += 16 * Addr(sf.TileIndex)
 		if obj.Attributes&Bit6 != 0 {
 			addr -= 2 * Addr(offsetInObj%8)
@@ -245,16 +245,16 @@ func (sf *SpriteFetcher) fetchTileLSB(ppu *PPU, mem []Data8) {
 	}
 
 	sf.TileLSBAddr = addr
-	sf.TileLSB = mem[addr]
+	sf.TileLSB = gb.Mem[addr]
 }
 
-func (sf *SpriteFetcher) fetchTileMSB(ppu *PPU, mem []Data8) {
-	sf.TileMSB = mem[sf.TileLSBAddr+1]
+func (sf *SpriteFetcher) fetchTileMSB(gb *Gameboy) {
+	sf.TileMSB = gb.Mem[sf.TileLSBAddr+1]
 }
 
-func (sf *SpriteFetcher) pushFIFO(ppu *PPU) bool {
-	obj := ppu.OAMBuffer.Buffer[sf.SpriteIDX]
-	palette := ppu.ObjPalette(obj.Attributes)
+func (sf *SpriteFetcher) pushFIFO(gb *Gameboy) bool {
+	obj := gb.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
+	palette := gb.PPU.ObjPalette(obj.Attributes)
 	line := DecodeTileLine(sf.TileMSB, sf.TileLSB)
 	if obj.Attributes&Bit5 != 0 {
 		for i := range 4 {
@@ -264,7 +264,7 @@ func (sf *SpriteFetcher) pushFIFO(ppu *PPU) bool {
 	for i := range 8 {
 		line[i].Palette = palette
 	}
-	if !ppu.OBJEnable() {
+	if !gb.PPU.OBJEnable() {
 		for i := range 8 {
 			line[i].ColorIDXBGPriority = 0
 		}
@@ -274,18 +274,18 @@ func (sf *SpriteFetcher) pushFIFO(ppu *PPU) bool {
 			line[i].SetBGPriority()
 		}
 	}
-	offsetInSprite := ppu.Shifter.X + 8 - obj.X
+	offsetInSprite := gb.PPU.Shifter.X + 8 - obj.X
 	pixelsToPush := 8 - offsetInSprite
-	pos := ppu.SpriteFIFO.ShiftPos
+	pos := gb.PPU.SpriteFIFO.ShiftPos
 	for i := range int(pixelsToPush) {
-		incLevel := i >= ppu.SpriteFIFO.Level
-		pushPixel := incLevel || ppu.SpriteFIFO.Slots[pos].ColorIDX() == 0
+		incLevel := i >= gb.PPU.SpriteFIFO.Level
+		pushPixel := incLevel || gb.PPU.SpriteFIFO.Slots[pos].ColorIDX() == 0
 		if pushPixel {
 			pixel := line[int(offsetInSprite)+i]
-			ppu.SpriteFIFO.Slots[pos] = pixel
+			gb.PPU.SpriteFIFO.Slots[pos] = pixel
 		}
 		if incLevel {
-			ppu.SpriteFIFO.Level++
+			gb.PPU.SpriteFIFO.Level++
 		}
 		pos++
 		if pos == 8 {

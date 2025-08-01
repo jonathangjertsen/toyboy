@@ -874,7 +874,7 @@ var dechlind_3 = endNoop
 
 func di(gb *Gameboy) bool {
 	gb.Interrupts.SetIMENextCycle = false
-	gb.Interrupts.SetIME(gb.Mem, false)
+	gb.Interrupts.SetIME(gb, false)
 	return true
 }
 

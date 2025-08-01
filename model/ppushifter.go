@@ -7,33 +7,33 @@ type Shifter struct {
 	LastShifted Color
 }
 
-func (ps *Shifter) fsm(ppu *PPU, debug *Debug, clk *ClockRT) {
+func (ps *Shifter) fsm(gb *Gameboy, clk *ClockRT) {
 	if ps.Suspended {
 		return
 	}
 
 	if ps.Discard > 0 {
-		if _, shifted := ppu.BackgroundFIFO.ShiftOut(); shifted {
+		if _, shifted := gb.PPU.BackgroundFIFO.ShiftOut(); shifted {
 			ps.Discard--
 		}
 	}
 
-	pixel, havePixel := ps.pixelMixer(ppu)
+	pixel, havePixel := ps.pixelMixer(gb)
 	if !havePixel {
 		return
 	}
 
 	// Write pixel to LCD
-	ppu.FBViewport[ppu.RegLY][ps.X] = pixel.Color()
+	gb.PPU.FBViewport[gb.PPU.RegLY][ps.X] = pixel.Color()
 	ps.LastShifted = pixel.Color()
 	ps.X++
 
-	debug.SetX(ps.X, clk)
+	gb.Debug.SetX(ps.X, clk)
 }
 
-func (ps *Shifter) pixelMixer(ppu *PPU) (Pixel, bool) {
-	spritePixel, haveSpritePixel := ppu.SpriteFIFO.ShiftOut()
-	bgPixel, haveBGPixel := ppu.BackgroundFIFO.ShiftOut()
+func (ps *Shifter) pixelMixer(gb *Gameboy) (Pixel, bool) {
+	spritePixel, haveSpritePixel := gb.PPU.SpriteFIFO.ShiftOut()
+	bgPixel, haveBGPixel := gb.PPU.BackgroundFIFO.ShiftOut()
 	if haveSpritePixel && haveBGPixel {
 		if spritePixel.ColorIDX() == 0 {
 			return bgPixel, true

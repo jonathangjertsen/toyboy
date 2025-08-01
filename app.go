@@ -132,7 +132,7 @@ type Frame struct {
 
 func (app *App) SetKeyState(in map[string]bool) {
 	jp := app.ButtonMapping.JoypadState(in)
-	app.GB.Joypad.SetState(app.CLK, &app.GB.Interrupts, jp, app.GB.Mem)
+	app.GB.Joypad.SetState(app.CLK, app.GB, jp)
 }
 
 var upgrader = websocket.Upgrader{
