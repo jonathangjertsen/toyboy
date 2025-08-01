@@ -1,9 +1,7 @@
 package model
 
 type CPU struct {
-	Bus        CPUBusIF
-	Debug      *Debug
-	Interrupts *Interrupts
+	GB *Gameboy
 
 	handlers [256]InstructionHandling
 
@@ -83,10 +81,7 @@ func (cpu *CPU) fsm(clk *ClockRT, mem []Data8) {
 	cpu.applyPendingIME(mem)
 
 	if cpu.halted {
-		if cpu.Interrupts == nil {
-			panic("can't be HALTed without interrupts")
-		}
-		if cpu.Interrupts.PendingInterrupt == 0 {
+		if cpu.GB.Interrupts.PendingInterrupt == 0 {
 			return
 		}
 		cpu.halted = false
@@ -94,14 +89,14 @@ func (cpu *CPU) fsm(clk *ClockRT, mem []Data8) {
 
 	var fetch bool
 	if cpu.clockCycle > 0 {
-		if cpu.Interrupts != nil && cpu.Interrupts.PendingInterrupt != 0 {
+		if cpu.GB.Interrupts.PendingInterrupt != 0 {
 			fetch = cpu.execTransferToISR(clk, mem)
 		} else {
 			fetch = cpu.handlers[cpu.Regs.IR](mem, cpu.machineCycle)
 		}
 		if fetch {
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
-			if cpu.Interrupts == nil || cpu.Interrupts.PendingInterrupt == 0 {
+			if cpu.GB.Interrupts.PendingInterrupt == 0 {
 				cpu.instructionFetch(clk, mem)
 			}
 			cpu.IncPC()
@@ -125,7 +120,7 @@ func (cpu *CPU) instructionFetch(clk *ClockRT, mem []Data8) {
 	// Read next instruction opcode
 	rawOp := mem[cpu.Regs.PC]
 	cpu.Regs.IR = Opcode(rawOp)
-	cpu.Debug.SetIR(cpu.Regs.IR, clk)
+	cpu.GB.Debug.SetIR(cpu.Regs.IR, clk)
 
 	di := DisInstruction{
 		Address: cpu.Regs.PC,
@@ -147,7 +142,7 @@ func (cpu *CPU) instructionFetch(clk *ClockRT, mem []Data8) {
 	entry.Instruction = di
 
 	// Set PC
-	cpu.Debug.SetPC(cpu.Regs.PC, clk)
+	cpu.GB.Debug.SetPC(cpu.Regs.PC, clk)
 }
 
 func (cpu *CPU) execTransferToISR(clk *ClockRT, mem []Data8) bool {
@@ -158,17 +153,17 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT, mem []Data8) bool {
 	case 3:
 		cpu.SetSP(cpu.Regs.SP - 1)
 		cpu.writeAddressBus(mem, cpu.Regs.SP)
-		cpu.Bus.WriteData(mem, cpu.Regs.PC.MSB())
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.MSB())
 		// push LSB of PC to stack
 	case 4:
 		cpu.SetSP(cpu.Regs.SP - 1)
 		cpu.writeAddressBus(mem, cpu.Regs.SP)
-		cpu.Bus.WriteData(mem, cpu.Regs.PC.LSB())
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.LSB())
 	case 5:
-		isr := cpu.Interrupts.PendingInterrupt.ISR()
+		isr := cpu.GB.Interrupts.PendingInterrupt.ISR()
 		cpu.SetPC(isr)
-		cpu.Debug.SetPC(isr, clk)
-		cpu.Interrupts.PendingInterrupt = 0
+		cpu.GB.Debug.SetPC(isr, clk)
+		cpu.GB.Interrupts.PendingInterrupt = 0
 		return true
 	default:
 		panicv(cpu.machineCycle)
@@ -177,15 +172,12 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT, mem []Data8) bool {
 }
 
 func (cpu *CPU) writeAddressBus(mem []Data8, addr Addr) {
-	cpu.Bus.WriteAddress(mem, addr)
+	cpu.GB.Bus.WriteAddress(mem, addr)
 }
 
 func (cpu *CPU) applyPendingIME(mem []Data8) {
-	if cpu.Interrupts == nil {
-		return
-	}
-	if cpu.Interrupts.setIMENextCycle {
-		cpu.Interrupts.setIMENextCycle = false
-		cpu.Interrupts.SetIME(mem, true)
+	if cpu.GB.Interrupts.setIMENextCycle {
+		cpu.GB.Interrupts.setIMENextCycle = false
+		cpu.GB.Interrupts.SetIME(mem, true)
 	}
 }

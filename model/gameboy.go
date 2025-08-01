@@ -66,10 +66,8 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 	gb.Mem[AddrP1] = 0x1f
 
 	gb.CPU = CPU{
-		Bus:        &gb.Bus,
-		Debug:      &gb.Debug,
-		Interrupts: &gb.Interrupts,
-		rewind:     NewRewind(8192),
+		GB:     &gb,
+		rewind: NewRewind(8192),
 	}
 	gb.CPU.handlers = handlers(&gb.CPU)
 

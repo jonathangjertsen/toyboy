@@ -194,18 +194,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeINCHLInd: cpu.inchlind,
 		OpcodeDECHLInd: cpu.dechlind,
 		OpcodeDI: func(mem []Data8, e int) bool {
-			if cpu.Interrupts == nil {
-				return false
-			}
-			cpu.Interrupts.setIMENextCycle = false
-			cpu.Interrupts.SetIME(mem, false)
+			cpu.GB.Interrupts.setIMENextCycle = false
+			cpu.GB.Interrupts.SetIME(mem, false)
 			return true
 		},
 		OpcodeEI: cpu.singleCycle("EI", func() {
-			if cpu.Interrupts == nil {
-				return
-			}
-			cpu.Interrupts.setIMENextCycle = true
+			cpu.GB.Interrupts.setIMENextCycle = true
 		}),
 		OpcodeHALT:     cpu.halt,
 		OpcodeJRe:      cpu.jre,
@@ -358,7 +352,7 @@ func (cpu *CPU) jre(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	// TODO: this impl is not exactly correct
 	case 2:
 	case 3:
@@ -378,11 +372,11 @@ func (cpu *CPU) jpnn(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.Bus.GetData()
+		cpu.Regs.TempW = cpu.GB.Bus.GetData()
 	case 3:
 	case 4:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
@@ -398,7 +392,7 @@ func (cpu *CPU) jrcce(f func() bool) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			if f() {
 				cpu.lastBranchResult = +1
@@ -427,11 +421,11 @@ func (cpu *CPU) jpccnn(f func() bool) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempW = cpu.Bus.GetData()
+			cpu.Regs.TempW = cpu.GB.Bus.GetData()
 		case 3:
 			if f() {
 				cpu.lastBranchResult = +1
@@ -458,11 +452,11 @@ func (cpu *CPU) push(msb, lsb *Data8) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(mem, cpu.Regs.SP)
-			cpu.Bus.WriteData(mem, *msb)
+			cpu.GB.Bus.WriteData(mem, *msb)
 		case 2:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(mem, cpu.Regs.SP)
-			cpu.Bus.WriteData(mem, *lsb)
+			cpu.GB.Bus.WriteData(mem, *lsb)
 		case 3:
 		case 4:
 			return true
@@ -478,11 +472,11 @@ func (cpu *CPU) pop(msb, lsb *Data8) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.writeAddressBus(mem, cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			cpu.writeAddressBus(mem, cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
-			cpu.Regs.TempW = cpu.Bus.GetData()
+			cpu.Regs.TempW = cpu.GB.Bus.GetData()
 		case 3:
 			*msb = cpu.Regs.TempW
 			if lsb == &cpu.Regs.F {
@@ -502,20 +496,20 @@ func (cpu *CPU) callnn(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.Bus.GetData()
+		cpu.Regs.TempW = cpu.GB.Bus.GetData()
 	case 3:
 		cpu.SetSP(cpu.Regs.SP - 1)
 	case 4:
 		cpu.writeAddressBus(mem, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP - 1)
-		cpu.Bus.WriteData(mem, cpu.Regs.PC.MSB())
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.MSB())
 	case 5:
 		cpu.writeAddressBus(mem, cpu.Regs.SP)
-		cpu.Bus.WriteData(mem, cpu.Regs.PC.LSB())
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.LSB())
 	case 6:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 		return true
@@ -530,11 +524,11 @@ func (cpu *CPU) callccnn(f func() bool) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempW = cpu.Bus.GetData()
+			cpu.Regs.TempW = cpu.GB.Bus.GetData()
 		case 3:
 			if f() {
 				cpu.lastBranchResult = +1
@@ -551,7 +545,7 @@ func (cpu *CPU) callccnn(f func() bool) func(mem []Data8, e int) bool {
 				panicv(e)
 			}
 			if cpu.lastBranchResult == +1 {
-				cpu.Bus.WriteData(mem, cpu.Regs.PC.MSB())
+				cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.MSB())
 			} else {
 				panicv(e)
 			}
@@ -562,7 +556,7 @@ func (cpu *CPU) callccnn(f func() bool) func(mem []Data8, e int) bool {
 				panicv(e)
 			}
 			if cpu.lastBranchResult == +1 {
-				cpu.Bus.WriteData(mem, cpu.Regs.PC.LSB())
+				cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.LSB())
 			} else {
 				panicv(e)
 			}
@@ -584,11 +578,11 @@ func (cpu *CPU) ret(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-		cpu.Regs.TempW = cpu.Bus.GetData()
+		cpu.Regs.TempW = cpu.GB.Bus.GetData()
 	case 3:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 	case 4:
@@ -603,17 +597,15 @@ func (cpu *CPU) reti(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-		cpu.Regs.TempW = cpu.Bus.GetData()
+		cpu.Regs.TempW = cpu.GB.Bus.GetData()
 	case 3:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 		// TODO verify if this is the right cycle
-		if cpu.Interrupts != nil {
-			cpu.Interrupts.IME = true
-		}
+		cpu.GB.Interrupts.IME = true
 	case 4:
 		return true
 	}
@@ -630,7 +622,7 @@ func (cpu *CPU) retcc(cond func() bool) func(mem []Data8, e int) bool {
 				cpu.lastBranchResult = +1
 				cpu.writeAddressBus(mem, cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
-				cpu.Regs.TempZ = cpu.Bus.GetData()
+				cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 			} else {
 				cpu.lastBranchResult = -1
 				return true
@@ -639,7 +631,7 @@ func (cpu *CPU) retcc(cond func() bool) func(mem []Data8, e int) bool {
 			if cpu.lastBranchResult == +1 {
 				cpu.writeAddressBus(mem, cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
-				cpu.Regs.TempW = cpu.Bus.GetData()
+				cpu.Regs.TempW = cpu.GB.Bus.GetData()
 			} else {
 				panicv(e)
 			}
@@ -701,7 +693,7 @@ func (cpu *CPU) inchlind(mem []Data8, e int) bool {
 	switch e {
 	case 1:
 		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		res := ADD(cpu.Regs.TempZ, 1, false)
 		// apparently doesn't set C.
@@ -710,7 +702,7 @@ func (cpu *CPU) inchlind(mem []Data8, e int) bool {
 		cpu.Regs.SetFlagN(res.N)
 		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
 		cpu.Regs.TempZ = res.Value
-		cpu.Bus.WriteData(mem, cpu.Regs.TempZ)
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
@@ -722,7 +714,7 @@ func (cpu *CPU) dechlind(mem []Data8, e int) bool {
 	switch e {
 	case 1:
 		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		res := SUB(cpu.Regs.TempZ, 1, false)
 		// apparently doesn't set C.
@@ -731,7 +723,7 @@ func (cpu *CPU) dechlind(mem []Data8, e int) bool {
 		cpu.Regs.SetFlagN(res.N)
 		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
 		cpu.Regs.TempZ = res.Value
-		cpu.Bus.WriteData(mem, cpu.Regs.TempZ)
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
@@ -744,7 +736,7 @@ func (cpu *CPU) aluhl(f func(v Data8)) func(mem []Data8, e int) bool {
 		switch e {
 		case 1:
 			cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			f(cpu.Regs.TempZ)
 			return true
@@ -811,7 +803,7 @@ func (cpu *CPU) alun(f func(imm Data8)) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			f(cpu.Regs.TempZ)
 			return true
@@ -826,7 +818,7 @@ func (cpu *CPU) ldrn(reg *Data8) func(mem []Data8, e int) bool {
 		switch e {
 		case 1:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			cpu.IncPC()
 			*reg = cpu.Regs.TempZ
@@ -843,7 +835,7 @@ func (cpu *CPU) ldrhl(reg *Data8) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
 		case 2:
-			*reg = cpu.Bus.GetData()
+			*reg = cpu.GB.Bus.GetData()
 			return true
 		}
 		return false
@@ -857,7 +849,7 @@ func (cpu *CPU) ldahlinc(mem []Data8, e int) bool {
 		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
 		cpu.SetHL(cpu.GetHL() + 1)
 	case 2:
-		cpu.Regs.A = cpu.Bus.GetData()
+		cpu.Regs.A = cpu.GB.Bus.GetData()
 		return true
 	}
 	return false
@@ -870,7 +862,7 @@ func (cpu *CPU) ldahldec(mem []Data8, e int) bool {
 		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
 		cpu.SetHL(cpu.GetHL() - 1)
 	case 2:
-		cpu.Regs.A = cpu.Bus.GetData()
+		cpu.Regs.A = cpu.GB.Bus.GetData()
 		return true
 	}
 	return false
@@ -887,7 +879,7 @@ func (cpu *CPU) ldhlr(reg *Data8, inc int) func(mem []Data8, e int) bool {
 			} else if inc == -1 {
 				cpu.SetHL(cpu.GetHL() - 1)
 			}
-			cpu.Bus.WriteData(mem, *reg)
+			cpu.GB.Bus.WriteData(mem, *reg)
 		case 2:
 			return true
 		}
@@ -901,7 +893,7 @@ func (cpu *CPU) ldrra(msb, lsb *Data8) func(mem []Data8, e int) bool {
 		switch e {
 		case 1:
 			cpu.writeAddressBus(mem, Addr(join16(*msb, *lsb)))
-			cpu.Bus.WriteData(mem, cpu.Regs.A)
+			cpu.GB.Bus.WriteData(mem, cpu.Regs.A)
 		case 2:
 			return true
 		}
@@ -914,7 +906,7 @@ func (cpu *CPU) ldhca(mem []Data8, e int) bool {
 	switch e {
 	case 1:
 		cpu.writeAddressBus(mem, Addr(join16(0xff, cpu.Regs.C)))
-		cpu.Bus.WriteData(mem, cpu.Regs.A)
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.A)
 	case 2:
 		return true
 	}
@@ -926,7 +918,7 @@ func (cpu *CPU) ldhac(mem []Data8, e int) bool {
 	switch e {
 	case 1:
 		cpu.writeAddressBus(mem, Addr(join16(0xff, cpu.Regs.C)))
-		cpu.Regs.A = cpu.Bus.GetData()
+		cpu.Regs.A = cpu.GB.Bus.GetData()
 	case 2:
 		return true
 	}
@@ -939,18 +931,18 @@ func (cpu *CPU) ldnnsp(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.Bus.GetData()
+		cpu.Regs.TempW = cpu.GB.Bus.GetData()
 	case 3:
 		cpu.writeAddressBus(mem, Addr(cpu.Regs.GetWZ()))
-		cpu.Bus.WriteData(mem, cpu.Regs.SP.LSB())
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.SP.LSB())
 		cpu.Regs.SetWZ(cpu.Regs.GetWZ() + 1)
 	case 4:
 		cpu.writeAddressBus(mem, Addr(cpu.Regs.GetWZ()))
-		cpu.Bus.WriteData(mem, cpu.Regs.SP.MSB())
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.SP.MSB())
 	case 5:
 		return true
 	}
@@ -963,14 +955,14 @@ func (cpu *CPU) ldnna(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.Bus.GetData()
+		cpu.Regs.TempW = cpu.GB.Bus.GetData()
 	case 3:
 		cpu.writeAddressBus(mem, Addr(cpu.Regs.GetWZ()))
-		cpu.Bus.WriteData(mem, cpu.Regs.A)
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.A)
 	case 4:
 		return true
 	}
@@ -983,14 +975,14 @@ func (cpu *CPU) ldann(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.Bus.GetData()
+		cpu.Regs.TempW = cpu.GB.Bus.GetData()
 	case 3:
 		cpu.writeAddressBus(mem, Addr(cpu.Regs.GetWZ()))
-		cpu.Regs.A = cpu.Bus.GetData()
+		cpu.Regs.A = cpu.GB.Bus.GetData()
 	case 4:
 		return true
 	}
@@ -1002,11 +994,11 @@ func (cpu *CPU) ldhna(mem []Data8, e int) bool {
 	switch e {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, Addr(join16(0xff, cpu.Regs.TempZ)))
 		cpu.IncPC()
-		cpu.Bus.WriteData(mem, cpu.Regs.A)
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.A)
 	case 3:
 		return true
 	}
@@ -1019,10 +1011,10 @@ func (cpu *CPU) ldhan(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, Addr(join16(0xff, cpu.Regs.TempZ)))
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 3:
 		cpu.Regs.A = cpu.Regs.TempZ
 		return true
@@ -1036,7 +1028,7 @@ func (cpu *CPU) ldarr(msb, lsb *Data8) func(mem []Data8, e int) bool {
 		switch e {
 		case 1:
 			cpu.writeAddressBus(mem, Addr(join16(*msb, *lsb)))
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			cpu.Regs.A = cpu.Regs.TempZ
 			return true
@@ -1093,7 +1085,7 @@ func (cpu *CPU) addspe(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		zSign := cpu.Regs.TempZ&Bit7 != 0
 		result := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
@@ -1128,11 +1120,11 @@ func (cpu *CPU) ldxxnn(f func(wz Data16)) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.Bus.GetData()
+			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 		case 2:
 			cpu.writeAddressBus(mem, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempW = cpu.Bus.GetData()
+			cpu.Regs.TempW = cpu.GB.Bus.GetData()
 		case 3:
 			f(join16(cpu.Regs.TempW, cpu.Regs.TempZ))
 			return true
@@ -1147,10 +1139,10 @@ func (cpu *CPU) ldhln(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-		cpu.Bus.WriteData(mem, cpu.Regs.TempZ)
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
@@ -1174,7 +1166,7 @@ func (cpu *CPU) ldhlspe(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.Bus.GetData()
+		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
 	case 2:
 		res := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
 		cpu.Regs.L = res.Value
@@ -1199,11 +1191,11 @@ func (cpu *CPU) rst(vec Data8) func(mem []Data8, e int) bool {
 		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(mem, cpu.Regs.SP)
-			cpu.Bus.WriteData(mem, cpu.Regs.PC.MSB())
+			cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.MSB())
 		case 2:
 			cpu.SetSP(cpu.Regs.SP - 1)
 			cpu.writeAddressBus(mem, cpu.Regs.SP)
-			cpu.Bus.WriteData(mem, cpu.Regs.PC.LSB())
+			cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.LSB())
 		case 3:
 			cpu.SetPC(Addr(join16(0x00, vec)))
 		case 4:
@@ -1223,7 +1215,7 @@ func (cpu *CPU) cb(mem []Data8, e int) bool {
 	case 1:
 		cpu.writeAddressBus(mem, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.CBOp = NewCBOp(cpu.Bus.GetData())
+		cpu.CBOp = NewCBOp(cpu.GB.Bus.GetData())
 	case 2:
 		if cpu.CBOp.Target == CBTargetIndirectHL {
 			cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
@@ -1243,7 +1235,7 @@ func (cpu *CPU) cb(mem []Data8, e int) bool {
 		case CBTargetL:
 			val = cpu.Regs.L
 		case CBTargetIndirectHL:
-			val = cpu.Bus.GetData()
+			val = cpu.GB.Bus.GetData()
 		case CBTargetA:
 			val = cpu.Regs.A
 		default:
@@ -1280,7 +1272,7 @@ func (cpu *CPU) cb(mem []Data8, e int) bool {
 			return true
 		}
 		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-		cpu.Bus.WriteData(mem, cpu.Regs.TempZ)
+		cpu.GB.Bus.WriteData(mem, cpu.Regs.TempZ)
 	case 4:
 		if cpu.CBOp.Target != CBTargetIndirectHL {
 			panicv(e)

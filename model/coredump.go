@@ -242,7 +242,7 @@ func (cpu *CPU) GetCoreDump(mem []Data8) CoreDump {
 		cd.ProgramEnd = cpu.Regs.PC + 0x40
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
-	cd.Disassembly = cpu.Debug.Disassembly(0, 0xffff)
+	cd.Disassembly = cpu.GB.Debug.Disassembly(0, 0xffff)
 	cd.Rewind = cpu.rewind
 	return cd
 }
