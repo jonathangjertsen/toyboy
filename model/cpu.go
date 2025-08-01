@@ -51,6 +51,11 @@ func (cpu *CPU) GetHL() Data16 {
 	return v
 }
 
+func (cpu *CPU) GetWZ() Data16 {
+	v := join16(cpu.Regs.TempW, cpu.Regs.TempZ)
+	return v
+}
+
 func join16(msb, lsb Data8) Data16 {
 	return (Data16(msb) << 8) | Data16(lsb)
 }
@@ -80,8 +85,9 @@ func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy, handlers *HandlerArray) {
 		if gb.Interrupts.PendingInterrupt != 0 {
 			fetch = cpu.execTransferToISR(clk, gb)
 		} else {
-			handler := handlers[cpu.Regs.IR][0]
+			handler := handlers[cpu.Regs.IR][cpu.MachineCycle-1]
 			if h1, ok := handler.(func(gb *Gameboy, e int) bool); ok {
+				// patch
 				for i := 1; i < 6; i++ {
 					handlers[cpu.Regs.IR][i] = handler
 				}
@@ -89,7 +95,7 @@ func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy, handlers *HandlerArray) {
 			} else if h2, ok := handler.(func(gb *Gameboy) bool); ok {
 				fetch = h2(gb)
 			} else {
-				panicf("%T", handler)
+				panicf("%T @ %s %d", handler, cpu.Regs.IR, cpu.MachineCycle-1)
 			}
 		}
 		if fetch {
