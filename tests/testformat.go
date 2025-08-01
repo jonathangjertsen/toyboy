@@ -84,18 +84,18 @@ type CPUState struct {
 	RAM RAM         `json:"ram"`
 }
 
-func TestCaseStateFromCPU(cpu *model.CPU) *CPUState {
+func TestCaseStateFromCPU(gb *model.Gameboy) *CPUState {
 	return &CPUState{
-		PC: cpu.Regs.PC,
-		SP: cpu.Regs.SP,
-		A:  cpu.Regs.A,
-		B:  cpu.Regs.B,
-		C:  cpu.Regs.C,
-		D:  cpu.Regs.D,
-		E:  cpu.Regs.E,
-		F:  cpu.Regs.F,
-		H:  cpu.Regs.H,
-		L:  cpu.Regs.L,
+		PC: gb.CPU.Regs.PC,
+		SP: gb.CPU.Regs.SP,
+		A:  gb.CPU.Regs.A,
+		B:  gb.CPU.Regs.B,
+		C:  gb.CPU.Regs.C,
+		D:  gb.CPU.Regs.D,
+		E:  gb.CPU.Regs.E,
+		F:  gb.CPU.Regs.F,
+		H:  gb.CPU.Regs.H,
+		L:  gb.CPU.Regs.L,
 	}
 }
 
@@ -125,14 +125,14 @@ type TestCase struct {
 	Cycles  Cycles   `json:"cycles,omitempty"`
 }
 
-func (tc *TestCase) String(cpu *model.CPU) string {
+func (tc *TestCase) String(gb *model.Gameboy) string {
 	return fmt.Sprintf(
 		"%s\n---------\nInitial expect:\n%s---<%d cycles>---\nFinal expect:\n%s-----\nFinal actual:\n%s",
 		tc.Name,
 		tc.Initial.String(),
 		len(tc.Cycles),
 		tc.Final.String(),
-		TestCaseStateFromCPU(cpu).String(),
+		TestCaseStateFromCPU(gb).String(),
 	)
 }
 
@@ -223,85 +223,79 @@ func Run(t *testing.T, tcs []TestCase, opcode model.Opcode) {
 func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
 	t.Helper()
 
-	audio, devnull := model.AudioStub()
-	defer func() { close(devnull) }()
-	testBus := TestBus{}
-	ints := model.NewInterrupts(testBus.RAM[:])
-
-	clock := model.NewRealtimeClock(model.DefaultConfig.Clock, audio, ints)
+	clock := model.NewClock()
 	defer func() { clock.Stop() }()
 
-	apu := model.NewAPU(clock, &model.DefaultConfig, testBus.RAM[:])
-	model.NewTimer(clock, testBus.RAM[:], apu, ints)
-	model.NewPPU(clock, ints)
+	audio, devnull := model.AudioStub()
+	defer func() { close(devnull) }()
 
-	config := model.DefaultConfig
-	config.Debug.PanicOnStackUnderflow = false
-	cpu := model.NewCPU(clock, nil, &testBus, &config, nil)
-	cpu.Reset()
-	cpu.Regs.A = tc.Initial.A
-	cpu.Regs.B = tc.Initial.B
-	cpu.Regs.C = tc.Initial.C
-	cpu.Regs.D = tc.Initial.D
-	cpu.Regs.E = tc.Initial.E
-	cpu.Regs.F = tc.Initial.F
-	cpu.Regs.H = tc.Initial.H
-	cpu.Regs.L = tc.Initial.L
-	cpu.Regs.PC = tc.Initial.PC
-	cpu.Regs.SP = tc.Initial.SP
+	fs := model.FrameSync{Ch: make(chan func(*model.ViewPort), 1)}
+
+	gb := model.NewGameboy(&model.DefaultConfig, clock)
+
+	gb.CPU.Regs.A = tc.Initial.A
+	gb.CPU.Regs.B = tc.Initial.B
+	gb.CPU.Regs.C = tc.Initial.C
+	gb.CPU.Regs.D = tc.Initial.D
+	gb.CPU.Regs.E = tc.Initial.E
+	gb.CPU.Regs.F = tc.Initial.F
+	gb.CPU.Regs.H = tc.Initial.H
+	gb.CPU.Regs.L = tc.Initial.L
+	gb.CPU.Regs.PC = tc.Initial.PC
+	gb.CPU.Regs.SP = tc.Initial.SP
 	for _, entry := range tc.Initial.RAM {
-		testBus.RAM[entry.Addr] = model.Data8(entry.Val)
+		gb.Mem[entry.Addr] = model.Data8(entry.Val)
 	}
-	cpu.Regs.IR = model.Opcode(testBus.RAM[cpu.Regs.PC])
+	gb.CPU.Regs.IR = model.Opcode(gb.Mem[gb.CPU.Regs.PC])
 
-	clock.MCycle(len(tc.Cycles)+1, ints)
+	clock.MCycle(len(tc.Cycles)+1, gb, audio, &fs)
 
-	if have, want := cpu.Regs.A, tc.Final.A; have != want {
-		t.Fatalf("Test %d Register A have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.A, tc.Final.A; have != want {
+		t.Fatalf("Test %d Register A have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.B, tc.Final.B; have != want {
-		t.Fatalf("Test %d Register B have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.B, tc.Final.B; have != want {
+		t.Fatalf("Test %d Register B have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.C, tc.Final.C; have != want {
-		t.Fatalf("Test %d Register C have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.C, tc.Final.C; have != want {
+		t.Fatalf("Test %d Register C have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.D, tc.Final.D; have != want {
-		t.Fatalf("Test %d Register D have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.D, tc.Final.D; have != want {
+		t.Fatalf("Test %d Register D have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.E, tc.Final.E; have != want {
-		t.Fatalf("Test %d Register E have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.E, tc.Final.E; have != want {
+		t.Fatalf("Test %d Register E have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.F.Bit(model.FlagBitZ), tc.Final.F.Bit(model.FlagBitZ); have != want {
-		t.Fatalf("Test %d Flag Z have %v want %v. Full test: %s", i, have, want, tc.String(cpu))
+	if have, want := gb.CPU.Regs.F.Bit(model.FlagBitZ), tc.Final.F.Bit(model.FlagBitZ); have != want {
+		t.Fatalf("Test %d Flag Z have %v want %v. Full test: %s", i, have, want, tc.String(gb))
 	}
-	if have, want := cpu.Regs.F.Bit(model.FlagBitC), tc.Final.F.Bit(model.FlagBitC); have != want {
-		t.Fatalf("Test %d Flag C have %v want %v. Full test: %s", i, have, want, tc.String(cpu))
+	if have, want := gb.CPU.Regs.F.Bit(model.FlagBitC), tc.Final.F.Bit(model.FlagBitC); have != want {
+		t.Fatalf("Test %d Flag C have %v want %v. Full test: %s", i, have, want, tc.String(gb))
 	}
-	if have, want := cpu.Regs.F.Bit(model.FlagBitH), tc.Final.F.Bit(model.FlagBitH); have != want {
-		t.Fatalf("Test %d Flag H have %v want %v. Full test: %s", i, have, want, tc.String(cpu))
+	if have, want := gb.CPU.Regs.F.Bit(model.FlagBitH), tc.Final.F.Bit(model.FlagBitH); have != want {
+		t.Fatalf("Test %d Flag H have %v want %v. Full test: %s", i, have, want, tc.String(gb))
 	}
-	if have, want := cpu.Regs.F.Bit(model.FlagBitN), tc.Final.F.Bit(model.FlagBitN); have != want {
-		t.Fatalf("Test %d Flag N have %v want %v. Full test: %s", i, have, want, tc.String(cpu))
+	if have, want := gb.CPU.Regs.F.Bit(model.FlagBitN), tc.Final.F.Bit(model.FlagBitN); have != want {
+		t.Fatalf("Test %d Flag N have %v want %v. Full test: %s", i, have, want, tc.String(gb))
 	}
-	if have, want := cpu.Regs.F, tc.Final.F; have != want {
-		t.Fatalf("Test %d Register F have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.F, tc.Final.F; have != want {
+		t.Fatalf("Test %d Register F have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.H, tc.Final.H; have != want {
-		t.Fatalf("Test %d Register H have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.H, tc.Final.H; have != want {
+		t.Fatalf("Test %d Register H have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.L, tc.Final.L; have != want {
-		t.Fatalf("Test %d Register L have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.L, tc.Final.L; have != want {
+		t.Fatalf("Test %d Register L have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.PC, tc.Final.PC+1; have != want {
-		t.Fatalf("Test %d Register PC have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.PC, tc.Final.PC+1; have != want {
+		t.Fatalf("Test %d Register PC have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
-	if have, want := cpu.Regs.SP, tc.Final.SP; have != want {
-		t.Fatalf("Test %d Register SP have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(cpu))
+	if have, want := gb.CPU.Regs.SP, tc.Final.SP; have != want {
+		t.Fatalf("Test %d Register SP have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))
 	}
 
 	for _, entry := range tc.Final.RAM {
-		if have, want := testBus.RAM[entry.Addr], model.Data8(entry.Val); have != want {
-			t.Fatalf("Test %d Addr %s have %s want %s. Full test: %s", i, entry.Addr.Hex(), have.Hex(), want.Hex(), tc.String(cpu))
+		if have, want := gb.Mem[entry.Addr], model.Data8(entry.Val); have != want {
+			t.Fatalf("Test %d Addr %s have %s want %s. Full test: %s", i, entry.Addr.Hex(), have.Hex(), want.Hex(), tc.String(gb))
 		}
 	}
 }

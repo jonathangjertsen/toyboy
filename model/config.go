@@ -35,7 +35,7 @@ var DefaultConfig = Config{
 	Debug: ConfigDebug{
 		PanicOnStackUnderflow: true,
 		Disassembler: ConfigDisassembler{
-			Trace: true,
+			Trace: false,
 		},
 	},
 }

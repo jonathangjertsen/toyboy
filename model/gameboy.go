@@ -115,7 +115,7 @@ func (gb *Gameboy) WriteData(v Data8) {
 	gb.Mem[addr] = v
 
 	if addr == AddrBootROMLock {
-		gb.BootROMLock.Write(gb.Mem, &gb.Debug, &gb.Cartridge, v)
+		gb.BootROMLock.Write(gb, v)
 	} else if addr == AddrP1 {
 		gb.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {

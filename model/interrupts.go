@@ -41,10 +41,10 @@ func (is IntSource) ISR() Addr {
 	return 0
 }
 
-func (ints *Interrupts) SetIME(gb *Gameboy, v bool) {
-	ints.IME = v
+func (gb *Gameboy) SetIME(v bool) {
+	gb.Interrupts.IME = v
 	if v {
-		ints.IRQCheck(gb)
+		gb.Interrupts.IRQCheck(gb)
 	}
 }
 

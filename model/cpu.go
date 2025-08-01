@@ -71,7 +71,7 @@ func (cpu *CPU) IncPC() {
 func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy) {
 	cpu.WroteToAddressBusThisCycle = false
 	cpu.ClockCycle = clk.Cycle
-	cpu.applyPendingIME(gb)
+	gb.applyPendingIME()
 
 	if cpu.Halted {
 		if gb.Interrupts.PendingInterrupt == 0 {
@@ -164,9 +164,9 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT, gb *Gameboy) bool {
 	return false
 }
 
-func (cpu *CPU) applyPendingIME(gb *Gameboy) {
+func (gb *Gameboy) applyPendingIME() {
 	if gb.Interrupts.SetIMENextCycle {
 		gb.Interrupts.SetIMENextCycle = false
-		gb.Interrupts.SetIME(gb, true)
+		gb.SetIME(true)
 	}
 }
