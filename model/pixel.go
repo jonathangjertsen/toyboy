@@ -1,23 +1,18 @@
 package model
 
-type Pixel struct {
-	ColorIDXBGPriority Data8 // Bit 7: BG priority. Bit 0-1: color idx
-	Palette            Data8
-}
+// Bit 16: BG priority
+// Bit 8-9: Color idx
+// Bit 0-7: Palette
+type Pixel = Data16
 
-func (p Pixel) ColorIDX() Data8 {
-	return p.ColorIDXBGPriority & 0x3
-}
-
-func (p Pixel) BGPriority() bool {
-	return p.ColorIDXBGPriority&Bit7 != 0
-}
-
-func (p *Pixel) SetBGPriority() {
-	p.ColorIDXBGPriority |= 0x80
-}
+const (
+	PxMaskColorIDX  = 0x300
+	PxShiftColorIDX = 8
+	PxMaskPriority  = 0x8000
+	PxMaskPalette   = 0x00ff
+)
 
 func (p Pixel) Color() Color {
-	shift := p.ColorIDX() * 2
-	return Color((p.Palette & (0x3 << shift)) >> shift)
+	shift := ((p & PxMaskColorIDX) >> (PxShiftColorIDX - 1))
+	return Color((p & (0x3 << shift)) >> shift)
 }

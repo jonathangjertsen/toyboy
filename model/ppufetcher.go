@@ -29,7 +29,9 @@ type BackgroundFetcher struct {
 	WindowPixelRenderedThisScanline bool
 }
 
-func (bgf *BackgroundFetcher) fsm(gb *Gameboy) {
+func (gb *Gameboy) backgroundFetcherFSM() {
+	bgf := &gb.PPU.BackgroundFetcher
+
 	if bgf.Suspended {
 		return
 	}
@@ -156,10 +158,7 @@ func (bgf *BackgroundFetcher) pushFIFO(gb *Gameboy) bool {
 		return false
 	}
 	if gb.PPU.BGWindowEnable() {
-		line := DecodeTileLine(bgf.TileMSB, bgf.TileLSB)
-		for i := range 8 {
-			line[i].Palette = gb.PPU.BGPalette
-		}
+		line := DecodeTileLine(bgf.TileMSB, bgf.TileLSB, Data16(gb.PPU.BGPalette))
 		gb.PPU.BackgroundFIFO.Write8(line)
 	} else {
 		gb.PPU.BackgroundFIFO.Write8(TileLine{})
@@ -173,7 +172,9 @@ type SpriteFetcher struct {
 	DoneX     Data8
 }
 
-func (sf *SpriteFetcher) fsm(gb *Gameboy) {
+func (gb *Gameboy) spriteFetcherFSM() {
+	sf := &gb.PPU.SpriteFetcher
+
 	sfCycle := sf.Cycle
 	sf.Cycle++
 
@@ -255,23 +256,18 @@ func (sf *SpriteFetcher) fetchTileMSB(gb *Gameboy) {
 func (sf *SpriteFetcher) pushFIFO(gb *Gameboy) bool {
 	obj := gb.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
 	palette := gb.PPU.ObjPalette(obj.Attributes)
-	line := DecodeTileLine(sf.TileMSB, sf.TileLSB)
+	line := DecodeTileLine(sf.TileMSB, sf.TileLSB, palette)
 	if obj.Attributes&Bit5 != 0 {
 		for i := range 4 {
 			line[i], line[7-i] = line[7-i], line[i]
 		}
 	}
-	for i := range 8 {
-		line[i].Palette = palette
-	}
 	if !gb.PPU.OBJEnable() {
-		for i := range 8 {
-			line[i].ColorIDXBGPriority = 0
-		}
+		clear(line[:])
 	}
 	if obj.Attributes&Bit7 != 0 {
 		for i := range 8 {
-			line[i].SetBGPriority()
+			line[i] |= PxMaskPriority
 		}
 	}
 	offsetInSprite := gb.PPU.Shifter.X + 8 - obj.X
@@ -279,7 +275,7 @@ func (sf *SpriteFetcher) pushFIFO(gb *Gameboy) bool {
 	pos := gb.PPU.SpriteFIFO.ShiftPos
 	for i := range int(pixelsToPush) {
 		incLevel := i >= gb.PPU.SpriteFIFO.Level
-		pushPixel := incLevel || gb.PPU.SpriteFIFO.Slots[pos].ColorIDX() == 0
+		pushPixel := incLevel || ((gb.PPU.SpriteFIFO.Slots[pos]&PxMaskColorIDX)>>PxShiftColorIDX) == 0
 		if pushPixel {
 			pixel := line[int(offsetInSprite)+i]
 			gb.PPU.SpriteFIFO.Slots[pos] = pixel

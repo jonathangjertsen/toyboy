@@ -7,9 +7,7 @@ import (
 
 func LoadROM(
 	filename string,
-	mem []Data8,
-	cart *Cartridge,
-	bootROMLock *BootROMLock,
+	gb *Gameboy,
 ) error {
 	// Read file
 	rom, err := os.ReadFile(filename)
@@ -24,22 +22,22 @@ func LoadROM(
 
 	// Load into ROM banks
 	for i := range len(rom) / ROMBankSize {
-		copy(cart.ROM[i][:], Data8Slice(rom[i*ROMBankSize:(i+1)*ROMBankSize]))
+		copy(gb.Cartridge.ROM[i][:], Data8Slice(rom[i*ROMBankSize:(i+1)*ROMBankSize]))
 	}
 
 	// If BootROM is done, map in Bank 0
 	// If BootROM isn't done yet, don't overwrite that
-	if bootROMLock.BootOff {
-		copy(mem[:AddrCartridgeBank0End], cart.ROM[0][:])
+	if gb.BootROMLock.BootOff {
+		copy(gb.Mem[:AddrCartridgeBank0End], gb.Cartridge.ROM[0][:])
 	} else {
-		copy(mem[SizeBootROM:AddrCartridgeBank0End], cart.ROM[0][SizeBootROM:])
+		copy(gb.Mem[SizeBootROM:AddrCartridgeBank0End], gb.Cartridge.ROM[0][SizeBootROM:])
 	}
 
 	// Map in initial Bank 1
-	cart.SetROMBank(mem, 1)
+	gb.SetROMBank(1)
 
 	// Configure cartridge MCB features
-	cart.MBCFeatures = GetMBCFeatures(
+	gb.Cartridge.MBCFeatures = GetMBCFeatures(
 		rom[AddrCartridgeType],
 		rom[AddrROMSize],
 		rom[AddrRAMSize],

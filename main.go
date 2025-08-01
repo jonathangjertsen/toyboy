@@ -39,12 +39,7 @@ func main() {
 		clk := model.NewClock()
 		gb := model.NewGameboy(&config.Model, clk)
 
-		if err := model.LoadROM(
-			"assets/cartridges/tetris.gb",
-			gb.Mem,
-			&gb.Cartridge,
-			&gb.BootROMLock,
-		); err != nil {
+		if err := model.LoadROM("assets/cartridges/tetris.gb", gb); err != nil {
 			panic(err)
 		}
 

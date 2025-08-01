@@ -16,7 +16,7 @@ func (fifo *FIFO) Clear() {
 
 func (fifo *FIFO) ShiftOut() (Pixel, bool) {
 	if fifo.Level == 0 {
-		return Pixel{}, false
+		return 0, false
 	}
 	fifo.Level--
 	p := fifo.Slots[fifo.ShiftPos]

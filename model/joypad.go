@@ -16,7 +16,7 @@ type JoypadState struct {
 	Select bool
 }
 
-func (jp *Joypad) Write(addr Addr, v Data8) {
+func (gb *Gameboy) WriteJoypad(addr Addr, v Data8) {
 	// TODO: this can trigger an interrupt
 }
 
@@ -75,7 +75,7 @@ func (jp *Joypad) SetState(clk *ClockRT, gb *Gameboy, jps JoypadState) {
 		jp.Direction = newDirection
 
 		if doJoypadInterrupt {
-			gb.Interrupts.IRQSet(gb, IntSourceJoypad)
+			gb.IRQSet(IntSourceJoypad)
 		}
 	})
 }

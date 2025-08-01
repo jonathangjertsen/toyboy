@@ -4,17 +4,17 @@ type BootROMLock struct {
 	BootOff bool
 }
 
-func (brl *BootROMLock) Write(gb *Gameboy, v Data8) {
-	if brl.BootOff {
+func (gb *Gameboy) WriteBootROMLock(v Data8) {
+	if gb.BootROMLock.BootOff {
 		return
 	}
 	if v&1 == 1 {
-		brl.Lock(gb)
+		gb.LockBootROM()
 	}
 }
 
-func (brl *BootROMLock) Lock(gb *Gameboy) {
-	brl.BootOff = true
+func (gb *Gameboy) LockBootROM() {
+	gb.BootROMLock.BootOff = true
 	copy(gb.Mem[:SizeBootROM], gb.Cartridge.ROM[0][:SizeBootROM])
 
 	// Update debug

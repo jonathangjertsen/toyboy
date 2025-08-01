@@ -7,37 +7,47 @@ type Shifter struct {
 	LastShifted Color
 }
 
-func (ps *Shifter) fsm(gb *Gameboy, clk *ClockRT) {
+func (gb *Gameboy) shifterFSM(clk *ClockRT) {
+	ps := &gb.PPU.Shifter
+
 	if ps.Suspended {
 		return
 	}
+
+	gb.shiftDiscarded()
+	pixel, havePixel := ps.pixelMixer(gb)
+	if !havePixel {
+		return
+	}
+	gb.writePixelToLCD(pixel)
+	gb.Debug.SetX(ps.X, clk)
+}
+
+func (gb *Gameboy) shiftDiscarded() {
+	ps := &gb.PPU.Shifter
 
 	if ps.Discard > 0 {
 		if _, shifted := gb.PPU.BackgroundFIFO.ShiftOut(); shifted {
 			ps.Discard--
 		}
 	}
+}
 
-	pixel, havePixel := ps.pixelMixer(gb)
-	if !havePixel {
-		return
-	}
+func (gb *Gameboy) writePixelToLCD(pixel Pixel) {
+	ps := &gb.PPU.Shifter
 
-	// Write pixel to LCD
 	gb.PPU.FBViewport[gb.PPU.RegLY][ps.X] = pixel.Color()
 	ps.LastShifted = pixel.Color()
 	ps.X++
-
-	gb.Debug.SetX(ps.X, clk)
 }
 
 func (ps *Shifter) pixelMixer(gb *Gameboy) (Pixel, bool) {
 	spritePixel, haveSpritePixel := gb.PPU.SpriteFIFO.ShiftOut()
 	bgPixel, haveBGPixel := gb.PPU.BackgroundFIFO.ShiftOut()
 	if haveSpritePixel && haveBGPixel {
-		if spritePixel.ColorIDX() == 0 {
+		if (spritePixel & 0x300) == 0 {
 			return bgPixel, true
-		} else if spritePixel.BGPriority() && bgPixel.ColorIDXBGPriority > 0 { // strictly speaking should be bgPixel.ColorIDX() > 0, but BGPriority is never set on background pixels
+		} else if (spritePixel&0x8000 != 0) && (bgPixel&0x300 != 0) {
 			return bgPixel, true
 		} else {
 			return spritePixel, true
@@ -47,5 +57,5 @@ func (ps *Shifter) pixelMixer(gb *Gameboy) (Pixel, bool) {
 	} else if haveBGPixel {
 		return bgPixel, true
 	}
-	return Pixel{}, false
+	return 0, false
 }

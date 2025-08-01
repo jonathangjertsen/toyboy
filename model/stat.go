@@ -42,7 +42,7 @@ func (s *Stat) CheckInterrupt(gb *Gameboy) {
 		statInt = true
 	}
 	if !s.PrevStatInt && statInt {
-		gb.Interrupts.IRQSet(gb, IntSourceLCD)
+		gb.IRQSet(IntSourceLCD)
 	}
 	s.PrevStatInt = statInt
 }

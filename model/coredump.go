@@ -158,24 +158,6 @@ func PrintPPU(f io.Writer, ppu PPUDump, mem []Data8) {
 	fmt.Fprintf(f, "BFetch.WYRch:  %d\n", b2i(ppu.BackgroundFetcher.WindowYReached))
 	fmt.Fprintf(f, "BFetch.WFetch: %d\n", b2i(ppu.BackgroundFetcher.WindowFetching))
 	fmt.Fprintf(f, "BFetch.WLC:    %d\n", ppu.BackgroundFetcher.WindowLineCounter)
-	fmt.Fprintf(f, "\n")
-	fmt.Fprintf(f, "BGFIFO: /[")
-	for i := range ppu.BGFIFO.Level {
-		fmt.Fprintf(f, "%d", ppu.BGFIFO.Slots[i].ColorIDX())
-	}
-	for range 8 - ppu.BGFIFO.Level {
-		fmt.Fprintf(f, " ")
-	}
-	fmt.Fprintf(f, "]\n")
-	fmt.Fprintf(f, "       [%d]\n", ppu.LastShifted)
-	fmt.Fprintf(f, " SFIFO: \\[")
-	for i := range ppu.SpriteFIFO.Level {
-		fmt.Fprintf(f, "%d", ppu.SpriteFIFO.Slots[i].ColorIDX())
-	}
-	for range 8 - ppu.SpriteFIFO.Level {
-		fmt.Fprintf(f, " ")
-	}
-	fmt.Fprintf(f, "]\n")
 	fmt.Fprintf(f, "SFetch.C:      %d\n", ppu.SpriteFetcher.Cycle)
 	fmt.Fprintf(f, "SFetch.State:  %d\n", int(ppu.SpriteFetcher.State))
 	fmt.Fprintf(f, "SFetch.X:      %d\n", ppu.SpriteFetcher.X)

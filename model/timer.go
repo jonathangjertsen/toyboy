@@ -39,7 +39,7 @@ func (t *Timer) tickDIV(gb *Gameboy) {
 		t.PreReloadCounter--
 		if t.PreReloadCounter == 0 {
 			gb.Mem[AddrTIMA] = gb.Mem[AddrTMA]
-			gb.Interrupts.IRQSet(gb, IntSourceTimer)
+			gb.IRQSet(IntSourceTimer)
 		}
 	}
 }

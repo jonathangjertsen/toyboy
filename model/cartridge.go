@@ -16,66 +16,66 @@ type Cartridge struct {
 	SelectedROMBank Data8
 }
 
-func (cart *Cartridge) SetROMBank(mem []Data8, which Data8) {
-	copy(mem[AddrCartridgeBankNBegin:AddrCartridgeBankNEnd], cart.ROM[which][:])
-	cart.SelectedROMBank = which
+func (gb *Gameboy) SetROMBank(which Data8) {
+	copy(gb.Mem[AddrCartridgeBankNBegin:AddrCartridgeBankNEnd], gb.Cartridge.ROM[which][:])
+	gb.Cartridge.SelectedROMBank = which
 }
 
-func (cart *Cartridge) SetRAMBank(mem []Data8, which Data8) {
+func (gb *Gameboy) SetRAMBank(which Data8) {
 	fmt.Printf("SetRAMBank %d\n", which)
 
 	// Store current RAM contents to bank
-	copy(cart.RAM[cart.SelectedRAMBank][:], mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd])
+	copy(gb.Cartridge.RAM[gb.Cartridge.SelectedRAMBank][:], gb.Mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd])
 
 	// Load from bank to RAM
-	copy(mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd], cart.RAM[which][:])
-	cart.SelectedRAMBank = which
+	copy(gb.Mem[AddrCartridgeRAMBegin:AddrCartridgeRAMEnd], gb.Cartridge.RAM[which][:])
+	gb.Cartridge.SelectedRAMBank = which
 }
 
-func (cart *Cartridge) Write(mem []Data8, addr Addr, v Data8) {
-	switch cart.MBCFeatures.ID {
+func (gb *Gameboy) WriteCartridge(addr Addr, v Data8) {
+	switch gb.Cartridge.MBCFeatures.ID {
 	case MBCIDNone:
 		return
 	case MBCID1:
 		if addr <= 0x1fff {
-			cart.ExtRAMEnabled = v&0x0f == 0x0a
+			gb.Cartridge.ExtRAMEnabled = v&0x0f == 0x0a
 		} else if addr <= 0x3fff {
 			if v == 0x00 {
 				v = 0x01
 			}
-			cart.BankNo1 = v & 0x1f
-			cart.updateBank(mem)
+			gb.Cartridge.BankNo1 = v & 0x1f
+			gb.updateBank()
 		} else if addr <= 0x5fff {
-			cart.BankNo2 = v & 0x03
-			cart.updateBank(mem)
+			gb.Cartridge.BankNo2 = v & 0x03
+			gb.updateBank()
 		} else if addr <= 0x7fff {
-			cart.BankModeSel = v & 0x01
-			cart.updateBank(mem)
+			gb.Cartridge.BankModeSel = v & 0x01
+			gb.updateBank()
 		}
 	default:
 		panic("not implemented MBC")
 	}
 }
 
-func (cart *Cartridge) updateBank(mem []Data8) {
-	if cart.BankModeSel != 0x00 {
+func (gb *Gameboy) updateBank() {
+	if gb.Cartridge.BankModeSel != 0x00 {
 		panic("advanced banking mode not implemented")
 	}
-	newRAMBank := cart.SelectedRAMBank
-	newROMBank := cart.SelectedROMBank
+	newRAMBank := gb.Cartridge.SelectedRAMBank
+	newROMBank := gb.Cartridge.SelectedROMBank
 
-	if cart.MBCFeatures.NRAMBanks == 4 {
-		newRAMBank = cart.BankNo2
-	} else if cart.MBCFeatures.NROMBanks >= 64 {
-		newROMBank = (cart.BankNo2 << 5) | cart.BankNo1
+	if gb.Cartridge.MBCFeatures.NRAMBanks == 4 {
+		newRAMBank = gb.Cartridge.BankNo2
+	} else if gb.Cartridge.MBCFeatures.NROMBanks >= 64 {
+		newROMBank = (gb.Cartridge.BankNo2 << 5) | gb.Cartridge.BankNo1
 	} else {
-		newROMBank = cart.BankNo1
+		newROMBank = gb.Cartridge.BankNo1
 	}
 
-	if newRAMBank != cart.SelectedRAMBank {
-		cart.SetRAMBank(mem, newRAMBank)
+	if newRAMBank != gb.Cartridge.SelectedRAMBank {
+		gb.SetRAMBank(newRAMBank)
 	}
-	if newROMBank != cart.SelectedROMBank {
-		cart.SetROMBank(mem, newROMBank)
+	if newROMBank != gb.Cartridge.SelectedROMBank {
+		gb.SetROMBank(newROMBank)
 	}
 }

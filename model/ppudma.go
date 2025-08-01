@@ -12,7 +12,9 @@ func (d *DMA) Write(v Data8) {
 	d.Dest = AddrOAMBegin
 }
 
-func (d *DMA) fsm(gb *Gameboy) {
+func (gb *Gameboy) fsmPPUDMA() {
+	d := &gb.PPU.DMA
+
 	if d.Source == 0 {
 		return
 	}

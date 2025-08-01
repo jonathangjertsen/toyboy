@@ -44,7 +44,7 @@ func (is IntSource) ISR() Addr {
 func (gb *Gameboy) SetIME(v bool) {
 	gb.Interrupts.IME = v
 	if v {
-		gb.Interrupts.IRQCheck(gb)
+		gb.IRQCheck()
 	}
 }
 
@@ -54,23 +54,23 @@ func (ints *Interrupts) PendInterrupt(gb *Gameboy, in IntSource) {
 	ints.PendingInterrupt = in
 }
 
-func (ints *Interrupts) IRQSet(gb *Gameboy, in IntSource) {
+func (gb *Gameboy) IRQSet(in IntSource) {
 	if gb.Mem[AddrIF]&in.Mask() != 0 {
 		return
 	}
 	gb.Mem[AddrIF] |= in.Mask()
-	ints.IRQCheck(gb)
+	gb.IRQCheck()
 }
 
-func (ints *Interrupts) IRQCheck(gb *Gameboy) {
-	if !ints.IME {
+func (gb *Gameboy) IRQCheck() {
+	if !gb.Interrupts.IME {
 		return
 	}
 	regIF := gb.Mem[AddrIF]
 	regIE := gb.Mem[AddrIE]
 	for is := IntSource(0); is < 5; is++ {
 		if (regIF & regIE & is.Mask()) != 0 {
-			ints.PendInterrupt(gb, is)
+			gb.Interrupts.PendInterrupt(gb, is)
 			break
 		}
 	}

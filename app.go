@@ -108,12 +108,7 @@ func (app *App) startGB(gb *model.Gameboy) {
 	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio, app.FrameSync)
 	app.GBFPSMeasurement.SetCounter(&app.GB.PPU.FrameCount)
 
-	if err := model.LoadROM(
-		app.config.ROMLocation,
-		app.GB.Mem,
-		&app.GB.Cartridge,
-		&app.GB.BootROMLock,
-	); err != nil {
+	if err := model.LoadROM(app.config.ROMLocation, app.GB); err != nil {
 		panic(err)
 	}
 
