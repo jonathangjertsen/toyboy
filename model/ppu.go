@@ -227,12 +227,12 @@ func (ppu *PPU) beginHBlank(gb *Gameboy) {
 	}
 }
 
-func (ppu *PPU) ObjPalette(attribs Data8) Data16 {
-	var palette Data16
+func (ppu *PPU) ObjPalette(attribs Data8) Data8 {
+	var palette Data8
 	if attribs&Bit4 != 0 {
-		palette = Data16(ppu.OBJPalette1)
+		palette = ppu.OBJPalette1
 	} else {
-		palette = Data16(ppu.OBJPalette0)
+		palette = ppu.OBJPalette0
 	}
 	palette &= 0xfc
 	return palette

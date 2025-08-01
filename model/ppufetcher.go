@@ -158,7 +158,7 @@ func (bgf *BackgroundFetcher) pushFIFO(gb *Gameboy) bool {
 		return false
 	}
 	if gb.PPU.BGWindowEnable() {
-		line := DecodeTileLine(bgf.TileMSB, bgf.TileLSB, Data16(gb.PPU.BGPalette))
+		line := DecodeTileLineBG(bgf.TileMSB, bgf.TileLSB, gb.PPU.BGPalette)
 		gb.PPU.BackgroundFIFO.Write8(line)
 	} else {
 		gb.PPU.BackgroundFIFO.Write8(TileLine{})
@@ -256,7 +256,7 @@ func (sf *SpriteFetcher) fetchTileMSB(gb *Gameboy) {
 func (sf *SpriteFetcher) pushFIFO(gb *Gameboy) bool {
 	obj := gb.PPU.OAMBuffer.Buffer[sf.SpriteIDX]
 	palette := gb.PPU.ObjPalette(obj.Attributes)
-	line := DecodeTileLine(sf.TileMSB, sf.TileLSB, palette)
+	line := DecodeTileLineSprite(sf.TileMSB, sf.TileLSB, palette)
 	if obj.Attributes&Bit5 != 0 {
 		for i := range 4 {
 			line[i], line[7-i] = line[7-i], line[i]
@@ -275,7 +275,7 @@ func (sf *SpriteFetcher) pushFIFO(gb *Gameboy) bool {
 	pos := gb.PPU.SpriteFIFO.ShiftPos
 	for i := range int(pixelsToPush) {
 		incLevel := i >= gb.PPU.SpriteFIFO.Level
-		pushPixel := incLevel || ((gb.PPU.SpriteFIFO.Slots[pos]&PxMaskColorIDX)>>PxShiftColorIDX) == 0
+		pushPixel := incLevel || (gb.PPU.SpriteFIFO.Slots[pos]&0x3) == 0
 		if pushPixel {
 			pixel := line[int(offsetInSprite)+i]
 			gb.PPU.SpriteFIFO.Slots[pos] = pixel
