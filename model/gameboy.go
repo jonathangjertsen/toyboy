@@ -21,7 +21,7 @@ type Gameboy struct {
 	Cartridge  Cartridge
 	Joypad     Joypad
 	FrameSync  FrameSync
-	Interrupts *Interrupts
+	Interrupts Interrupts
 	Audio      *Audio
 	Timer      *Timer
 }
@@ -63,7 +63,7 @@ func NewGameboy(
 
 func (gb *Gameboy) Init(audio *Audio) {
 	mem := NewAddressSpace()
-	interrupts := NewInterrupts(mem)
+	gb.Interrupts.mem = mem
 	gb.Debug = Debug{
 		Debugger:     NewDebugger(),
 		Disassembler: NewDisassembler(&gb.Config.Debug.Disassembler),
@@ -105,26 +105,25 @@ func (gb *Gameboy) Init(audio *Audio) {
 		Config:     gb.Config,
 		Bus:        &gb.Bus,
 		Debug:      &gb.Debug,
-		Interrupts: interrupts,
+		Interrupts: &gb.Interrupts,
 		rewind:     NewRewind(8192),
 	}
 	gb.CPU.handlers = handlers(&gb.CPU)
 
 	gb.PPU.SpriteFetcher.Suspended = true
 	gb.PPU.SpriteFetcher.DoneX = 0xff
-	gb.PPU.beginFrame(gb.Interrupts)
+	gb.PPU.beginFrame(&gb.Interrupts)
 
 	gb.Bus.BootROMLock = bootROMLock
 	gb.Bus.APU = &gb.APU
 	gb.Bus.PPU = &gb.PPU
 	gb.Bus.Cartridge = &gb.Cartridge
 	gb.Bus.Joypad = &gb.Joypad
-	gb.Bus.Interrupts = interrupts
+	gb.Bus.Interrupts = &gb.Interrupts
 	gb.Bus.Timer = &timer
 	gb.Bus.Config = gb.Config
 
 	gb.Mem = mem
-	gb.Interrupts = interrupts
 	gb.Audio = audio
 	gb.Timer = &timer
 
