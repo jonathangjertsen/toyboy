@@ -193,13 +193,14 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeINCL:     cpu.increg(&cpu.Regs.L),
 		OpcodeINCHLInd: cpu.inchlind,
 		OpcodeDECHLInd: cpu.dechlind,
-		OpcodeDI: cpu.singleCycle("DI", func() {
+		OpcodeDI: func(mem []Data8, e int) bool {
 			if cpu.Interrupts == nil {
-				return
+				return false
 			}
 			cpu.Interrupts.setIMENextCycle = false
-			cpu.Interrupts.SetIME(false)
-		}),
+			cpu.Interrupts.SetIME(mem, false)
+			return true
+		},
 		OpcodeEI: cpu.singleCycle("EI", func() {
 			if cpu.Interrupts == nil {
 				return

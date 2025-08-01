@@ -39,7 +39,7 @@ func (t *Timer) tickDIV(mem []Data8, ints *Interrupts, apu *APU) {
 		t.preReloadCounter--
 		if t.preReloadCounter == 0 {
 			mem[AddrTIMA] = mem[AddrTMA]
-			ints.IRQSet(IntSourceTimer)
+			ints.IRQSet(mem, IntSourceTimer)
 		}
 	}
 }

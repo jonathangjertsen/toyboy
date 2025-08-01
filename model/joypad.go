@@ -75,7 +75,7 @@ func (jp *Joypad) SetState(clk *ClockRT, ints *Interrupts, jps JoypadState, mem 
 		jp.Direction = newDirection
 
 		if doJoypadInterrupt {
-			ints.IRQSet(IntSourceJoypad)
+			ints.IRQSet(mem, IntSourceJoypad)
 		}
 	})
 }

@@ -9,21 +9,21 @@ func (s *Stat) Write(v Data8) {
 	s.Reg = maskedWrite(s.Reg, v, 0xf8)
 }
 
-func (s *Stat) SetMode(ints *Interrupts, mode PPUMode) {
+func (s *Stat) SetMode(mem []Data8, ints *Interrupts, mode PPUMode) {
 	s.Reg = maskedWrite(s.Reg, Data8(mode), 0x7)
-	s.CheckInterrupt(ints)
+	s.CheckInterrupt(mem, ints)
 }
 
-func (s *Stat) SetLYCEqLY(ints *Interrupts, equal bool) {
+func (s *Stat) SetLYCEqLY(mem []Data8, ints *Interrupts, equal bool) {
 	if equal {
 		s.Reg |= 1 << 2
 	} else {
 		s.Reg &= ^Data8(1 << 2)
 	}
-	s.CheckInterrupt(ints)
+	s.CheckInterrupt(mem, ints)
 }
 
-func (s *Stat) CheckInterrupt(ints *Interrupts) {
+func (s *Stat) CheckInterrupt(mem []Data8, ints *Interrupts) {
 	statInt := false
 	if s.Reg&0xb == 0x08 {
 		// Mode 0 int selected and mode is 0
@@ -42,7 +42,7 @@ func (s *Stat) CheckInterrupt(ints *Interrupts) {
 		statInt = true
 	}
 	if !s.PrevStatInt && statInt {
-		ints.IRQSet(IntSourceLCD)
+		ints.IRQSet(mem, IntSourceLCD)
 	}
 	s.PrevStatInt = statInt
 }

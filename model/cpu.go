@@ -31,35 +31,6 @@ func (cpu *CPU) CurrInstruction() (DisInstruction, int) {
 	return cpu.rewind.Curr().Instruction, cpu.machineCycle
 }
 
-func (cpu *CPU) Reset() {
-	cpu.Regs = RegisterFile{}
-	cpu.Regs.SP = 0xfffe
-	if cpu.Interrupts != nil {
-		cpu.Interrupts.mem[AddrIE] = 0
-		cpu.Interrupts.mem[AddrIF] = 0
-		cpu.Interrupts.IME = false
-	}
-	cpu.CBOp = CBOp{}
-	cpu.machineCycle = 0
-	cpu.clockCycle = 0
-	cpu.Bus.Reset()
-	cpu.wroteToAddressBusThisCycle = false
-	cpu.rewind.Reset()
-
-	if cpu.Config.BootROM.Skip {
-		cpu.Regs.A = 0x01
-		cpu.Regs.F = 0xB0
-		cpu.Regs.B = 0x00
-		cpu.Regs.C = 0x13
-		cpu.Regs.D = 0x00
-		cpu.Regs.E = 0xD8
-		cpu.Regs.H = 0x01
-		cpu.Regs.L = 0x4D
-		cpu.Regs.PC = 0x00ff
-		cpu.Regs.SP = 0xFFFE
-	}
-}
-
 type ExecLogEntry struct {
 	Instruction  DisInstruction
 	BranchResult int
@@ -114,7 +85,7 @@ func (cpu *CPU) IncPC() {
 func (cpu *CPU) fsm(clk *ClockRT, mem []Data8) {
 	cpu.wroteToAddressBusThisCycle = false
 	cpu.clockCycle = clk.Cycle
-	cpu.applyPendingIME()
+	cpu.applyPendingIME(mem)
 
 	if cpu.halted {
 		if cpu.Interrupts == nil {
@@ -214,12 +185,12 @@ func (cpu *CPU) writeAddressBus(mem []Data8, addr Addr) {
 	cpu.Bus.WriteAddress(mem, addr)
 }
 
-func (cpu *CPU) applyPendingIME() {
+func (cpu *CPU) applyPendingIME(mem []Data8) {
 	if cpu.Interrupts == nil {
 		return
 	}
 	if cpu.Interrupts.setIMENextCycle {
 		cpu.Interrupts.setIMENextCycle = false
-		cpu.Interrupts.SetIME(true)
+		cpu.Interrupts.SetIME(mem, true)
 	}
 }

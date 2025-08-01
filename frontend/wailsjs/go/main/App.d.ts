@@ -10,8 +10,6 @@ export function Pause():Promise<void>;
 
 export function SetKeyState(arg1:Record<string, boolean>):Promise<void>;
 
-export function SoftReset():Promise<void>;
-
 export function Start():Promise<void>;
 
 export function Step():Promise<void>;

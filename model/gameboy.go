@@ -41,15 +41,6 @@ func (gb *Gameboy) Step() {
 	gb.CLK.Start()
 }
 
-func (gb *Gameboy) SoftReset() {
-	gb.CLK.Sync(func() {
-		gb.CLK.Cycle = 0
-		gb.CPU.Reset()
-		gb.PPU.Reset()
-		gb.APU.Reset()
-	})
-}
-
 func NewGameboy(
 	config *Config,
 	audio *Audio,
@@ -63,7 +54,6 @@ func NewGameboy(
 
 func (gb *Gameboy) Init(audio *Audio) {
 	mem := NewAddressSpace()
-	gb.Interrupts.mem = mem
 	gb.Debug = Debug{
 		Debugger:     NewDebugger(),
 		Disassembler: NewDisassembler(&gb.Config.Debug.Disassembler),
@@ -110,7 +100,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 
 	gb.PPU.SpriteFetcher.Suspended = true
 	gb.PPU.SpriteFetcher.DoneX = 0xff
-	gb.PPU.beginFrame(&gb.Interrupts)
+	gb.PPU.beginFrame(mem, &gb.Interrupts)
 
 	gb.Bus.BootROMLock = bootROMLock
 	gb.Bus.APU = &gb.APU
@@ -125,8 +115,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Audio = audio
 
 	go gb.CLK.run(gb)
-
-	gb.CPU.Reset()
 
 	gb.CLK.Onpanic = gb.CPU.Dump
 }

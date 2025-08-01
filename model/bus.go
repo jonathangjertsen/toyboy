@@ -87,11 +87,11 @@ func (b *Bus) WriteData(mem []Data8, v Data8) {
 	} else if addr == AddrP1 {
 		b.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {
-		b.Interrupts.IRQCheck()
+		b.Interrupts.IRQCheck(mem)
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		b.APU.Write(addr, v)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		b.PPU.Write(addr, v, b.Interrupts)
+		b.PPU.Write(mem, addr, v, b.Interrupts)
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
 		b.Timer.Write(addr, v)
 	}

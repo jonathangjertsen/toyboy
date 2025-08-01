@@ -142,9 +142,9 @@ func (ppu *PPU) SetLY(v Data8) {
 	ppu.RegLY = v
 }
 
-func (ppu *PPU) SetLYC(ints *Interrupts, v Data8) {
+func (ppu *PPU) SetLYC(mem []Data8, ints *Interrupts, v Data8) {
 	ppu.RegLYC = v
-	ints.IRQCheck()
+	ints.IRQCheck(mem)
 }
 
 func (ppu *PPU) SetBGP(v Data8) {
@@ -168,9 +168,9 @@ func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT, mem []Data8, f
 	}
 	switch ppu.Mode {
 	case PPUModeVBlank:
-		ppu.fsmVBlank(ints, debug, fs)
+		ppu.fsmVBlank(mem, ints, debug, fs)
 	case PPUModeHBlank:
-		ppu.fsmHBlank(ints, debug)
+		ppu.fsmHBlank(mem, ints, debug)
 	case PPUModePixelDraw:
 		ppu.fsmPixelDraw(ints, debug, clk, mem)
 	case PPUModeOAMScan:
@@ -178,25 +178,25 @@ func (ppu *PPU) fsm(ints *Interrupts, debug *Debug, clk *ClockRT, mem []Data8, f
 	}
 }
 
-func (ppu *PPU) setMode(ints *Interrupts, mode PPUMode) {
+func (ppu *PPU) setMode(mem []Data8, ints *Interrupts, mode PPUMode) {
 	ppu.Mode = mode
-	ppu.Stat.SetMode(ints, mode)
+	ppu.Stat.SetMode(mem, ints, mode)
 }
 
-func (ppu *PPU) beginFrame(ints *Interrupts) {
-	ppu.beginOAMScan(ints)
+func (ppu *PPU) beginFrame(mem []Data8, ints *Interrupts) {
+	ppu.beginOAMScan(mem, ints)
 	ppu.BackgroundFetcher.WindowYReached = false
 }
 
-func (ppu *PPU) beginOAMScan(ints *Interrupts) {
-	ppu.setMode(ints, PPUModeOAMScan)
+func (ppu *PPU) beginOAMScan(mem []Data8, ints *Interrupts) {
+	ppu.setMode(mem, ints, PPUModeOAMScan)
 	ppu.OAMScanCycle = 0
 	ppu.OAMBuffer.Level = 0
 }
 
 // start of scanline after 7OAM scan
-func (ppu *PPU) beginPixelDraw(ints *Interrupts) {
-	ppu.setMode(ints, PPUModePixelDraw)
+func (ppu *PPU) beginPixelDraw(mem []Data8, ints *Interrupts) {
+	ppu.setMode(mem, ints, PPUModePixelDraw)
 	ppu.BackgroundFetcher.Cycle = 0
 	ppu.BackgroundFetcher.State = FetcherStateFetchTileNo
 	ppu.BackgroundFetcher.WindowFetching = false
@@ -218,8 +218,8 @@ func (ppu *PPU) beginPixelDraw(ints *Interrupts) {
 	ppu.Shifter.Discard = ppu.RegSCX % 8
 }
 
-func (ppu *PPU) beginHBlank(ints *Interrupts) {
-	ppu.setMode(ints, PPUModeHBlank)
+func (ppu *PPU) beginHBlank(mem []Data8, ints *Interrupts) {
+	ppu.setMode(mem, ints, PPUModeHBlank)
 	if ppu.PixelDrawCycle > 376 {
 		ppu.HBlankRemainingCycles = 1
 	} else {
@@ -238,15 +238,15 @@ func (ppu *PPU) ObjPalette(attribs Data8) Data8 {
 	return palette
 }
 
-func (ppu *PPU) beginVBlank(ints *Interrupts) {
+func (ppu *PPU) beginVBlank(mem []Data8, ints *Interrupts) {
 	ppu.BackgroundFetcher.WindowLineCounter = 0
 
-	ppu.setMode(ints, PPUModeVBlank)
+	ppu.setMode(mem, ints, PPUModeVBlank)
 
 	ppu.VBlankLineRemainingCycles = 456
 
 	// TODO: do we ever clear the VBlank interrupt?
-	ints.IRQSet(IntSourceVBlank)
+	ints.IRQSet(mem, IntSourceVBlank)
 
 	ppu.FrameCount++
 }
@@ -255,7 +255,7 @@ func (ppu *PPU) fsmOAMScan(ints *Interrupts, mem []Data8) {
 	cycle := ppu.OAMScanCycle
 	ppu.OAMScanCycle++
 	if ppu.OAMScanCycle == 80 {
-		ppu.beginPixelDraw(ints)
+		ppu.beginPixelDraw(mem, ints)
 	}
 
 	// PPU checks the OAM entry every 2 cycles
@@ -317,14 +317,14 @@ func (ppu *PPU) fsmPixelDraw(ints *Interrupts, debug *Debug, clk *ClockRT, mem [
 	}
 
 	if ppu.Shifter.X >= 160 {
-		ppu.beginHBlank(ints)
+		ppu.beginHBlank(mem, ints)
 		ppu.Shifter.X = 0
 	}
 
 	ppu.PixelDrawCycle++
 }
 
-func (ppu *PPU) fsmVBlank(ints *Interrupts, debug *Debug, fs *FrameSync) {
+func (ppu *PPU) fsmVBlank(mem []Data8, ints *Interrupts, debug *Debug, fs *FrameSync) {
 	if ppu.VBlankLineRemainingCycles > 0 {
 		ppu.VBlankLineRemainingCycles--
 		return
@@ -335,39 +335,39 @@ func (ppu *PPU) fsmVBlank(ints *Interrupts, debug *Debug, fs *FrameSync) {
 		f := <-fs.ch
 		f(&ppu.FBViewport)
 	}
-	ppu.IncRegLY(ints, debug)
+	ppu.IncRegLY(mem, ints, debug)
 
 	if ppu.RegLY == 0 {
-		ppu.beginFrame(ints)
+		ppu.beginFrame(mem, ints)
 	}
 }
 
-func (ppu *PPU) fsmHBlank(ints *Interrupts, debug *Debug) {
+func (ppu *PPU) fsmHBlank(mem []Data8, ints *Interrupts, debug *Debug) {
 	if ppu.HBlankRemainingCycles > 0 {
 		ppu.HBlankRemainingCycles--
 		return
 	}
 
-	ppu.IncRegLY(ints, debug)
+	ppu.IncRegLY(mem, ints, debug)
 	if ppu.BackgroundFetcher.WindowPixelRenderedThisScanline {
 		ppu.BackgroundFetcher.WindowLineCounter++
 	}
 
 	if ppu.RegLY < 144 {
-		ppu.beginOAMScan(ints)
+		ppu.beginOAMScan(mem, ints)
 	} else if ppu.RegLY == 144 {
-		ppu.beginVBlank(ints)
+		ppu.beginVBlank(mem, ints)
 	} else {
 		panicv(ppu.RegLY)
 	}
 }
 
-func (ppu *PPU) IncRegLY(ints *Interrupts, debug *Debug) {
+func (ppu *PPU) IncRegLY(mem []Data8, ints *Interrupts, debug *Debug) {
 	ppu.RegLY++
 	if ppu.RegLY >= 153 {
 		ppu.RegLY = 0
 	}
-	ppu.Stat.SetLYCEqLY(ints, ppu.RegLY == ppu.RegLYC)
+	ppu.Stat.SetLYCEqLY(mem, ints, ppu.RegLY == ppu.RegLYC)
 	debug.SetY(ppu.RegLY)
 }
 
@@ -401,7 +401,7 @@ func (ppu *PPU) Read(addr Addr) Data8 {
 	return 0
 }
 
-func (ppu *PPU) Write(addr Addr, v Data8, ints *Interrupts) {
+func (ppu *PPU) Write(mem []Data8, addr Addr, v Data8, ints *Interrupts) {
 	switch Addr(addr) {
 	case AddrLCDC:
 		ppu.SetLCDC(v)
@@ -414,7 +414,7 @@ func (ppu *PPU) Write(addr Addr, v Data8, ints *Interrupts) {
 	case AddrLY:
 		ppu.SetLY(v)
 	case AddrLYC:
-		ppu.SetLYC(ints, v)
+		ppu.SetLYC(mem, ints, v)
 	case AddrBGP:
 		ppu.SetBGP(v)
 	case AddrOBP0:

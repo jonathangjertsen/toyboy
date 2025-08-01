@@ -3,8 +3,6 @@ package model
 //go:generate go-enum --marshal --flag --values --nocomments
 
 type Interrupts struct {
-	mem []Data8
-
 	IME bool
 
 	// TODO: move IME pend handling out of CPU code
@@ -43,42 +41,36 @@ func (is IntSource) ISR() Addr {
 	return 0
 }
 
-func NewInterrupts(mem []Data8) *Interrupts {
-	return &Interrupts{
-		mem: mem,
-	}
-}
-
-func (ints *Interrupts) SetIME(v bool) {
+func (ints *Interrupts) SetIME(mem []Data8, v bool) {
 	ints.IME = v
 	if v {
-		ints.IRQCheck()
+		ints.IRQCheck(mem)
 	}
 }
 
-func (ints *Interrupts) PendInterrupt(in IntSource) {
+func (ints *Interrupts) PendInterrupt(mem []Data8, in IntSource) {
 	ints.IME = false
-	ints.mem[AddrIF] &= ^in.Mask()
+	mem[AddrIF] &= ^in.Mask()
 	ints.PendingInterrupt = in
 }
 
-func (ints *Interrupts) IRQSet(in IntSource) {
-	if ints.mem[AddrIF]&in.Mask() != 0 {
+func (ints *Interrupts) IRQSet(mem []Data8, in IntSource) {
+	if mem[AddrIF]&in.Mask() != 0 {
 		return
 	}
-	ints.mem[AddrIF] |= in.Mask()
-	ints.IRQCheck()
+	mem[AddrIF] |= in.Mask()
+	ints.IRQCheck(mem)
 }
 
-func (ints *Interrupts) IRQCheck() {
+func (ints *Interrupts) IRQCheck(mem []Data8) {
 	if !ints.IME {
 		return
 	}
-	regIF := ints.mem[AddrIF]
-	regIE := ints.mem[AddrIE]
+	regIF := mem[AddrIF]
+	regIE := mem[AddrIE]
 	for is := IntSource(0); is < 5; is++ {
 		if (regIF & regIE & is.Mask()) != 0 {
-			ints.PendInterrupt(is)
+			ints.PendInterrupt(mem, is)
 			break
 		}
 	}

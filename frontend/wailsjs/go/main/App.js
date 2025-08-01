@@ -18,10 +18,6 @@ export function SetKeyState(arg1) {
   return window['go']['main']['App']['SetKeyState'](arg1);
 }
 
-export function SoftReset() {
-  return window['go']['main']['App']['SoftReset']();
-}
-
 export function Start() {
   return window['go']['main']['App']['Start']();
 }

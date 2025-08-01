@@ -392,7 +392,3 @@ func (app *App) Step() {
 	default:
 	}
 }
-
-func (app *App) SoftReset() {
-	app.GB.SoftReset()
-}
