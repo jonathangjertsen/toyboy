@@ -5,6 +5,8 @@ package model
 // Bit 0-7: Palette
 type Pixel = Data8
 
+type TileLine [8]Pixel
+
 const (
 	PxMaskPriority = 0x80
 )
@@ -14,8 +16,6 @@ func (p Pixel) Color() Color {
 }
 
 const DefaultPalette = (0 << 0) | (1 << 2) | (2 << 4) | (3 << 6)
-
-type TileLine [8]Pixel
 
 func DecodeTileLineBG(msb, lsb Data8, palette Data8) TileLine {
 	var pixels TileLine

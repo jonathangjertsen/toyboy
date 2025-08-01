@@ -275,10 +275,10 @@ func (sf *SpriteFetcher) pushFIFO(gb *Gameboy) bool {
 	pos := gb.PPU.SpriteFIFO.ShiftPos
 	for i := range int(pixelsToPush) {
 		incLevel := i >= gb.PPU.SpriteFIFO.Level
-		pushPixel := incLevel || (gb.PPU.SpriteFIFO.Slots[pos]&0x3) == 0
+		pushPixel := incLevel || (gb.PPU.SpriteFIFO.Slot(pos)&0x3) == 0
 		if pushPixel {
 			pixel := line[int(offsetInSprite)+i]
-			gb.PPU.SpriteFIFO.Slots[pos] = pixel
+			gb.PPU.SpriteFIFO.SetSlot(pos, pixel)
 		}
 		if incLevel {
 			gb.PPU.SpriteFIFO.Level++

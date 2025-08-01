@@ -55,8 +55,6 @@ type FrameSync struct {
 
 func (ppu *PPU) GetDump() PPUDump {
 	var dump PPUDump
-	dump.BGFIFO = ppu.BackgroundFIFO.Dump()
-	dump.SpriteFIFO = ppu.SpriteFIFO.Dump()
 	dump.LastShifted = ppu.Shifter.LastShifted
 	dump.OAMScanCycle = ppu.OAMScanCycle
 	dump.PixelDrawCycle = ppu.PixelDrawCycle

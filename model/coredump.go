@@ -18,8 +18,6 @@ type CoreDump struct {
 }
 
 type PPUDump struct {
-	BGFIFO                    PixelFIFODump
-	SpriteFIFO                PixelFIFODump
 	LastShifted               Color
 	OAMScanCycle              uint64
 	PixelDrawCycle            uint64
