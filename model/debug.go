@@ -17,16 +17,6 @@ type UserMessage struct {
 	Warn    bool
 }
 
-func NewDebug(config *ConfigDebug) *Debug {
-	dbg := &Debug{
-		Debugger:     NewDebugger(),
-		Disassembler: NewDisassembler(&config.Disassembler),
-		Warnings:     map[string]UserMessage{},
-	}
-	dbg.Init()
-	return dbg
-}
-
 func (d *Debug) SetPC(addr Addr, clk *ClockRT) {
 	if d == nil {
 		return
