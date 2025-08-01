@@ -47,7 +47,7 @@ func main() {
 			panic(err)
 		}
 
-		gb.Start()
+		gb.Start(nil)
 		select {}
 	}
 

@@ -7,8 +7,6 @@ import (
 )
 
 type Gameboy struct {
-	Running atomic.Bool
-
 	Mem        []Data8
 	CLK        ClockRT
 	Bus        Bus
@@ -23,14 +21,18 @@ type Gameboy struct {
 	Timer      Timer
 }
 
-func (gb *Gameboy) Start() {
+func (gb *Gameboy) Start(runFlag *atomic.Bool) {
 	gb.CLK.Start()
-	gb.Running.Store(true)
+	if runFlag != nil {
+		runFlag.Store(true)
+	}
 }
 
-func (gb *Gameboy) Pause() {
+func (gb *Gameboy) Pause(runFlag *atomic.Bool) {
 	gb.CLK.Pause()
-	gb.Running.Store(false)
+	if runFlag != nil {
+		runFlag.Store(false)
+	}
 }
 
 func (gb *Gameboy) Step() {

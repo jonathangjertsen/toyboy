@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -42,6 +43,7 @@ type App struct {
 
 	ButtonMapping ButtonMapping
 
+	GBRunFlag        atomic.Bool
 	GB               *model.Gameboy
 	ClockMeasurement *plugin.ClockMeasurement
 	GBFPSMeasurement *plugin.ClockMeasurement
@@ -113,7 +115,7 @@ func (app *App) startGB() {
 		panic(err)
 	}
 
-	app.GB.Start()
+	app.GB.Start(&app.GBRunFlag)
 }
 
 func (app *App) GetConfig() *Config {
@@ -216,7 +218,7 @@ func (app *App) startWebSocketServer(fs *model.FrameSync) {
 				}
 				app.GB.CLK.Sync(func() {
 					if buf := buffers[DataIDCPUState]; buf != nil {
-						if app.GB.Running.Load() {
+						if app.GBRunFlag.Load() {
 							buf.WriteByte(1)
 						} else {
 							buf.WriteByte(0)
@@ -372,7 +374,7 @@ func (r Range) Constrain(begin, end uint) Range {
 }
 
 func (app *App) Pause() {
-	app.GB.Pause()
+	app.GB.Pause(&app.GBRunFlag)
 	select {
 	case <-app.needStateUpdate:
 	default:
@@ -380,7 +382,7 @@ func (app *App) Pause() {
 }
 
 func (app *App) Start() {
-	app.GB.Start()
+	app.GB.Start(&app.GBRunFlag)
 	select {
 	case <-app.needStateUpdate:
 	default:
