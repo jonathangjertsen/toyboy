@@ -3,15 +3,7 @@ package model
 type Bus struct {
 	Data    Data8
 	Address Addr
-
-	GB          *Gameboy
-	BootROMLock *BootROMLock
-	APU         *APU
-	PPU         *PPU
-	Cartridge   *Cartridge
-	Joypad      *Joypad
-	Interrupts  *Interrupts
-	Timer       *Timer
+	GB      *Gameboy
 }
 
 func (b *Bus) GetData() Data8 {
@@ -25,13 +17,13 @@ func (b *Bus) WriteAddress(mem []Data8, addr Addr) {
 
 func (b *Bus) ProbeAddress(mem []Data8, addr Addr) Data8 {
 	if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
-		return b.APU.Read(addr)
+		return b.GB.APU.Read(addr)
 	}
 	if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		return b.PPU.Read(addr)
+		return b.GB.PPU.Read(addr)
 	}
 	if addr == AddrP1 {
-		return b.Joypad.Read(mem[AddrP1], addr)
+		return b.GB.Joypad.Read(mem[AddrP1], addr)
 	}
 	return mem[addr]
 }
@@ -41,10 +33,10 @@ func (b *Bus) ProbeRange(mem []Data8, begin, end Addr) []Data8 {
 		return nil
 	}
 	if begin >= AddrAPUBegin && end <= AddrAPUEnd {
-		return readRange(b.APU, begin, end)
+		return readRange(&b.GB.APU, begin, end)
 	}
 	if begin >= AddrPPUBegin && end <= AddrPPUEnd {
-		return readRange(b.PPU, begin, end)
+		return readRange(&b.GB.PPU, begin, end)
 	}
 	return mem[begin : end+1]
 }
@@ -62,28 +54,28 @@ func (b *Bus) WriteData(mem []Data8, v Data8) {
 	addr := b.Address
 
 	if addr <= AddrBootROMEnd {
-		if b.BootROMLock.BootOff {
-			b.Cartridge.Write(mem, addr, v)
+		if b.GB.BootROMLock.BootOff {
+			b.GB.Cartridge.Write(mem, addr, v)
 		}
 		return
 	}
 	if addr <= AddrCartridgeBankNEnd {
-		b.Cartridge.Write(mem, addr, v)
+		b.GB.Cartridge.Write(mem, addr, v)
 		return
 	}
 	mem[addr] = v
 
 	if addr == AddrBootROMLock {
-		b.BootROMLock.Write(mem, &b.GB.Debug, b.Cartridge, v)
+		b.GB.BootROMLock.Write(mem, &b.GB.Debug, &b.GB.Cartridge, v)
 	} else if addr == AddrP1 {
-		b.Joypad.Write(addr, v)
+		b.GB.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {
-		b.Interrupts.IRQCheck(mem)
+		b.GB.Interrupts.IRQCheck(mem)
 	} else if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
-		b.APU.Write(addr, v)
+		b.GB.APU.Write(addr, v)
 	} else if addr >= AddrPPUBegin && addr <= AddrPPUEnd {
-		b.PPU.Write(mem, addr, v, b.Interrupts)
+		b.GB.PPU.Write(mem, addr, v, &b.GB.Interrupts)
 	} else if addr >= AddrTimerBegin && addr <= AddrTimerEnd {
-		b.Timer.Write(addr, v)
+		b.GB.Timer.Write(addr, v)
 	}
 }

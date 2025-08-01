@@ -43,7 +43,7 @@ func main() {
 			"assets/cartridges/tetris.gb",
 			gb.Mem,
 			&gb.Cartridge,
-			gb.Bus.BootROMLock,
+			&gb.BootROMLock,
 		); err != nil {
 			panic(err)
 		}

@@ -76,13 +76,6 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 	gb.PPU.beginFrame(gb.Mem, &gb.Interrupts)
 
 	gb.Bus.GB = &gb
-	gb.Bus.BootROMLock = &gb.BootROMLock
-	gb.Bus.APU = &gb.APU
-	gb.Bus.PPU = &gb.PPU
-	gb.Bus.Cartridge = &gb.Cartridge
-	gb.Bus.Joypad = &gb.Joypad
-	gb.Bus.Interrupts = &gb.Interrupts
-	gb.Bus.Timer = &gb.Timer
 
 	clk.Onpanic = gb.CPU.Dump
 

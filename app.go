@@ -112,7 +112,7 @@ func (app *App) startGB() {
 		"assets/cartridges/tetris.gb",
 		app.GB.Mem,
 		&app.GB.Cartridge,
-		app.GB.Bus.BootROMLock,
+		&app.GB.BootROMLock,
 	); err != nil {
 		panic(err)
 	}
