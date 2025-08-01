@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-type InstructionHandling func(mem []Data8, e int) bool
+type InstructionHandling func(gb *Gameboy, e int) bool
 
 type CBOp struct {
 	Op     cb
@@ -193,14 +193,15 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeINCL:     cpu.increg(&cpu.Regs.L),
 		OpcodeINCHLInd: cpu.inchlind,
 		OpcodeDECHLInd: cpu.dechlind,
-		OpcodeDI: func(mem []Data8, e int) bool {
-			cpu.GB.Interrupts.setIMENextCycle = false
-			cpu.GB.Interrupts.SetIME(mem, false)
+		OpcodeDI: func(gb *Gameboy, e int) bool {
+			gb.Interrupts.setIMENextCycle = false
+			gb.Interrupts.SetIME(gb.Mem, false)
 			return true
 		},
-		OpcodeEI: cpu.singleCycle("EI", func() {
-			cpu.GB.Interrupts.setIMENextCycle = true
-		}),
+		OpcodeEI: func(gb *Gameboy, e int) bool {
+			gb.Interrupts.setIMENextCycle = true
+			return true
+		},
 		OpcodeHALT:     cpu.halt,
 		OpcodeJRe:      cpu.jre,
 		OpcodeJPnn:     cpu.jpnn,
@@ -309,7 +310,7 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 	}
 }
 
-func (cpu *CPU) notImplemented(mem []Data8, e int) bool {
+func (cpu *CPU) notImplemented(gb *Gameboy, e int) bool {
 	panicf("not implemented opcode %v", cpu.Regs.IR)
 	return false
 }
@@ -326,33 +327,33 @@ func checkCycle(e, max int) {
 	}
 }
 
-func (cpu *CPU) singleCycle(name string, f func()) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) singleCycle(name string, f func()) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycleNamed(name, e, 1)
 		f()
 		return true
 	}
 }
 
-func (cpu *CPU) jphl(mem []Data8, e int) bool {
+func (cpu *CPU) jphl(gb *Gameboy, e int) bool {
 	checkCycle(e, 1)
 	cpu.SetPC(Addr(cpu.GetHL()))
 	return true
 }
 
-func (cpu *CPU) halt(mem []Data8, e int) bool {
+func (cpu *CPU) halt(gb *Gameboy, e int) bool {
 	checkCycle(e, 1)
 	cpu.halted = true
 	return true
 }
 
-func (cpu *CPU) jre(mem []Data8, e int) bool {
+func (cpu *CPU) jre(gb *Gameboy, e int) bool {
 	checkCycle(e, 3)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	// TODO: this impl is not exactly correct
 	case 2:
 	case 3:
@@ -366,17 +367,17 @@ func (cpu *CPU) jre(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) jpnn(mem []Data8, e int) bool {
+func (cpu *CPU) jpnn(gb *Gameboy, e int) bool {
 	checkCycle(e, 4)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.GB.Bus.GetData()
+		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
 	case 4:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
@@ -385,14 +386,14 @@ func (cpu *CPU) jpnn(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) jrcce(f func() bool) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) jrcce(f func() bool) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 3)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
 			if f() {
 				cpu.lastBranchResult = +1
@@ -414,18 +415,18 @@ func (cpu *CPU) jrcce(f func() bool) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) jpccnn(f func() bool) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) jpccnn(f func() bool) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 4)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempW = cpu.GB.Bus.GetData()
+			cpu.Regs.TempW = gb.Bus.GetData()
 		case 3:
 			if f() {
 				cpu.lastBranchResult = +1
@@ -445,18 +446,18 @@ func (cpu *CPU) jpccnn(f func() bool) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) push(msb, lsb *Data8) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) push(msb, lsb *Data8) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 4)
 		switch e {
 		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
-			cpu.writeAddressBus(mem, cpu.Regs.SP)
-			cpu.GB.Bus.WriteData(mem, *msb)
+			cpu.writeAddressBus(gb, cpu.Regs.SP)
+			gb.Bus.WriteData(gb.Mem, *msb)
 		case 2:
 			cpu.SetSP(cpu.Regs.SP - 1)
-			cpu.writeAddressBus(mem, cpu.Regs.SP)
-			cpu.GB.Bus.WriteData(mem, *lsb)
+			cpu.writeAddressBus(gb, cpu.Regs.SP)
+			gb.Bus.WriteData(gb.Mem, *lsb)
 		case 3:
 		case 4:
 			return true
@@ -465,18 +466,18 @@ func (cpu *CPU) push(msb, lsb *Data8) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) pop(msb, lsb *Data8) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) pop(msb, lsb *Data8) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 3)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, cpu.Regs.SP)
+			cpu.writeAddressBus(gb, cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
-			cpu.writeAddressBus(mem, cpu.Regs.SP)
+			cpu.writeAddressBus(gb, cpu.Regs.SP)
 			cpu.SetSP(cpu.Regs.SP + 1)
-			cpu.Regs.TempW = cpu.GB.Bus.GetData()
+			cpu.Regs.TempW = gb.Bus.GetData()
 		case 3:
 			*msb = cpu.Regs.TempW
 			if lsb == &cpu.Regs.F {
@@ -490,26 +491,26 @@ func (cpu *CPU) pop(msb, lsb *Data8) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) callnn(mem []Data8, e int) bool {
+func (cpu *CPU) callnn(gb *Gameboy, e int) bool {
 	checkCycle(e, 6)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.GB.Bus.GetData()
+		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
 		cpu.SetSP(cpu.Regs.SP - 1)
 	case 4:
-		cpu.writeAddressBus(mem, cpu.Regs.SP)
+		cpu.writeAddressBus(gb, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP - 1)
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.MSB())
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.MSB())
 	case 5:
-		cpu.writeAddressBus(mem, cpu.Regs.SP)
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.LSB())
+		cpu.writeAddressBus(gb, cpu.Regs.SP)
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.LSB())
 	case 6:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 		return true
@@ -517,18 +518,18 @@ func (cpu *CPU) callnn(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) callccnn(f func() bool) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) callccnn(f func() bool) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 6)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempW = cpu.GB.Bus.GetData()
+			cpu.Regs.TempW = gb.Bus.GetData()
 		case 3:
 			if f() {
 				cpu.lastBranchResult = +1
@@ -539,24 +540,24 @@ func (cpu *CPU) callccnn(f func() bool) func(mem []Data8, e int) bool {
 			}
 		case 4:
 			if cpu.lastBranchResult == +1 {
-				cpu.writeAddressBus(mem, cpu.Regs.SP)
+				cpu.writeAddressBus(gb, cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP - 1)
 			} else {
 				panicv(e)
 			}
 			if cpu.lastBranchResult == +1 {
-				cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.MSB())
+				gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.MSB())
 			} else {
 				panicv(e)
 			}
 		case 5:
 			if cpu.lastBranchResult == +1 {
-				cpu.writeAddressBus(mem, cpu.Regs.SP)
+				cpu.writeAddressBus(gb, cpu.Regs.SP)
 			} else {
 				panicv(e)
 			}
 			if cpu.lastBranchResult == +1 {
-				cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.LSB())
+				gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.LSB())
 			} else {
 				panicv(e)
 			}
@@ -572,17 +573,17 @@ func (cpu *CPU) callccnn(f func() bool) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) ret(mem []Data8, e int) bool {
+func (cpu *CPU) ret(gb *Gameboy, e int) bool {
 	checkCycle(e, 4)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.SP)
+		cpu.writeAddressBus(gb, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, cpu.Regs.SP)
+		cpu.writeAddressBus(gb, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-		cpu.Regs.TempW = cpu.GB.Bus.GetData()
+		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 	case 4:
@@ -591,47 +592,47 @@ func (cpu *CPU) ret(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) reti(mem []Data8, e int) bool {
+func (cpu *CPU) reti(gb *Gameboy, e int) bool {
 	checkCycle(e, 4)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.SP)
+		cpu.writeAddressBus(gb, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, cpu.Regs.SP)
+		cpu.writeAddressBus(gb, cpu.Regs.SP)
 		cpu.SetSP(cpu.Regs.SP + 1)
-		cpu.Regs.TempW = cpu.GB.Bus.GetData()
+		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
 		cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 		// TODO verify if this is the right cycle
-		cpu.GB.Interrupts.IME = true
+		gb.Interrupts.IME = true
 	case 4:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) retcc(cond func() bool) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) retcc(cond func() bool) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 5)
 		switch e {
 		case 1:
 		case 2:
 			if cond() {
 				cpu.lastBranchResult = +1
-				cpu.writeAddressBus(mem, cpu.Regs.SP)
+				cpu.writeAddressBus(gb, cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
-				cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+				cpu.Regs.TempZ = gb.Bus.GetData()
 			} else {
 				cpu.lastBranchResult = -1
 				return true
 			}
 		case 3:
 			if cpu.lastBranchResult == +1 {
-				cpu.writeAddressBus(mem, cpu.Regs.SP)
+				cpu.writeAddressBus(gb, cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
-				cpu.Regs.TempW = cpu.GB.Bus.GetData()
+				cpu.Regs.TempW = gb.Bus.GetData()
 			} else {
 				panicv(e)
 			}
@@ -652,91 +653,91 @@ func (cpu *CPU) retcc(cond func() bool) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) ld(dst *Data8, src *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) ld(dst *Data8, src *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("LD r, r", func() {
 		*dst = *src
 	})
 }
 
-func (cpu *CPU) andreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) andreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("AND r", func() {
 		cpu.Regs.SetFlagsAndA(AND(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) xorreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) xorreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("XOR r", func() {
 		cpu.Regs.SetFlagsAndA(XOR(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) orreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) orreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("OR r", func() {
 		cpu.Regs.SetFlagsAndA(OR(cpu.Regs.A, *reg))
 	})
 }
 
-func (cpu *CPU) addreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) addreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("ADD r", func() {
 		cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) adcreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) adcreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("ADC r", func() {
 		cpu.Regs.SetFlagsAndA(ADD(cpu.Regs.A, *reg, cpu.Regs.GetFlagC()))
 	})
 }
 
-func (cpu *CPU) inchlind(mem []Data8, e int) bool {
+func (cpu *CPU) inchlind(gb *Gameboy, e int) bool {
 	checkCycle(e, 3)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
 		res := ADD(cpu.Regs.TempZ, 1, false)
 		// apparently doesn't set C.
 		cpu.Regs.SetFlagH(res.H)
 		cpu.Regs.SetFlagZ(res.Z())
 		cpu.Regs.SetFlagN(res.N)
-		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
+		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 		cpu.Regs.TempZ = res.Value
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.TempZ)
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) dechlind(mem []Data8, e int) bool {
+func (cpu *CPU) dechlind(gb *Gameboy, e int) bool {
 	checkCycle(e, 3)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
 		res := SUB(cpu.Regs.TempZ, 1, false)
 		// apparently doesn't set C.
 		cpu.Regs.SetFlagH(res.H)
 		cpu.Regs.SetFlagZ(res.Z())
 		cpu.Regs.SetFlagN(res.N)
-		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
+		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 		cpu.Regs.TempZ = res.Value
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.TempZ)
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) aluhl(f func(v Data8)) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) aluhl(f func(v Data8)) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
 			f(cpu.Regs.TempZ)
 			return true
@@ -745,25 +746,25 @@ func (cpu *CPU) aluhl(f func(v Data8)) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) subreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) subreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("SUB r", func() {
 		cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) sbcreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) sbcreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("SBC r", func() {
 		cpu.Regs.SetFlagsAndA(SUB(cpu.Regs.A, *reg, cpu.Regs.GetFlagC()))
 	})
 }
 
-func (cpu *CPU) cpreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) cpreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("CP r", func() {
 		cpu.Regs.SetFlags(SUB(cpu.Regs.A, *reg, false))
 	})
 }
 
-func (cpu *CPU) decreg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) decreg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("DEC r", func() {
 		result := SUB(*reg, 1, false)
 		*reg = result.Value
@@ -773,7 +774,7 @@ func (cpu *CPU) decreg(reg *Data8) func(mem []Data8, e int) bool {
 	})
 }
 
-func (cpu *CPU) increg(reg *Data8) func(mem []Data8, e int) bool {
+func (cpu *CPU) increg(reg *Data8) func(gb *Gameboy, e int) bool {
 	return cpu.singleCycle("INC r", func() {
 		result := ADD(*reg, 1, false)
 		*reg = result.Value
@@ -783,8 +784,8 @@ func (cpu *CPU) increg(reg *Data8) func(mem []Data8, e int) bool {
 	})
 }
 
-func (cpu *CPU) iduOp(f func()) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) iduOp(f func()) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
@@ -796,14 +797,14 @@ func (cpu *CPU) iduOp(f func()) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) alun(f func(imm Data8)) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) alun(f func(imm Data8)) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
 			f(cpu.Regs.TempZ)
 			return true
@@ -812,13 +813,13 @@ func (cpu *CPU) alun(f func(imm Data8)) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) ldrn(reg *Data8) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) ldrn(reg *Data8) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
 			cpu.IncPC()
 			*reg = cpu.Regs.TempZ
@@ -828,58 +829,58 @@ func (cpu *CPU) ldrn(reg *Data8) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) ldrhl(reg *Data8) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) ldrhl(reg *Data8) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
+			cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 		case 2:
-			*reg = cpu.GB.Bus.GetData()
+			*reg = gb.Bus.GetData()
 			return true
 		}
 		return false
 	}
 }
 
-func (cpu *CPU) ldahlinc(mem []Data8, e int) bool {
+func (cpu *CPU) ldahlinc(gb *Gameboy, e int) bool {
 	checkCycle(e, 2)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
+		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 		cpu.SetHL(cpu.GetHL() + 1)
 	case 2:
-		cpu.Regs.A = cpu.GB.Bus.GetData()
+		cpu.Regs.A = gb.Bus.GetData()
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldahldec(mem []Data8, e int) bool {
+func (cpu *CPU) ldahldec(gb *Gameboy, e int) bool {
 	checkCycle(e, 2)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
+		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 		cpu.SetHL(cpu.GetHL() - 1)
 	case 2:
-		cpu.Regs.A = cpu.GB.Bus.GetData()
+		cpu.Regs.A = gb.Bus.GetData()
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldhlr(reg *Data8, inc int) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) ldhlr(reg *Data8, inc int) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
+			cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 			if inc == +1 {
 				cpu.SetHL(cpu.GetHL() + 1)
 			} else if inc == -1 {
 				cpu.SetHL(cpu.GetHL() - 1)
 			}
-			cpu.GB.Bus.WriteData(mem, *reg)
+			gb.Bus.WriteData(gb.Mem, *reg)
 		case 2:
 			return true
 		}
@@ -887,13 +888,13 @@ func (cpu *CPU) ldhlr(reg *Data8, inc int) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) ldrra(msb, lsb *Data8) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) ldrra(msb, lsb *Data8) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, Addr(join16(*msb, *lsb)))
-			cpu.GB.Bus.WriteData(mem, cpu.Regs.A)
+			cpu.writeAddressBus(gb, Addr(join16(*msb, *lsb)))
+			gb.Bus.WriteData(gb.Mem, cpu.Regs.A)
 		case 2:
 			return true
 		}
@@ -901,120 +902,120 @@ func (cpu *CPU) ldrra(msb, lsb *Data8) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) ldhca(mem []Data8, e int) bool {
+func (cpu *CPU) ldhca(gb *Gameboy, e int) bool {
 	checkCycle(e, 2)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, Addr(join16(0xff, cpu.Regs.C)))
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.A)
+		cpu.writeAddressBus(gb, Addr(join16(0xff, cpu.Regs.C)))
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.A)
 	case 2:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldhac(mem []Data8, e int) bool {
+func (cpu *CPU) ldhac(gb *Gameboy, e int) bool {
 	checkCycle(e, 2)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, Addr(join16(0xff, cpu.Regs.C)))
-		cpu.Regs.A = cpu.GB.Bus.GetData()
+		cpu.writeAddressBus(gb, Addr(join16(0xff, cpu.Regs.C)))
+		cpu.Regs.A = gb.Bus.GetData()
 	case 2:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldnnsp(mem []Data8, e int) bool {
+func (cpu *CPU) ldnnsp(gb *Gameboy, e int) bool {
 	checkCycle(e, 5)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.GB.Bus.GetData()
+		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
-		cpu.writeAddressBus(mem, Addr(cpu.Regs.GetWZ()))
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.SP.LSB())
+		cpu.writeAddressBus(gb, Addr(cpu.Regs.GetWZ()))
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.SP.LSB())
 		cpu.Regs.SetWZ(cpu.Regs.GetWZ() + 1)
 	case 4:
-		cpu.writeAddressBus(mem, Addr(cpu.Regs.GetWZ()))
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.SP.MSB())
+		cpu.writeAddressBus(gb, Addr(cpu.Regs.GetWZ()))
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.SP.MSB())
 	case 5:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldnna(mem []Data8, e int) bool {
+func (cpu *CPU) ldnna(gb *Gameboy, e int) bool {
 	checkCycle(e, 4)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.GB.Bus.GetData()
+		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
-		cpu.writeAddressBus(mem, Addr(cpu.Regs.GetWZ()))
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.A)
+		cpu.writeAddressBus(gb, Addr(cpu.Regs.GetWZ()))
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.A)
 	case 4:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldann(mem []Data8, e int) bool {
+func (cpu *CPU) ldann(gb *Gameboy, e int) bool {
 	checkCycle(e, 4)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempW = cpu.GB.Bus.GetData()
+		cpu.Regs.TempW = gb.Bus.GetData()
 	case 3:
-		cpu.writeAddressBus(mem, Addr(cpu.Regs.GetWZ()))
-		cpu.Regs.A = cpu.GB.Bus.GetData()
+		cpu.writeAddressBus(gb, Addr(cpu.Regs.GetWZ()))
+		cpu.Regs.A = gb.Bus.GetData()
 	case 4:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldhna(mem []Data8, e int) bool {
+func (cpu *CPU) ldhna(gb *Gameboy, e int) bool {
 	checkCycle(e, 3)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, Addr(join16(0xff, cpu.Regs.TempZ)))
+		cpu.writeAddressBus(gb, Addr(join16(0xff, cpu.Regs.TempZ)))
 		cpu.IncPC()
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.A)
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.A)
 	case 3:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldhan(mem []Data8, e int) bool {
+func (cpu *CPU) ldhan(gb *Gameboy, e int) bool {
 	checkCycle(e, 3)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, Addr(join16(0xff, cpu.Regs.TempZ)))
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.writeAddressBus(gb, Addr(join16(0xff, cpu.Regs.TempZ)))
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 3:
 		cpu.Regs.A = cpu.Regs.TempZ
 		return true
@@ -1022,13 +1023,13 @@ func (cpu *CPU) ldhan(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) ldarr(msb, lsb *Data8) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) ldarr(msb, lsb *Data8) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, Addr(join16(*msb, *lsb)))
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.writeAddressBus(gb, Addr(join16(*msb, *lsb)))
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
 			cpu.Regs.A = cpu.Regs.TempZ
 			return true
@@ -1037,8 +1038,8 @@ func (cpu *CPU) ldarr(msb, lsb *Data8) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) addhlrr(hi, lo *Data8) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) addhlrr(hi, lo *Data8) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 2)
 		switch e {
 		case 1:
@@ -1059,7 +1060,7 @@ func (cpu *CPU) addhlrr(hi, lo *Data8) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) addhlsp(mem []Data8, e int) bool {
+func (cpu *CPU) addhlsp(gb *Gameboy, e int) bool {
 	checkCycle(e, 2)
 	switch e {
 	case 1:
@@ -1079,13 +1080,13 @@ func (cpu *CPU) addhlsp(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) addspe(mem []Data8, e int) bool {
+func (cpu *CPU) addspe(gb *Gameboy, e int) bool {
 	checkCycle(e, 4)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
 		zSign := cpu.Regs.TempZ&Bit7 != 0
 		result := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
@@ -1113,18 +1114,18 @@ func (cpu *CPU) addspe(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) ldxxnn(f func(wz Data16)) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) ldxxnn(f func(wz Data16)) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 3)
 		switch e {
 		case 1:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
 			cpu.IncPC()
-			cpu.Regs.TempW = cpu.GB.Bus.GetData()
+			cpu.Regs.TempW = gb.Bus.GetData()
 		case 3:
 			f(join16(cpu.Regs.TempW, cpu.Regs.TempZ))
 			return true
@@ -1133,23 +1134,23 @@ func (cpu *CPU) ldxxnn(f func(wz Data16)) func(mem []Data8, e int) bool {
 	}
 }
 
-func (cpu *CPU) ldhln(mem []Data8, e int) bool {
+func (cpu *CPU) ldhln(gb *Gameboy, e int) bool {
 	checkCycle(e, 3)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
-		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.TempZ)
+		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.TempZ)
 	case 3:
 		return true
 	}
 	return false
 }
 
-func (cpu *CPU) ldsphl(mem []Data8, e int) bool {
+func (cpu *CPU) ldsphl(gb *Gameboy, e int) bool {
 	checkCycle(e, 2)
 	switch e {
 	case 1:
@@ -1160,13 +1161,13 @@ func (cpu *CPU) ldsphl(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) ldhlspe(mem []Data8, e int) bool {
+func (cpu *CPU) ldhlspe(gb *Gameboy, e int) bool {
 	checkCycle(e, 3)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.Regs.TempZ = cpu.GB.Bus.GetData()
+		cpu.Regs.TempZ = gb.Bus.GetData()
 	case 2:
 		res := ADD(cpu.Regs.SP.LSB(), cpu.Regs.TempZ, false)
 		cpu.Regs.L = res.Value
@@ -1184,18 +1185,18 @@ func (cpu *CPU) ldhlspe(mem []Data8, e int) bool {
 	return false
 }
 
-func (cpu *CPU) rst(vec Data8) func(mem []Data8, e int) bool {
-	return func(mem []Data8, e int) bool {
+func (cpu *CPU) rst(vec Data8) func(gb *Gameboy, e int) bool {
+	return func(gb *Gameboy, e int) bool {
 		checkCycle(e, 4)
 		switch e {
 		case 1:
 			cpu.SetSP(cpu.Regs.SP - 1)
-			cpu.writeAddressBus(mem, cpu.Regs.SP)
-			cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.MSB())
+			cpu.writeAddressBus(gb, cpu.Regs.SP)
+			gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.MSB())
 		case 2:
 			cpu.SetSP(cpu.Regs.SP - 1)
-			cpu.writeAddressBus(mem, cpu.Regs.SP)
-			cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.LSB())
+			cpu.writeAddressBus(gb, cpu.Regs.SP)
+			gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.LSB())
 		case 3:
 			cpu.SetPC(Addr(join16(0x00, vec)))
 		case 4:
@@ -1209,16 +1210,16 @@ func NewCBOp(v Data8) CBOp {
 	return CBOp{Op: cb((v & 0xf8) >> 3), Target: CBTarget(v & 0x7)}
 }
 
-func (cpu *CPU) cb(mem []Data8, e int) bool {
+func (cpu *CPU) cb(gb *Gameboy, e int) bool {
 	checkCycle(e, 4)
 	switch e {
 	case 1:
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
 		cpu.IncPC()
-		cpu.CBOp = NewCBOp(cpu.GB.Bus.GetData())
+		cpu.CBOp = NewCBOp(gb.Bus.GetData())
 	case 2:
 		if cpu.CBOp.Target == CBTargetIndirectHL {
-			cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
+			cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
 		}
 		var val Data8
 		switch cpu.CBOp.Target {
@@ -1235,7 +1236,7 @@ func (cpu *CPU) cb(mem []Data8, e int) bool {
 		case CBTargetL:
 			val = cpu.Regs.L
 		case CBTargetIndirectHL:
-			val = cpu.GB.Bus.GetData()
+			val = gb.Bus.GetData()
 		case CBTargetA:
 			val = cpu.Regs.A
 		default:
@@ -1271,8 +1272,8 @@ func (cpu *CPU) cb(mem []Data8, e int) bool {
 		if cpu.CBOp.Op.Is3Cycles() {
 			return true
 		}
-		cpu.writeAddressBus(mem, Addr(cpu.GetHL()))
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.TempZ)
+		cpu.writeAddressBus(gb, Addr(cpu.GetHL()))
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.TempZ)
 	case 4:
 		if cpu.CBOp.Target != CBTargetIndirectHL {
 			panicv(e)

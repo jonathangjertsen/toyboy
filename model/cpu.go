@@ -1,8 +1,6 @@
 package model
 
 type CPU struct {
-	GB *Gameboy
-
 	handlers [256]InstructionHandling
 
 	Regs                       RegisterFile
@@ -13,14 +11,6 @@ type CPU struct {
 	wroteToAddressBusThisCycle bool // deprecated
 	rewind                     Rewind
 	lastBranchResult           int
-}
-
-type CPUBusIF interface {
-	WriteAddress([]Data8, Addr)
-	WriteData([]Data8, Data8)
-	GetData() Data8
-	ProbeAddress([]Data8, Addr) Data8
-	ProbeRange([]Data8, Addr, Addr) []Data8
 }
 
 func (cpu *CPU) CurrInstruction() (DisInstruction, int) {
@@ -75,13 +65,13 @@ func (cpu *CPU) IncPC() {
 	cpu.SetPC(cpu.Regs.PC + 1)
 }
 
-func (cpu *CPU) fsm(clk *ClockRT, mem []Data8) {
+func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy) {
 	cpu.wroteToAddressBusThisCycle = false
 	cpu.clockCycle = clk.Cycle
-	cpu.applyPendingIME(mem)
+	cpu.applyPendingIME(gb)
 
 	if cpu.halted {
-		if cpu.GB.Interrupts.PendingInterrupt == 0 {
+		if gb.Interrupts.PendingInterrupt == 0 {
 			return
 		}
 		cpu.halted = false
@@ -89,15 +79,15 @@ func (cpu *CPU) fsm(clk *ClockRT, mem []Data8) {
 
 	var fetch bool
 	if cpu.clockCycle > 0 {
-		if cpu.GB.Interrupts.PendingInterrupt != 0 {
-			fetch = cpu.execTransferToISR(clk, mem)
+		if gb.Interrupts.PendingInterrupt != 0 {
+			fetch = cpu.execTransferToISR(clk, gb)
 		} else {
-			fetch = cpu.handlers[cpu.Regs.IR](mem, cpu.machineCycle)
+			fetch = cpu.handlers[cpu.Regs.IR](gb, cpu.machineCycle)
 		}
 		if fetch {
-			cpu.writeAddressBus(mem, cpu.Regs.PC)
-			if cpu.GB.Interrupts.PendingInterrupt == 0 {
-				cpu.instructionFetch(clk, mem)
+			cpu.writeAddressBus(gb, cpu.Regs.PC)
+			if gb.Interrupts.PendingInterrupt == 0 {
+				cpu.instructionFetch(clk, gb)
 			}
 			cpu.IncPC()
 			cpu.machineCycle = 0
@@ -105,22 +95,22 @@ func (cpu *CPU) fsm(clk *ClockRT, mem []Data8) {
 	} else {
 		// initial instruction
 		fetch = true
-		cpu.writeAddressBus(mem, cpu.Regs.PC)
-		cpu.instructionFetch(clk, mem)
+		cpu.writeAddressBus(gb, cpu.Regs.PC)
+		cpu.instructionFetch(clk, gb)
 		cpu.IncPC()
 	}
 
 	cpu.machineCycle++
 }
 
-func (cpu *CPU) instructionFetch(clk *ClockRT, mem []Data8) {
+func (cpu *CPU) instructionFetch(clk *ClockRT, gb *Gameboy) {
 	// Reset inter-instruction state
 	cpu.Regs.SetWZ(0)
 
 	// Read next instruction opcode
-	rawOp := mem[cpu.Regs.PC]
+	rawOp := gb.Mem[cpu.Regs.PC]
 	cpu.Regs.IR = Opcode(rawOp)
-	cpu.GB.Debug.SetIR(cpu.Regs.IR, clk)
+	gb.Debug.SetIR(cpu.Regs.IR, clk)
 
 	di := DisInstruction{
 		Address: cpu.Regs.PC,
@@ -132,7 +122,7 @@ func (cpu *CPU) instructionFetch(clk *ClockRT, mem []Data8) {
 		panicf("no size set for %v", cpu.Regs.IR)
 	}
 	for i := Size16(1); i < size; i++ {
-		di.Raw[i] = mem[cpu.Regs.PC+Addr(i)]
+		di.Raw[i] = gb.Mem[cpu.Regs.PC+Addr(i)]
 	}
 
 	// Update rewind buffer
@@ -142,28 +132,28 @@ func (cpu *CPU) instructionFetch(clk *ClockRT, mem []Data8) {
 	entry.Instruction = di
 
 	// Set PC
-	cpu.GB.Debug.SetPC(cpu.Regs.PC, clk)
+	gb.Debug.SetPC(cpu.Regs.PC, clk)
 }
 
-func (cpu *CPU) execTransferToISR(clk *ClockRT, mem []Data8) bool {
+func (cpu *CPU) execTransferToISR(clk *ClockRT, gb *Gameboy) bool {
 	switch cpu.machineCycle {
 	// wait states
 	case 1, 2:
 	// push MSB of PC to stack
 	case 3:
 		cpu.SetSP(cpu.Regs.SP - 1)
-		cpu.writeAddressBus(mem, cpu.Regs.SP)
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.MSB())
+		cpu.writeAddressBus(gb, cpu.Regs.SP)
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.MSB())
 		// push LSB of PC to stack
 	case 4:
 		cpu.SetSP(cpu.Regs.SP - 1)
-		cpu.writeAddressBus(mem, cpu.Regs.SP)
-		cpu.GB.Bus.WriteData(mem, cpu.Regs.PC.LSB())
+		cpu.writeAddressBus(gb, cpu.Regs.SP)
+		gb.Bus.WriteData(gb.Mem, cpu.Regs.PC.LSB())
 	case 5:
-		isr := cpu.GB.Interrupts.PendingInterrupt.ISR()
+		isr := gb.Interrupts.PendingInterrupt.ISR()
 		cpu.SetPC(isr)
-		cpu.GB.Debug.SetPC(isr, clk)
-		cpu.GB.Interrupts.PendingInterrupt = 0
+		gb.Debug.SetPC(isr, clk)
+		gb.Interrupts.PendingInterrupt = 0
 		return true
 	default:
 		panicv(cpu.machineCycle)
@@ -171,13 +161,13 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT, mem []Data8) bool {
 	return false
 }
 
-func (cpu *CPU) writeAddressBus(mem []Data8, addr Addr) {
-	cpu.GB.Bus.WriteAddress(mem, addr)
+func (cpu *CPU) writeAddressBus(gb *Gameboy, addr Addr) {
+	gb.Bus.WriteAddress(gb.Mem, addr)
 }
 
-func (cpu *CPU) applyPendingIME(mem []Data8) {
-	if cpu.GB.Interrupts.setIMENextCycle {
-		cpu.GB.Interrupts.setIMENextCycle = false
-		cpu.GB.Interrupts.SetIME(mem, true)
+func (cpu *CPU) applyPendingIME(gb *Gameboy) {
+	if gb.Interrupts.setIMENextCycle {
+		gb.Interrupts.setIMENextCycle = false
+		gb.Interrupts.SetIME(gb.Mem, true)
 	}
 }

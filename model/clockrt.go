@@ -16,7 +16,7 @@ type ClockRT struct {
 	stop            chan struct{}
 	jobs            chan func()
 	uiDevices       []func()
-	Onpanic         func(mem []Data8)
+	Onpanic         func(gb *Gameboy)
 	PauseAfterCycle atomic.Int32
 	Running         atomic.Bool
 }
@@ -27,7 +27,7 @@ func NewClock() *ClockRT {
 		pause:   make(chan struct{}),
 		stop:    make(chan struct{}),
 		jobs:    make(chan func()),
-		Onpanic: func(mem []Data8) {},
+		Onpanic: func(gb *Gameboy) {},
 	}
 }
 
@@ -103,7 +103,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64, audio *Audio) {
 func (clockRT *ClockRT) Run(gb *Gameboy, config *Config, audio *Audio) {
 	defer func() {
 		if e := recover(); e != nil {
-			clockRT.Onpanic(gb.Mem)
+			clockRT.Onpanic(gb)
 			panic(e)
 		}
 	}()
@@ -180,7 +180,7 @@ func (clockRT *ClockRT) MCycle(
 		audio.Clock(&gb.APU)
 
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
-		gb.CPU.fsm(clockRT, gb.Mem)
+		gb.CPU.fsm(clockRT, gb)
 
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
