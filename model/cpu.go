@@ -80,7 +80,7 @@ func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy, handlers *HandlerArray) {
 		if gb.Interrupts.PendingInterrupt != 0 {
 			fetch = cpu.execTransferToISR(clk, gb)
 		} else {
-			fetch = handlers[cpu.Regs.IR](gb, cpu.MachineCycle)
+			fetch = handlers[cpu.Regs.IR][0](gb, cpu.MachineCycle)
 		}
 		if fetch {
 			gb.WriteAddress(cpu.Regs.PC)
