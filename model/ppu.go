@@ -53,12 +53,6 @@ type FrameSync struct {
 	ch chan func(*ViewPort)
 }
 
-func NewFrameSync() *FrameSync {
-	return &FrameSync{
-		ch: make(chan func(*ViewPort), 1),
-	}
-}
-
 func (ppu *PPU) GetDump() PPUDump {
 	var dump PPUDump
 	dump.BGFIFO = ppu.BackgroundFIFO.Dump()

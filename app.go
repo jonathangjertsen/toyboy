@@ -70,7 +70,7 @@ func NewApp(config *Config) *App {
 func (app *App) startup(ctx context.Context) {
 	app.ctx = ctx
 	app.startGB()
-	app.startWebSocketServer(app.GB.FrameSync)
+	app.startWebSocketServer(&app.GB.FrameSync)
 }
 
 func (app App) domReady(ctx context.Context) {

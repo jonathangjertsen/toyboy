@@ -20,7 +20,7 @@ type Gameboy struct {
 	APU        APU
 	Cartridge  Cartridge
 	Joypad     Joypad
-	FrameSync  *FrameSync
+	FrameSync  FrameSync
 	Interrupts *Interrupts
 	Audio      *Audio
 	Timer      *Timer
@@ -70,7 +70,7 @@ func (gb *Gameboy) Init(audio *Audio) {
 		Warnings:     map[string]UserMessage{},
 	}
 	gb.Debug.Init()
-	fs := NewFrameSync()
+	gb.FrameSync.ch = make(chan func(*ViewPort), 1)
 	gb.CLK = ClockRT{
 		resume:  make(chan struct{}),
 		pause:   make(chan struct{}),
@@ -124,7 +124,6 @@ func (gb *Gameboy) Init(audio *Audio) {
 	gb.Bus.Config = gb.Config
 
 	gb.Mem = mem
-	gb.FrameSync = fs
 	gb.Interrupts = interrupts
 	gb.Audio = audio
 	gb.Timer = &timer
