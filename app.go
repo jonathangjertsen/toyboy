@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/gob"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,7 +16,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jonathangjertsen/toyboy/model"
 	"github.com/jonathangjertsen/toyboy/plugin"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:generate go-enum --marshal --flag --values --nocomments
@@ -47,8 +50,9 @@ type App struct {
 	GBRunFlag        atomic.Bool
 	CLK              *model.ClockRT
 	GB               *model.Gameboy
-	ClockMeasurement *plugin.ClockMeasurement
-	GBFPSMeasurement *plugin.ClockMeasurement
+	GBMu             sync.Mutex
+	ClockMeasurement plugin.ClockMeasurement
+	GBFPSMeasurement plugin.ClockMeasurement
 }
 
 func NewApp(config *Config) *App {
@@ -71,9 +75,10 @@ func NewApp(config *Config) *App {
 		Audio:           NewAudio(),
 		CLK:             model.NewClock(),
 	}
+	app.ClockMeasurement.SetCounter(&app.CLK.Cycle)
 	app.GBAudio = &model.Audio{
 		SampleInterval: time.Second / 44100,
-		SampleBuffers:  model.NewSampleBuffers(512),
+		SampleBuffers:  model.NewSampleBuffers(1024),
 		SubSampling:    1024,
 		Out:            app.Audio.In,
 	}
@@ -82,7 +87,8 @@ func NewApp(config *Config) *App {
 
 func (app *App) startup(ctx context.Context) {
 	app.ctx = ctx
-	app.startGB()
+
+	app.startGB(model.NewGameboy(&app.config.Model, app.CLK))
 	app.startWebSocketServer()
 }
 
@@ -97,23 +103,14 @@ func (app *App) beforeClose(ctx context.Context) (prevent bool) {
 func (app *App) shutdown(ctx context.Context) {
 }
 
-func (app *App) startGB() {
-	app.GB = model.NewGameboy(&app.config.Model, app.CLK)
+func (app *App) startGB(gb *model.Gameboy) {
+	app.GB = gb
 	handlers := model.Handlers(&app.GB.CPU)
-
 	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio, &handlers, app.FrameSync)
-
-	runtime.LogPrintf(app.ctx, "Started gameboy")
-
-	app.ClockMeasurement = plugin.NewClockMeasurement(&app.CLK.Cycle)
-
-	runtime.LogPrintf(app.ctx, "Started Clock Measurement")
-
-	app.GBFPSMeasurement = plugin.NewClockMeasurement(&app.GB.PPU.FrameCount)
-	runtime.LogPrintf(app.ctx, "Started Gameboy FPS Measurement")
+	app.GBFPSMeasurement.SetCounter(&app.GB.PPU.FrameCount)
 
 	if err := model.LoadROM(
-		"assets/cartridges/tetris.gb",
+		app.config.ROMLocation,
 		app.GB.Mem,
 		&app.GB.Cartridge,
 		&app.GB.BootROMLock,
@@ -400,6 +397,68 @@ func (app *App) Start() {
 func (app *App) Step() {
 	app.CLK.PauseAfterCycle.Add(1)
 	app.Start()
+	select {
+	case <-app.needStateUpdate:
+	default:
+	}
+}
+
+func (app *App) Save() {
+	app.CLK.Sync(func() {
+		app.GBMu.Lock()
+		defer app.GBMu.Unlock()
+
+		buf := bytes.Buffer{}
+		gz := gzip.NewWriter(&buf)
+		enc := gob.NewEncoder(gz)
+		err := enc.Encode(app.GB)
+		errClose := gz.Close()
+		if err == nil {
+			err = errClose
+		}
+		if err == nil {
+			err = os.WriteFile("gb.sav", buf.Bytes(), 0o666)
+		}
+		if err == nil {
+			fmt.Printf("SAV: %d kB\n", buf.Len()/1024)
+		} else {
+			fmt.Printf("save state create failed: %v", err)
+		}
+	})
+
+	select {
+	case <-app.needStateUpdate:
+	default:
+	}
+}
+
+func (app *App) Load() {
+	app.CLK.Stop()
+	app.GBMu.Lock()
+	defer app.GBMu.Unlock()
+
+	var newGB model.Gameboy
+	data, err := os.ReadFile("gb.sav")
+	var gz io.ReadCloser
+	var openErr error
+	if err == nil {
+		fmt.Printf("LOAD: %d kB\n", len(data)/1024)
+
+		buf := bytes.NewBuffer(data)
+		gz, openErr = gzip.NewReader(buf)
+		err = openErr
+	}
+	if err == nil {
+		dec := gob.NewDecoder(gz)
+		err = dec.Decode(&newGB)
+	}
+	if err == nil {
+		err = gz.Close()
+	}
+	if err == nil {
+		app.startGB(&newGB)
+	}
+
 	select {
 	case <-app.needStateUpdate:
 	default:

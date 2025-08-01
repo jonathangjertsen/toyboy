@@ -6,12 +6,20 @@ export function GetConfig() {
   return window['go']['main']['App']['GetConfig']();
 }
 
+export function Load() {
+  return window['go']['main']['App']['Load']();
+}
+
 export function MachineStateRequest(arg1) {
   return window['go']['main']['App']['MachineStateRequest'](arg1);
 }
 
 export function Pause() {
   return window['go']['main']['App']['Pause']();
+}
+
+export function Save() {
+  return window['go']['main']['App']['Save']();
 }
 
 export function SetKeyState(arg1) {

@@ -1,6 +1,8 @@
 const RunBtn = document.getElementById("run-btn");
 const PauseBtn = document.getElementById("pause-btn");
 const StepBtn = document.getElementById("step-btn");
+const LoadBtn = document.getElementById("load-btn");
+const SaveBtn = document.getElementById("save-btn");
 
 RunBtn.addEventListener('click', () => {
     runBtn()
@@ -10,6 +12,12 @@ PauseBtn.addEventListener('click', () => {
 })
 StepBtn.addEventListener('click', () => {
     stepBtn()
+})
+SaveBtn.addEventListener('click', () => {
+    saveBtn()
+})
+LoadBtn.addEventListener('click', () => {
+    loadBtn()
 })
 
 async function runBtn() {
@@ -22,4 +30,12 @@ async function pauseBtn() {
 
 async function stepBtn() {
     await window.go.main.App.Step();
+}
+
+async function loadBtn() {
+    await window.go.main.App.Load();
+}
+
+async function saveBtn() {
+    await window.go.main.App.Save();
 }

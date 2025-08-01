@@ -10,10 +10,8 @@ type ClockMeasurement struct {
 	t0        time.Time
 }
 
-func NewClockMeasurement(counter *uint) *ClockMeasurement {
-	return &ClockMeasurement{
-		counter: counter,
-	}
+func (cm *ClockMeasurement) SetCounter(c *uint) {
+	cm.counter = c
 }
 
 func (cm *ClockMeasurement) Start() {

@@ -12,7 +12,7 @@ type ClockRT struct {
 	Cycle           uint
 	mCyclesPerTick  int
 	resume          chan struct{}
-	pause           chan struct{}
+	pause           chan chan bool
 	stop            chan struct{}
 	jobs            chan func()
 	uiDevices       []func()
@@ -24,7 +24,7 @@ type ClockRT struct {
 func NewClock() *ClockRT {
 	return &ClockRT{
 		resume:  make(chan struct{}),
-		pause:   make(chan struct{}),
+		pause:   make(chan chan bool),
 		stop:    make(chan struct{}),
 		jobs:    make(chan func()),
 		Onpanic: func(gb *Gameboy) {},
@@ -56,8 +56,8 @@ func (clockRT *ClockRT) wait() bool {
 	for {
 		resumed := false
 		select {
-		case <-clockRT.pause:
-			fmt.Printf("Ignored pause\n")
+		case res := <-clockRT.pause:
+			res <- false
 		case <-clockRT.resume:
 			resumed = true
 		case job := <-clockRT.jobs:
@@ -124,7 +124,8 @@ func (clockRT *ClockRT) Run(gb *Gameboy, config *Config, audio *Audio, handlers 
 			clockRT.uiCycle()
 		case <-clockRT.resume:
 			fmt.Printf("Ignored resume\n")
-		case <-clockRT.pause:
+		case res := <-clockRT.pause:
+			res <- true
 			exit = clockRT.wait()
 		case job := <-clockRT.jobs:
 			job()
@@ -151,9 +152,12 @@ func (clockRT *ClockRT) Start() {
 }
 
 // Pause the clock
-// When this function returns, the clock has paused
-func (clockRT *ClockRT) Pause() {
-	clockRT.pause <- struct{}{}
+// When this function returns, the clock has paused.
+// Returns the previous run state of the clock
+func (clockRT *ClockRT) Pause() bool {
+	res := make(chan bool)
+	clockRT.pause <- res
+	return <-res
 }
 
 // Stop the clock

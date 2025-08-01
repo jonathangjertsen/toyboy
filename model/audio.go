@@ -50,10 +50,6 @@ func (ab *SampleBuffers) Add(l, r AudioSample) bool {
 	return false
 }
 
-func (audio *Audio) Enabled(apu *APU) bool {
-	return apu != nil && audio.SampleDivider > 0
-}
-
 func (audio *Audio) SetMPeriod(mPeriod time.Duration) {
 	if mPeriod > 0 {
 		audio.SampleDivider = int(audio.SampleInterval / mPeriod)
@@ -64,7 +60,7 @@ func (audio *Audio) SetMPeriod(mPeriod time.Duration) {
 }
 
 func (audio *Audio) Clock(apu *APU) {
-	if !audio.Enabled(apu) {
+	if audio.SampleDivider <= 0 {
 		return
 	}
 	audio.MCounter -= audio.SubSampling
@@ -84,8 +80,8 @@ func (audio *Audio) Clock(apu *APU) {
 	}
 
 	mono := make([]AudioSample, len(audio.SampleBuffers.Left))
-	for i := range mono {
-		mono[i] = (audio.SampleBuffers.Left[i] + audio.SampleBuffers.Right[i]) / 2
+	for i := range audio.SampleBuffers.Left {
+		mono[i] = (audio.SampleBuffers.Left[i] + audio.SampleBuffers.Right[i])
 	}
 	highpass(mono, &audio.Capacitor)
 	audio.Out <- mono

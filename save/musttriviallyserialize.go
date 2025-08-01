@@ -1,4 +1,4 @@
-package model
+package save
 
 import (
 	"reflect"
@@ -25,7 +25,7 @@ func (st *stackT) join() string {
 	return strings.Join(st.buf, ".")[1:]
 }
 
-func mustTriviallySerialize(v any) {
+func MustTriviallySerialize(v any) {
 	t := reflect.TypeOf(v)
 	var stack stackT
 	stack.buf = make([]string, 0, 10)

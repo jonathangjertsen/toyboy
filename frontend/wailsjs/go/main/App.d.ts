@@ -4,9 +4,13 @@ import {main} from '../models';
 
 export function GetConfig():Promise<main.Config>;
 
+export function Load():Promise<void>;
+
 export function MachineStateRequest(arg1:main.MachineStateRequest):Promise<void>;
 
 export function Pause():Promise<void>;
+
+export function Save():Promise<void>;
 
 export function SetKeyState(arg1:Record<string, boolean>):Promise<void>;
 

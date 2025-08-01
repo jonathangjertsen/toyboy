@@ -761,6 +761,7 @@ export namespace main {
 	}
 	export class Config {
 	    Location: string;
+	    ROMLocation: string;
 	    Model: model.Config;
 	    PProfURL: string;
 	    GUI: ConfigGUI;
@@ -772,6 +773,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Location = source["Location"];
+	        this.ROMLocation = source["ROMLocation"];
 	        this.Model = this.convertValues(source["Model"], model.Config);
 	        this.PProfURL = source["PProfURL"];
 	        this.GUI = this.convertValues(source["GUI"], ConfigGUI);
@@ -933,18 +935,6 @@ export namespace model {
 	        this.Skip = source["Skip"];
 	    }
 	}
-	export class ConfigROM {
-	    Location: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ConfigROM(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Location = source["Location"];
-	    }
-	}
 	export class ConfigClock {
 	    SpeedPercent: number;
 	
@@ -959,7 +949,6 @@ export namespace model {
 	}
 	export class Config {
 	    Clock: ConfigClock;
-	    ROM: ConfigROM;
 	    BootROM: ConfigBootROM;
 	    Debug: ConfigDebug;
 	
@@ -970,7 +959,6 @@ export namespace model {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Clock = this.convertValues(source["Clock"], ConfigClock);
-	        this.ROM = this.convertValues(source["ROM"], ConfigROM);
 	        this.BootROM = this.convertValues(source["BootROM"], ConfigBootROM);
 	        this.Debug = this.convertValues(source["Debug"], ConfigDebug);
 	    }
@@ -993,7 +981,6 @@ export namespace model {
 		    return a;
 		}
 	}
-	
 	
 	
 	

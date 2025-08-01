@@ -10,8 +10,9 @@ import (
 )
 
 var DefaultConfig = Config{
-	Location: "config.json",
-	Model:    model.DefaultConfig,
+	Location:    "config.json",
+	ROMLocation: "assets/cartridges/unbricked.gb",
+	Model:       model.DefaultConfig,
 	GUI: ConfigGUI{
 		Graphics: ConfigGraphicsGlobal{
 			Overlay:       false,
@@ -110,10 +111,11 @@ var DefaultConfig = Config{
 }
 
 type Config struct {
-	Location string
-	Model    model.Config
-	PProfURL string
-	GUI      ConfigGUI
+	Location    string
+	ROMLocation string
+	Model       model.Config
+	PProfURL    string
+	GUI         ConfigGUI
 }
 
 type ConfigGUI struct {
