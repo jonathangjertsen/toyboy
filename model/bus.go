@@ -4,6 +4,7 @@ type Bus struct {
 	Data    Data8
 	Address Addr
 
+	GB          *Gameboy
 	BootROMLock *BootROMLock
 	APU         *APU
 	PPU         *PPU
@@ -73,7 +74,7 @@ func (b *Bus) WriteData(mem []Data8, v Data8) {
 	mem[addr] = v
 
 	if addr == AddrBootROMLock {
-		b.BootROMLock.Write(addr, v)
+		b.BootROMLock.Write(mem, &b.GB.Debug, b.Cartridge, v)
 	} else if addr == AddrP1 {
 		b.Joypad.Write(addr, v)
 	} else if addr == AddrIF || addr == AddrIE {

@@ -61,11 +61,6 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 		BankNo1:         1,
 		SelectedROMBank: 1,
 	}
-	gb.BootROMLock = BootROMLock{
-		mem:       gb.Mem,
-		cartridge: &gb.Cartridge,
-		debug:     &gb.Debug,
-	}
 	gb.Joypad.Action = 0xf
 	gb.Joypad.Direction = 0xf
 	gb.Mem[AddrP1] = 0x1f
@@ -82,6 +77,7 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 	gb.PPU.SpriteFetcher.DoneX = 0xff
 	gb.PPU.beginFrame(gb.Mem, &gb.Interrupts)
 
+	gb.Bus.GB = &gb
 	gb.Bus.BootROMLock = &gb.BootROMLock
 	gb.Bus.APU = &gb.APU
 	gb.Bus.PPU = &gb.PPU

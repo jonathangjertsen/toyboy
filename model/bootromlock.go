@@ -2,35 +2,31 @@ package model
 
 type BootROMLock struct {
 	BootOff bool
-
-	mem       []Data8 `json:"-"`
-	cartridge *Cartridge
-	debug     *Debug
 }
 
-func (brl *BootROMLock) Write(addr Addr, v Data8) {
+func (brl *BootROMLock) Write(mem []Data8, debug *Debug, cart *Cartridge, v Data8) {
 	if brl.BootOff {
 		return
 	}
 	if v&1 == 1 {
-		brl.Lock()
+		brl.Lock(mem, debug, cart)
 	}
 }
 
-func (brl *BootROMLock) Lock() {
+func (brl *BootROMLock) Lock(mem []Data8, debug *Debug, cart *Cartridge) {
 	brl.BootOff = true
-	copy(brl.mem[:SizeBootROM], brl.cartridge.ROM[0][:SizeBootROM])
+	copy(mem[:SizeBootROM], cart.ROM[0][:SizeBootROM])
 
-	if brl.debug != nil {
+	if debug != nil {
 		// Update debug
-		brl.debug.SetProgram(brl.mem[:AddrCartridgeBankNEnd])
+		debug.SetProgram(mem[:AddrCartridgeBankNEnd])
 
 		// Explore from known entry points (Cartridge entrypoint and interrupt vector)
-		brl.debug.Disassembler.SetPC(0x100)
-		brl.debug.Disassembler.SetPC(0x40)
-		brl.debug.Disassembler.SetPC(0x48)
-		brl.debug.Disassembler.SetPC(0x50)
-		brl.debug.Disassembler.SetPC(0x58)
-		brl.debug.Disassembler.SetPC(0x60)
+		debug.Disassembler.SetPC(0x100)
+		debug.Disassembler.SetPC(0x40)
+		debug.Disassembler.SetPC(0x48)
+		debug.Disassembler.SetPC(0x50)
+		debug.Disassembler.SetPC(0x58)
+		debug.Disassembler.SetPC(0x60)
 	}
 }
