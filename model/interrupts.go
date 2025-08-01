@@ -6,7 +6,7 @@ type Interrupts struct {
 	IME bool
 
 	// TODO: move IME pend handling out of CPU code
-	setIMENextCycle bool
+	SetIMENextCycle bool
 
 	PendingInterrupt IntSource
 }

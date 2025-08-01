@@ -33,11 +33,12 @@ import (
 type DataID uint8
 
 type App struct {
-	ctx     context.Context
-	config  *Config
-	reqChan chan MachineStateRequest
-	Audio   *AudioInterface
-	GBAudio *model.Audio
+	ctx       context.Context
+	config    *Config
+	reqChan   chan MachineStateRequest
+	Audio     *AudioInterface
+	GBAudio   *model.Audio
+	FrameSync *model.FrameSync
 
 	needStateUpdate chan struct{}
 
@@ -63,6 +64,7 @@ func NewApp(config *Config) *App {
 			Select:         "n",
 			SOCDResolution: SOCDResolutionOppositeNeutral,
 		},
+		FrameSync:       &model.FrameSync{Ch: make(chan func(*model.ViewPort), 1)},
 		reqChan:         make(chan MachineStateRequest, 10),
 		needStateUpdate: make(chan struct{}, 1),
 		config:          config,
@@ -81,7 +83,7 @@ func NewApp(config *Config) *App {
 func (app *App) startup(ctx context.Context) {
 	app.ctx = ctx
 	app.startGB()
-	app.startWebSocketServer(&app.GB.FrameSync)
+	app.startWebSocketServer()
 }
 
 func (app *App) domReady(ctx context.Context) {
@@ -97,7 +99,9 @@ func (app *App) shutdown(ctx context.Context) {
 
 func (app *App) startGB() {
 	app.GB = model.NewGameboy(&app.config.Model, app.CLK)
-	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio)
+	handlers := model.Handlers(&app.GB.CPU)
+
+	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio, &handlers, app.FrameSync)
 
 	runtime.LogPrintf(app.ctx, "Started gameboy")
 
@@ -159,7 +163,7 @@ func (ts *TimeoutState) Update() {
 	ts.Next = time.Now().Add(ts.Interval)
 }
 
-func (app *App) startWebSocketServer(fs *model.FrameSync) {
+func (app *App) startWebSocketServer() {
 	http.HandleFunc("/data", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -186,7 +190,7 @@ func (app *App) startWebSocketServer(fs *model.FrameSync) {
 		// Hammer the websocket with frames from the PPU
 		go func() {
 			for {
-				app.GB.PPU.Sync(fs, func(vp *model.ViewPort) {
+				app.GB.PPU.Sync(app.FrameSync, func(vp *model.ViewPort) {
 					grayscale := vp.Grayscale()
 					if !sendData(conn, mu, DataIDViewport, grayscale[:]) {
 						exit <- struct{}{}

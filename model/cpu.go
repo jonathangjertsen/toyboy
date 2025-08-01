@@ -1,20 +1,18 @@
 package model
 
 type CPU struct {
-	handlers [256]InstructionHandling
-
 	Regs                       RegisterFile
 	CBOp                       CBOp
-	halted                     bool
-	machineCycle               int
-	clockCycle                 uint
-	wroteToAddressBusThisCycle bool // deprecated
-	rewind                     Rewind
-	lastBranchResult           int
+	Halted                     bool
+	MachineCycle               int
+	ClockCycle                 uint
+	WroteToAddressBusThisCycle bool // deprecated
+	Rewind                     Rewind
+	LastBranchResult           int
 }
 
 func (cpu *CPU) CurrInstruction() (DisInstruction, int) {
-	return cpu.rewind.Curr().Instruction, cpu.machineCycle
+	return cpu.Rewind.Curr().Instruction, cpu.MachineCycle
 }
 
 type ExecLogEntry struct {
@@ -65,24 +63,24 @@ func (cpu *CPU) IncPC() {
 	cpu.SetPC(cpu.Regs.PC + 1)
 }
 
-func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy) {
-	cpu.wroteToAddressBusThisCycle = false
-	cpu.clockCycle = clk.Cycle
+func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy, handlers *HandlerArray) {
+	cpu.WroteToAddressBusThisCycle = false
+	cpu.ClockCycle = clk.Cycle
 	cpu.applyPendingIME(gb)
 
-	if cpu.halted {
+	if cpu.Halted {
 		if gb.Interrupts.PendingInterrupt == 0 {
 			return
 		}
-		cpu.halted = false
+		cpu.Halted = false
 	}
 
 	var fetch bool
-	if cpu.clockCycle > 0 {
+	if cpu.ClockCycle > 0 {
 		if gb.Interrupts.PendingInterrupt != 0 {
 			fetch = cpu.execTransferToISR(clk, gb)
 		} else {
-			fetch = cpu.handlers[cpu.Regs.IR](gb, cpu.machineCycle)
+			fetch = handlers[cpu.Regs.IR](gb, cpu.MachineCycle)
 		}
 		if fetch {
 			cpu.writeAddressBus(gb, cpu.Regs.PC)
@@ -90,7 +88,7 @@ func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy) {
 				cpu.instructionFetch(clk, gb)
 			}
 			cpu.IncPC()
-			cpu.machineCycle = 0
+			cpu.MachineCycle = 0
 		}
 	} else {
 		// initial instruction
@@ -100,7 +98,7 @@ func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy) {
 		cpu.IncPC()
 	}
 
-	cpu.machineCycle++
+	cpu.MachineCycle++
 }
 
 func (cpu *CPU) instructionFetch(clk *ClockRT, gb *Gameboy) {
@@ -126,9 +124,9 @@ func (cpu *CPU) instructionFetch(clk *ClockRT, gb *Gameboy) {
 	}
 
 	// Update rewind buffer
-	cpu.rewind.Curr().BranchResult = cpu.lastBranchResult
-	cpu.lastBranchResult = 0
-	entry := cpu.rewind.Push()
+	cpu.Rewind.Curr().BranchResult = cpu.LastBranchResult
+	cpu.LastBranchResult = 0
+	entry := cpu.Rewind.Push()
 	entry.Instruction = di
 
 	// Set PC
@@ -136,7 +134,7 @@ func (cpu *CPU) instructionFetch(clk *ClockRT, gb *Gameboy) {
 }
 
 func (cpu *CPU) execTransferToISR(clk *ClockRT, gb *Gameboy) bool {
-	switch cpu.machineCycle {
+	switch cpu.MachineCycle {
 	// wait states
 	case 1, 2:
 	// push MSB of PC to stack
@@ -156,7 +154,7 @@ func (cpu *CPU) execTransferToISR(clk *ClockRT, gb *Gameboy) bool {
 		gb.Interrupts.PendingInterrupt = 0
 		return true
 	default:
-		panicv(cpu.machineCycle)
+		panicv(cpu.MachineCycle)
 	}
 	return false
 }
@@ -166,8 +164,8 @@ func (cpu *CPU) writeAddressBus(gb *Gameboy, addr Addr) {
 }
 
 func (cpu *CPU) applyPendingIME(gb *Gameboy) {
-	if gb.Interrupts.setIMENextCycle {
-		gb.Interrupts.setIMENextCycle = false
+	if gb.Interrupts.SetIMENextCycle {
+		gb.Interrupts.SetIMENextCycle = false
 		gb.Interrupts.SetIME(gb.Mem, true)
 	}
 }

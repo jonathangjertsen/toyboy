@@ -12,7 +12,7 @@ type Debug struct {
 }
 
 type UserMessage struct {
-	Time    time.Time
+	Time    string
 	Message string
 	Warn    bool
 }
@@ -40,7 +40,7 @@ func (d *Debug) SetWarning(key string, message string) {
 		return
 	}
 	d.Warnings[key] = UserMessage{
-		Time:    time.Now(),
+		Time:    time.Now().Format(time.RFC3339),
 		Warn:    true,
 		Message: message,
 	}

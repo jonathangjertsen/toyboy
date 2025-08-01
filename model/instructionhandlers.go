@@ -7,6 +7,8 @@ import (
 
 type InstructionHandling func(gb *Gameboy, e int) bool
 
+type HandlerArray [256]InstructionHandling
+
 type CBOp struct {
 	Op     cb
 	Target CBTarget
@@ -29,8 +31,8 @@ func (cb CBOp) String() string {
 	return fmt.Sprintf("%s %s", cb.Op, cb.Target)
 }
 
-func handlers(cpu *CPU) [256]InstructionHandling {
-	return [256]InstructionHandling{
+func Handlers(cpu *CPU) HandlerArray {
+	return HandlerArray{
 		OpcodeNop:      cpu.singleCycle("NOP", func() {}),
 		OpcodeLDAA:     cpu.ld(&cpu.Regs.A, &cpu.Regs.A),
 		OpcodeLDAB:     cpu.ld(&cpu.Regs.A, &cpu.Regs.B),
@@ -194,12 +196,12 @@ func handlers(cpu *CPU) [256]InstructionHandling {
 		OpcodeINCHLInd: cpu.inchlind,
 		OpcodeDECHLInd: cpu.dechlind,
 		OpcodeDI: func(gb *Gameboy, e int) bool {
-			gb.Interrupts.setIMENextCycle = false
+			gb.Interrupts.SetIMENextCycle = false
 			gb.Interrupts.SetIME(gb.Mem, false)
 			return true
 		},
 		OpcodeEI: func(gb *Gameboy, e int) bool {
-			gb.Interrupts.setIMENextCycle = true
+			gb.Interrupts.SetIMENextCycle = true
 			return true
 		},
 		OpcodeHALT:     cpu.halt,
@@ -343,7 +345,7 @@ func (cpu *CPU) jphl(gb *Gameboy, e int) bool {
 
 func (cpu *CPU) halt(gb *Gameboy, e int) bool {
 	checkCycle(e, 1)
-	cpu.halted = true
+	cpu.Halted = true
 	return true
 }
 
@@ -396,15 +398,15 @@ func (cpu *CPU) jrcce(f func() bool) func(gb *Gameboy, e int) bool {
 			cpu.Regs.TempZ = gb.Bus.GetData()
 		case 2:
 			if f() {
-				cpu.lastBranchResult = +1
+				cpu.LastBranchResult = +1
 				newPC := Data16(int16(cpu.Regs.PC) + int16(int8(cpu.Regs.TempZ)))
 				cpu.Regs.SetWZ(newPC)
 			} else {
-				cpu.lastBranchResult = -1
+				cpu.LastBranchResult = -1
 				return true
 			}
 		case 3:
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 				return true
 			} else {
@@ -429,14 +431,14 @@ func (cpu *CPU) jpccnn(f func() bool) func(gb *Gameboy, e int) bool {
 			cpu.Regs.TempW = gb.Bus.GetData()
 		case 3:
 			if f() {
-				cpu.lastBranchResult = +1
+				cpu.LastBranchResult = +1
 				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 			} else {
-				cpu.lastBranchResult = -1
+				cpu.LastBranchResult = -1
 				return true
 			}
 		case 4:
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				return true
 			} else {
 				panicv(e)
@@ -532,37 +534,37 @@ func (cpu *CPU) callccnn(f func() bool) func(gb *Gameboy, e int) bool {
 			cpu.Regs.TempW = gb.Bus.GetData()
 		case 3:
 			if f() {
-				cpu.lastBranchResult = +1
+				cpu.LastBranchResult = +1
 				cpu.SetSP(cpu.Regs.SP - 1)
 			} else {
-				cpu.lastBranchResult = -1
+				cpu.LastBranchResult = -1
 				return true
 			}
 		case 4:
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				cpu.writeAddressBus(gb, cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP - 1)
 			} else {
 				panicv(e)
 			}
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				gb.Bus.WriteData(gb, cpu.Regs.PC.MSB())
 			} else {
 				panicv(e)
 			}
 		case 5:
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				cpu.writeAddressBus(gb, cpu.Regs.SP)
 			} else {
 				panicv(e)
 			}
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				gb.Bus.WriteData(gb, cpu.Regs.PC.LSB())
 			} else {
 				panicv(e)
 			}
 		case 6:
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 				return true
 			} else {
@@ -620,16 +622,16 @@ func (cpu *CPU) retcc(cond func() bool) func(gb *Gameboy, e int) bool {
 		case 1:
 		case 2:
 			if cond() {
-				cpu.lastBranchResult = +1
+				cpu.LastBranchResult = +1
 				cpu.writeAddressBus(gb, cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
 				cpu.Regs.TempZ = gb.Bus.GetData()
 			} else {
-				cpu.lastBranchResult = -1
+				cpu.LastBranchResult = -1
 				return true
 			}
 		case 3:
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				cpu.writeAddressBus(gb, cpu.Regs.SP)
 				cpu.SetSP(cpu.Regs.SP + 1)
 				cpu.Regs.TempW = gb.Bus.GetData()
@@ -637,13 +639,13 @@ func (cpu *CPU) retcc(cond func() bool) func(gb *Gameboy, e int) bool {
 				panicv(e)
 			}
 		case 4:
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				cpu.SetPC(Addr(cpu.Regs.GetWZ()))
 			} else {
 				panicv(e)
 			}
 		case 5:
-			if cpu.lastBranchResult == +1 {
+			if cpu.LastBranchResult == +1 {
 				return true
 			} else {
 				panicv(e)

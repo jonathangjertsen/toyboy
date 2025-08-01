@@ -50,7 +50,7 @@ type PPU struct {
 }
 
 type FrameSync struct {
-	ch chan func(*ViewPort)
+	Ch chan func(*ViewPort)
 }
 
 func (ppu *PPU) GetDump() PPUDump {
@@ -71,7 +71,7 @@ func (ppu *PPU) GetDump() PPUDump {
 
 func (ppu *PPU) Sync(fs *FrameSync, f func(*ViewPort)) {
 	done := make(chan struct{})
-	fs.ch <- func(vp *ViewPort) {
+	fs.Ch <- func(vp *ViewPort) {
 		f(vp)
 		done <- struct{}{}
 	}
@@ -330,9 +330,9 @@ func (ppu *PPU) fsmVBlank(mem []Data8, ints *Interrupts, debug *Debug, fs *Frame
 		return
 	}
 
-	nSyncers := len(fs.ch)
+	nSyncers := len(fs.Ch)
 	for range nSyncers {
-		f := <-fs.ch
+		f := <-fs.Ch
 		f(&ppu.FBViewport)
 	}
 	ppu.IncRegLY(mem, ints, debug)

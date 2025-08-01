@@ -15,7 +15,6 @@ type Gameboy struct {
 	APU         APU
 	Cartridge   Cartridge
 	Joypad      Joypad
-	FrameSync   FrameSync
 	Interrupts  Interrupts
 	Timer       Timer
 	BootROMLock BootROMLock
@@ -44,7 +43,6 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 		Warnings:     map[string]UserMessage{},
 	}
 	gb.Debug.Init()
-	gb.FrameSync.ch = make(chan func(*ViewPort), 1)
 
 	if config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
@@ -66,9 +64,8 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 	gb.Mem[AddrP1] = 0x1f
 
 	gb.CPU = CPU{
-		rewind: NewRewind(8192),
+		Rewind: NewRewind(8192),
 	}
-	gb.CPU.handlers = handlers(&gb.CPU)
 
 	gb.PPU.SpriteFetcher.Suspended = true
 	gb.PPU.SpriteFetcher.DoneX = 0xff
@@ -76,7 +73,7 @@ func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 
 	clk.Onpanic = gb.CPU.Dump
 
-	//mustTriviallySerialize(&gb)
+	mustTriviallySerialize(&gb)
 
 	return &gb
 }

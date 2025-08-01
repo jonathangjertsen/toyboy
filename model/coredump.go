@@ -243,7 +243,7 @@ func (cpu *CPU) GetCoreDump(gb *Gameboy) CoreDump {
 	}
 	cd.ProgramEnd = (cd.ProgramEnd/0x10)*0x10 + 0x10 - 1
 	cd.Disassembly = gb.Debug.Disassembly(0, 0xffff)
-	cd.Rewind = cpu.rewind
+	cd.Rewind = cpu.Rewind
 	return cd
 }
 

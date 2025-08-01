@@ -2,8 +2,8 @@ package model
 
 type Timer struct {
 	DIV              Data16
-	prevAndResult    bool
-	preReloadCounter int
+	PrevAndResult    bool
+	PreReloadCounter int
 }
 
 // Tick the DIV timer
@@ -25,19 +25,19 @@ func (t *Timer) tickDIV(mem []Data8, ints *Interrupts, apu *APU) {
 		clockSelect = clockSelectBits[tac&(Bit0|Bit1)]
 	}
 	andResult = (div&clockSelect != 0)
-	if t.prevAndResult && !andResult {
+	if t.PrevAndResult && !andResult {
 		tima := &mem[AddrTIMA]
 		if *tima == 0xFF {
-			t.preReloadCounter = 4
+			t.PreReloadCounter = 4
 			*tima = 0
 		} else {
 			*tima++
 		}
 	}
-	t.prevAndResult = andResult
-	if t.preReloadCounter > 0 {
-		t.preReloadCounter--
-		if t.preReloadCounter == 0 {
+	t.PrevAndResult = andResult
+	if t.PreReloadCounter > 0 {
+		t.PreReloadCounter--
+		if t.PreReloadCounter == 0 {
 			mem[AddrTIMA] = mem[AddrTMA]
 			ints.IRQSet(mem, IntSourceTimer)
 		}
@@ -58,13 +58,13 @@ func (t *Timer) Write(addr Addr, v Data8) {
 	case AddrTIMA:
 		// If TIMA is written to on the same T-cycle on which the reload from TMA occurs
 		// the write is ignored and the value in TMA will be loaded into TIMA.
-		if t.preReloadCounter == 1 {
+		if t.PreReloadCounter == 1 {
 			return
 		}
 		// The reload of the TMA value as well as the interrupt request can be aborted by writing any value to TIMA during the four T-cycles until it is supposed to be reloaded.
 		// The TIMA register contains whatever value was written to it
 		// even after the 4 T-cycles have elapsed and no interrupt will be requested.
-		t.preReloadCounter = 0
+		t.PreReloadCounter = 0
 	case AddrTAC:
 	}
 }

@@ -6,7 +6,7 @@ import (
 )
 
 type Disassembler struct {
-	Config *ConfigDisassembler
+	Trace bool
 
 	Program Block
 	HRAM    Block
@@ -14,8 +14,8 @@ type Disassembler struct {
 
 	PC Addr
 
-	stack    []Addr
-	stackIdx int
+	Stack    []Addr
+	StackIdx int
 }
 
 type Block struct {
@@ -338,7 +338,7 @@ func splitSections(sections []DataSection) []DataSection {
 
 func NewDisassembler(config *ConfigDisassembler) Disassembler {
 	dis := Disassembler{
-		Config:  config,
+		Trace:   config.Trace,
 		Program: Block{Name: "Program", Begin: 0},
 		HRAM:    Block{Name: "HRAM", Begin: AddrHRAMBegin, Decoded: make([]DisInstruction, SizeHRAM)},
 		WRAM:    Block{Name: "WRAM", Begin: AddrWRAMBegin, Decoded: make([]DisInstruction, SizeWRAM)},
@@ -353,14 +353,14 @@ func (dis *Disassembler) SetProgram(program []Data8) {
 }
 
 func (dis *Disassembler) print(msg string) {
-	if !dis.Config.Trace {
+	if !dis.Trace {
 		return
 	}
-	for range dis.stackIdx {
+	for range dis.StackIdx {
 		fmt.Printf("  ")
 	}
-	if dis.stackIdx > 0 {
-		fmt.Printf("%s ", dis.stack[dis.stackIdx-1].Hex())
+	if dis.StackIdx > 0 {
+		fmt.Printf("%s ", dis.Stack[dis.StackIdx-1].Hex())
 	}
 	fmt.Println(msg)
 }
@@ -377,13 +377,13 @@ func (dis *Disassembler) SetPC(address Addr) {
 }
 
 func (dis *Disassembler) ExploreFrom(address Addr) {
-	dis.stack = append(dis.stack, address)
-	dis.stackIdx++
+	dis.Stack = append(dis.Stack, address)
+	dis.StackIdx++
 
 	dis.exploreFromInner(address)
 
-	dis.stackIdx--
-	dis.stack = dis.stack[:dis.stackIdx]
+	dis.StackIdx--
+	dis.Stack = dis.Stack[:dis.StackIdx]
 }
 
 func (dis *Disassembler) exploreFromInner(address Addr) {
@@ -443,7 +443,7 @@ func (dis *Disassembler) exploreFromInner(address Addr) {
 
 		dis.insert(di, block)
 		address += Addr(di.Size())
-		dis.stack[dis.stackIdx-1] = address
+		dis.Stack[dis.StackIdx-1] = address
 
 		if dis.checkBranches(di, block) {
 			return
@@ -524,7 +524,7 @@ func (dis *Disassembler) Disassembly(start, end Addr) *Disassembly {
 }
 
 func (dis *Disassembler) insert(di DisInstruction, block *Block) {
-	if dis.Config.Trace {
+	if dis.Trace {
 		dis.print(fmt.Sprintf("insert %s at %s:%s", di.Asm(), di.Address.Hex(), (di.Address + Addr(di.Size()) - 1).Hex()))
 	}
 	if di.Address == 0xa8 {
@@ -542,7 +542,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 		e := int8(di.Raw[1])
 
 		// branch taken
-		if dis.Config.Trace {
+		if dis.Trace {
 			dis.print("checking branch-taken for relative jump @ " + di.Asm())
 		}
 		if e > 0 {
@@ -559,7 +559,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 	case OpcodeJPnn, OpcodeJPCnn, OpcodeJPNCnn, OpcodeJPZnn, OpcodeJPNZnn,
 		OpcodeCALLnn, OpcodeCALLCnn, OpcodeCALLNCnn, OpcodeCALLZnn, OpcodeCALLNZnn:
 		addr := Addr(join16(di.Raw[2], di.Raw[1]))
-		if dis.Config.Trace {
+		if dis.Trace {
 			dis.print("checking branch-taken for absolute jump @ " + di.Asm())
 		}
 		dis.ExploreFrom(addr)
