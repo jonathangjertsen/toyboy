@@ -166,7 +166,7 @@ func (clockRT *ClockRT) MCycle(
 			clockRT.pauseAfterCycle.Add(-1)
 		}
 
-		gb.Audio.Clock(gb.APU)
+		gb.Audio.Clock(&gb.APU)
 
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
 		gb.CPU.fsm(clockRT, gb.Mem)
@@ -174,7 +174,7 @@ func (clockRT *ClockRT) MCycle(
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
 		if m&0x3f == 0 {
-			gb.Timer.tickDIV(gb.Mem, gb.Interrupts, gb.APU)
+			gb.Timer.tickDIV(gb.Mem, gb.Interrupts, &gb.APU)
 		}
 
 		// Clock the peripherals.

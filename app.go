@@ -230,7 +230,7 @@ func (app *App) startWebSocketServer(fs *model.FrameSync) {
 						model.PrintPPU(buf, app.GB.PPU.GetDump(), app.GB.Mem)
 					}
 					if buf := buffers[DataIDAPURegisters]; buf != nil {
-						model.PrintAPU(buf, app.GB.Mem, app.GB.APU)
+						model.PrintAPU(buf, app.GB.Mem, &app.GB.APU)
 					}
 					if buf := buffers[DataIDHRAM]; buf != nil {
 						model.MemDump(
