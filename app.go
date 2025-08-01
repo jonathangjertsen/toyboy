@@ -105,7 +105,7 @@ func (app *App) shutdown(ctx context.Context) {
 
 func (app *App) startGB(gb *model.Gameboy) {
 	app.GB = gb
-	handlers := model.Handlers(&app.GB.CPU)
+	handlers := model.Handlers(app.GB)
 	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio, &handlers, app.FrameSync)
 	app.GBFPSMeasurement.SetCounter(&app.GB.PPU.FrameCount)
 
