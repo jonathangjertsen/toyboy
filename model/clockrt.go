@@ -17,8 +17,18 @@ type ClockRT struct {
 	jobs            chan func()
 	uiDevices       []func()
 	Onpanic         func(mem []Data8)
-	pauseAfterCycle atomic.Int32
+	PauseAfterCycle atomic.Int32
 	Running         atomic.Bool
+}
+
+func NewClock() *ClockRT {
+	return &ClockRT{
+		resume:  make(chan struct{}),
+		pause:   make(chan struct{}),
+		stop:    make(chan struct{}),
+		jobs:    make(chan func()),
+		Onpanic: func(mem []Data8) {},
+	}
 }
 
 // Executes the function in the clocks' goroutine
@@ -159,12 +169,12 @@ func (clockRT *ClockRT) MCycle(
 ) {
 	for range n {
 		// Breakpoints will stop here, right before executing next M-cycle
-		if clockRT.pauseAfterCycle.Load() > 0 {
+		if clockRT.PauseAfterCycle.Load() > 0 {
 			exit := clockRT.wait()
 			if exit {
 				return
 			}
-			clockRT.pauseAfterCycle.Add(-1)
+			clockRT.PauseAfterCycle.Add(-1)
 		}
 
 		audio.Clock(&gb.APU)

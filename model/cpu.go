@@ -1,7 +1,6 @@
 package model
 
 type CPU struct {
-	Config     *Config
 	Bus        CPUBusIF
 	Debug      *Debug
 	Interrupts *Interrupts
@@ -19,7 +18,6 @@ type CPU struct {
 }
 
 type CPUBusIF interface {
-	Reset()
 	WriteAddress([]Data8, Addr)
 	WriteData([]Data8, Data8)
 	GetData() Data8
@@ -49,9 +47,6 @@ func (cpu *CPU) SetDE(v Data16) {
 }
 
 func (cpu *CPU) SetSP(v Addr) {
-	if v == 0 && cpu.Config.Debug.PanicOnStackUnderflow {
-		panic("stack underflow")
-	}
 	cpu.Regs.SP = v
 }
 

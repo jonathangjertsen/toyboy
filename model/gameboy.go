@@ -8,7 +8,6 @@ import (
 
 type Gameboy struct {
 	Mem        []Data8
-	CLK        ClockRT
 	Bus        Bus
 	Debug      Debug
 	CPU        CPU
@@ -21,26 +20,21 @@ type Gameboy struct {
 	Timer      Timer
 }
 
-func (gb *Gameboy) Start(runFlag *atomic.Bool) {
-	gb.CLK.Start()
+func Start(clk *ClockRT, runFlag *atomic.Bool) {
+	clk.Start()
 	if runFlag != nil {
 		runFlag.Store(true)
 	}
 }
 
-func (gb *Gameboy) Pause(runFlag *atomic.Bool) {
-	gb.CLK.Pause()
+func Pause(clk *ClockRT, runFlag *atomic.Bool) {
+	clk.Pause()
 	if runFlag != nil {
 		runFlag.Store(false)
 	}
 }
 
-func (gb *Gameboy) Step() {
-	gb.CLK.pauseAfterCycle.Add(1)
-	gb.CLK.Start()
-}
-
-func NewGameboy(config *Config) *Gameboy {
+func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
 	var gb Gameboy
 	gb.Mem = NewAddressSpace()
 	gb.Debug = Debug{
@@ -50,19 +44,12 @@ func NewGameboy(config *Config) *Gameboy {
 	}
 	gb.Debug.Init()
 	gb.FrameSync.ch = make(chan func(*ViewPort), 1)
-	gb.CLK = ClockRT{
-		resume:  make(chan struct{}),
-		pause:   make(chan struct{}),
-		stop:    make(chan struct{}),
-		jobs:    make(chan func()),
-		Onpanic: func(mem []Data8) {},
-	}
 
 	if config.BootROM.Variant == "DMGBoot" {
 		bootROM := Data8Slice(assets.DMGBoot)
 		copy(gb.Mem[:SizeBootROM], bootROM)
 		gb.Debug.SetProgram(bootROM)
-		gb.Debug.SetPC(0, &gb.CLK)
+		gb.Debug.SetPC(0, clk)
 	} else {
 		panic("unknown boot ROM")
 	}
@@ -79,7 +66,6 @@ func NewGameboy(config *Config) *Gameboy {
 	gb.Mem[AddrP1] = 0x1f
 
 	gb.CPU = CPU{
-		Config:     config,
 		Bus:        &gb.Bus,
 		Debug:      &gb.Debug,
 		Interrupts: &gb.Interrupts,
@@ -98,9 +84,10 @@ func NewGameboy(config *Config) *Gameboy {
 	gb.Bus.Joypad = &gb.Joypad
 	gb.Bus.Interrupts = &gb.Interrupts
 	gb.Bus.Timer = &gb.Timer
-	gb.Bus.Config = config
 
-	gb.CLK.Onpanic = gb.CPU.Dump
+	clk.Onpanic = gb.CPU.Dump
+
+	//mustTriviallySerialize(&gb)
 
 	return &gb
 }

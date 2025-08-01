@@ -31,7 +31,7 @@ func (dbg *Debugger) Break(clk *ClockRT) {
 	if dbg == nil {
 		return
 	}
-	clk.pauseAfterCycle.Add(1)
+	clk.PauseAfterCycle.Add(1)
 }
 
 func (dbg *Debugger) SetY(y Data8) {

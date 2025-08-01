@@ -4,7 +4,6 @@ type Bus struct {
 	Data    Data8
 	Address Addr
 
-	Config      *Config
 	BootROMLock *BootROMLock
 	APU         *APU
 	PPU         *PPU
@@ -12,15 +11,6 @@ type Bus struct {
 	Joypad      *Joypad
 	Interrupts  *Interrupts
 	Timer       *Timer
-}
-
-func (b *Bus) Reset() {
-	b.Address = 0
-	b.Data = 0
-
-	if b.Config.BootROM.Skip {
-		b.BootROMLock.Lock()
-	}
 }
 
 func (b *Bus) GetData() Data8 {

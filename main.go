@@ -36,7 +36,8 @@ func main() {
 	}
 
 	if len(os.Args) == 2 && os.Args[1] == "debug" {
-		gb := model.NewGameboy(&config.Model)
+		clk := model.NewClock()
+		gb := model.NewGameboy(&config.Model, clk)
 
 		if err := model.LoadROM(
 			"assets/cartridges/tetris.gb",
@@ -47,7 +48,7 @@ func main() {
 			panic(err)
 		}
 
-		gb.Start(nil)
+		clk.Start()
 		select {}
 	}
 

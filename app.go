@@ -44,6 +44,7 @@ type App struct {
 	ButtonMapping ButtonMapping
 
 	GBRunFlag        atomic.Bool
+	CLK              *model.ClockRT
 	GB               *model.Gameboy
 	ClockMeasurement *plugin.ClockMeasurement
 	GBFPSMeasurement *plugin.ClockMeasurement
@@ -66,6 +67,7 @@ func NewApp(config *Config) *App {
 		needStateUpdate: make(chan struct{}, 1),
 		config:          config,
 		Audio:           NewAudio(),
+		CLK:             model.NewClock(),
 	}
 	app.GBAudio = &model.Audio{
 		SampleInterval: time.Second / 44100,
@@ -82,7 +84,7 @@ func (app *App) startup(ctx context.Context) {
 	app.startWebSocketServer(&app.GB.FrameSync)
 }
 
-func (app App) domReady(ctx context.Context) {
+func (app *App) domReady(ctx context.Context) {
 
 }
 
@@ -94,12 +96,12 @@ func (app *App) shutdown(ctx context.Context) {
 }
 
 func (app *App) startGB() {
-	app.GB = model.NewGameboy(&app.config.Model)
-	go app.GB.CLK.Run(app.GB, &app.config.Model, app.GBAudio)
+	app.GB = model.NewGameboy(&app.config.Model, app.CLK)
+	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio)
 
 	runtime.LogPrintf(app.ctx, "Started gameboy")
 
-	app.ClockMeasurement = plugin.NewClockMeasurement(&app.GB.CLK.Cycle)
+	app.ClockMeasurement = plugin.NewClockMeasurement(&app.CLK.Cycle)
 
 	runtime.LogPrintf(app.ctx, "Started Clock Measurement")
 
@@ -115,7 +117,7 @@ func (app *App) startGB() {
 		panic(err)
 	}
 
-	app.GB.Start(&app.GBRunFlag)
+	app.Start()
 }
 
 func (app *App) GetConfig() *Config {
@@ -130,7 +132,7 @@ type Frame struct {
 
 func (app *App) SetKeyState(in map[string]bool) {
 	jp := app.ButtonMapping.JoypadState(in)
-	app.GB.Joypad.SetState(&app.GB.CLK, &app.GB.Interrupts, jp, app.GB.Mem)
+	app.GB.Joypad.SetState(app.CLK, &app.GB.Interrupts, jp, app.GB.Mem)
 }
 
 var upgrader = websocket.Upgrader{
@@ -139,7 +141,7 @@ var upgrader = websocket.Upgrader{
 
 func (app *App) MachineStateRequest(req MachineStateRequest) {
 	if req.ClickedNumber == "TargetSpeed" {
-		app.GB.CLK.SetSpeedPercent(req.Numbers["TargetSpeed"], app.GBAudio)
+		app.CLK.SetSpeedPercent(req.Numbers["TargetSpeed"], app.GBAudio)
 		fmt.Printf("Updated speed to %f\n", req.Numbers["TargetSpeed"])
 	}
 	app.reqChan <- req
@@ -216,7 +218,7 @@ func (app *App) startWebSocketServer(fs *model.FrameSync) {
 						buffers[id] = &bytes.Buffer{}
 					}
 				}
-				app.GB.CLK.Sync(func() {
+				app.CLK.Sync(func() {
 					if buf := buffers[DataIDCPUState]; buf != nil {
 						if app.GBRunFlag.Load() {
 							buf.WriteByte(1)
@@ -282,12 +284,12 @@ func (app *App) startWebSocketServer(fs *model.FrameSync) {
 
 						cps := float64(cycles) * 1_000_000 / float64(uint64(fdur/time.Microsecond))
 
-						if app.GB.CLK.Cycle < 1_000_000 {
-							fmt.Fprintf(buf, "Cycle: %d\n", app.GB.CLK.Cycle)
-						} else if app.GB.CLK.Cycle < 1_000_000_000 {
-							fmt.Fprintf(buf, "Cycle: %d M\n", app.GB.CLK.Cycle/1_000_000)
+						if app.CLK.Cycle < 1_000_000 {
+							fmt.Fprintf(buf, "Cycle: %d\n", app.CLK.Cycle)
+						} else if app.CLK.Cycle < 1_000_000_000 {
+							fmt.Fprintf(buf, "Cycle: %d M\n", app.CLK.Cycle/1_000_000)
 						} else {
-							fmt.Fprintf(buf, "Cycle: %d G\n", app.GB.CLK.Cycle/1_000_000_000)
+							fmt.Fprintf(buf, "Cycle: %d G\n", app.CLK.Cycle/1_000_000_000)
 						}
 						fmt.Fprintf(buf, "Speed: %.0f %%\n", (100*cps)/4194304)
 					}
@@ -374,7 +376,8 @@ func (r Range) Constrain(begin, end uint) Range {
 }
 
 func (app *App) Pause() {
-	app.GB.Pause(&app.GBRunFlag)
+	app.CLK.Pause()
+	app.GBRunFlag.Store(false)
 	select {
 	case <-app.needStateUpdate:
 	default:
@@ -382,7 +385,8 @@ func (app *App) Pause() {
 }
 
 func (app *App) Start() {
-	app.GB.Start(&app.GBRunFlag)
+	app.CLK.Start()
+	app.GBRunFlag.Store(true)
 	select {
 	case <-app.needStateUpdate:
 	default:
@@ -390,7 +394,8 @@ func (app *App) Start() {
 }
 
 func (app *App) Step() {
-	app.GB.Step()
+	app.CLK.PauseAfterCycle.Add(1)
+	app.Start()
 	select {
 	case <-app.needStateUpdate:
 	default:
