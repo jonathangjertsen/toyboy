@@ -4,8 +4,8 @@ var DefaultBlipConfig = Config{
 	InputRange:        32,
 	Volume:            0.5, // up to 1.0, which would map -InputRange:InputRange to -32768:32767
 	Quality:           12,
-	MaxBufferSize:     100000,
-	BufferAccuracy:    16,
+	MaxBufferSize:     10000000,
+	BufferAccuracy:    8,
 	PhaseBits:         6,
 	SampleBits:        30,
 	WidestImpulse:     16,

@@ -1,6 +1,9 @@
 package blip
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // Public API
 
@@ -178,7 +181,10 @@ func (bs *Synth) update(t uint, amplitude int) {
 
 	subsamples := bs.config.resolution()
 	offset := int(t >> bs.config.BufferAccuracy)
+
 	if offset >= len(bs.output.buf) {
+		fmt.Printf("offset=%d buf=%d\n", offset, len(bs.output.buf))
+
 		// time is beyond end of buf
 		return
 	}

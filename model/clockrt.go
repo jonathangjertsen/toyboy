@@ -41,7 +41,7 @@ func (r *ClockRT) Sync(f func()) {
 	<-done
 }
 
-func (r *ClockRT) SetSpeedPercent(pct float64, audio *Audio) {
+func (r *ClockRT) SetSpeedPercent(pct float64, audio Audio) {
 	r.Sync(func() {
 		r.setSpeedPercent(pct, audio)
 	})
@@ -73,7 +73,7 @@ func (clockRT *ClockRT) wait() bool {
 	return false
 }
 
-func (clockRT *ClockRT) setSpeedPercent(pct float64, audio *Audio) {
+func (clockRT *ClockRT) setSpeedPercent(pct float64, audio Audio) {
 	// Target frequency
 	tFreq := 4194304.0 * pct / 100
 	mFreq := tFreq / 4
@@ -100,7 +100,7 @@ func (clockRT *ClockRT) setSpeedPercent(pct float64, audio *Audio) {
 	}
 }
 
-func (clockRT *ClockRT) Run(gb *Gameboy, config *Config, audio *Audio, fs *FrameSync) {
+func (clockRT *ClockRT) Run(gb *Gameboy, config *Config, audio Audio, fs *FrameSync) {
 	defer func() {
 		if e := recover(); e != nil {
 			clockRT.Onpanic(gb)
@@ -169,10 +169,15 @@ func (clockRT *ClockRT) Stop() {
 func (clockRT *ClockRT) MCycle(
 	n int,
 	gb *Gameboy,
-	audio *Audio,
+	audio Audio,
 	fs *FrameSync,
 ) {
-	for range n {
+	for i := range n {
+		_ = i
+
+		gb.TCycle = clockRT.Cycle
+		gb.MCycle = clockRT.Cycle >> 2
+
 		// Breakpoints will stop here, right before executing next M-cycle
 		if clockRT.PauseAfterCycle.Load() > 0 {
 			exit := clockRT.wait()
@@ -184,19 +189,19 @@ func (clockRT *ClockRT) MCycle(
 
 		audio.Clock(&gb.APU)
 
+		gb.applyPendingIME()
+
 		// Clock the CPU. This is the only place where the enabled-state of APU/PPU can change.
 		gb.CPU.fsm(clockRT, gb)
 
 		m := clockRT.Cycle >> 2
 		clockRT.Cycle += 4
-		if m&0x3f == 0 {
-			gb.Timer.tickDIV(gb)
-		}
 
 		// Clock the peripherals.
 		// 99.99% of the time, both PPU and APU are on, so we clock everything
 		if gb.PPU.RegLCDC&gb.APU.MasterCtl&Bit7 != 0 {
 			// T0
+			gb.Timer.tickDIV(gb)
 			gb.APU.Wave.clock(gb.Mem)
 			if m&0x1 == 0 {
 				gb.APU.Pulse1.clock()
@@ -206,13 +211,20 @@ func (clockRT *ClockRT) MCycle(
 				gb.APU.Noise.clock()
 			}
 			gb.PPU.fsm(gb, clockRT, fs)
+			gb.TCycle++
 
 			// T1
+			gb.Timer.tickDIV(gb)
+			gb.TCycle++
 
 			// T2
 			gb.PPU.fsm(gb, clockRT, fs)
+			gb.Timer.tickDIV(gb)
+			gb.TCycle++
 
 			// T3
+			gb.Timer.tickDIV(gb)
+			gb.TCycle++
 		} else {
 			clockRT.mCycleSlowPath(m, gb, fs)
 		}
@@ -221,6 +233,7 @@ func (clockRT *ClockRT) MCycle(
 
 func (clockRT *ClockRT) mCycleSlowPath(m uint, gb *Gameboy, fs *FrameSync) {
 	// T0
+	gb.TCycle++
 	if gb.PPU.RegLCDC&Bit7 != 0 {
 		gb.PPU.fsm(gb, clockRT, fs)
 	}
@@ -236,11 +249,14 @@ func (clockRT *ClockRT) mCycleSlowPath(m uint, gb *Gameboy, fs *FrameSync) {
 	}
 
 	// T1
+	gb.TCycle++
 
 	// T2
+	gb.TCycle++
 	if gb.PPU.RegLCDC&Bit7 != 0 {
 		gb.PPU.fsm(gb, clockRT, fs)
 	}
 
 	// T3
+	gb.TCycle++
 }

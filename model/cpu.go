@@ -1,18 +1,16 @@
 package model
 
 type CPU struct {
-	Regs                       RegisterFile
-	CBOp                       CBOp
-	Halted                     bool
-	MachineCycle               int
-	ClockCycle                 uint
-	WroteToAddressBusThisCycle bool // deprecated
-	Rewind                     Rewind
-	LastBranchResult           int
+	Regs             RegisterFile
+	CBOp             CBOp
+	Halted           bool
+	UOpCycle         int
+	Rewind           Rewind
+	LastBranchResult int
 }
 
 func (cpu *CPU) CurrInstruction() (DisInstruction, int) {
-	return cpu.Rewind.Curr().Instruction, cpu.MachineCycle
+	return cpu.Rewind.Curr().Instruction, cpu.UOpCycle
 }
 
 type ExecLogEntry struct {
@@ -69,56 +67,39 @@ func (cpu *CPU) IncPC() {
 }
 
 func (cpu *CPU) fsm(clk *ClockRT, gb *Gameboy) {
-	cpu.WroteToAddressBusThisCycle = false
-	cpu.ClockCycle = clk.Cycle
-	gb.applyPendingIME()
-
 	if cpu.Halted {
-		if gb.Interrupts.PendingInterrupt == 0 {
-			return
-		}
-		cpu.Halted = false
+		return
 	}
-
-	var fetch bool
-	if cpu.ClockCycle > 0 {
-		if gb.Interrupts.PendingInterrupt != 0 {
-			fetch = cpu.execTransferToISR(clk, gb)
-		} else {
-			fetch = Handlers[cpu.Regs.IR][cpu.MachineCycle-1](gb)
-		}
-		if fetch {
-			gb.WriteAddress(cpu.Regs.PC)
-			if gb.Interrupts.PendingInterrupt == 0 {
-				cpu.instructionFetch(clk, gb)
-			}
-			cpu.IncPC()
-			cpu.MachineCycle = 0
-		}
+	var handler UOpHandler
+	if gb.Interrupts.PendingInterrupt != 0 {
+		handler = IRQHandler[cpu.UOpCycle-1]
 	} else {
-		// initial instruction
-		fetch = true
-		gb.WriteAddress(cpu.Regs.PC)
-		cpu.instructionFetch(clk, gb)
-		cpu.IncPC()
+		handler = Handlers[cpu.Regs.IR][cpu.UOpCycle-1]
 	}
-
-	cpu.MachineCycle++
+	if done := handler(gb); done {
+		gb.WriteAddress(cpu.Regs.PC)
+		gb.instructionFetch(clk)
+		cpu.UOpCycle = 0
+	}
+	cpu.UOpCycle++
 }
 
-func (cpu *CPU) instructionFetch(clk *ClockRT, gb *Gameboy) {
+func (gb *Gameboy) instructionFetch(clk *ClockRT) {
+	cpu := &gb.CPU
+
 	// Reset inter-instruction state
 	cpu.Regs.SetWZ(0)
 
 	// Read next instruction opcode
 	rawOp := gb.Mem[cpu.Regs.PC]
 	cpu.Regs.IR = Opcode(rawOp)
-	gb.Debug.SetIR(cpu.Regs.IR, clk)
+	gb.Debug.SetIR(gb, cpu.Regs.IR, clk)
 
 	di := DisInstruction{
 		Address: cpu.Regs.PC,
 		Opcode:  cpu.Regs.IR,
 		Raw:     [3]Data8{rawOp, 0, 0},
+		InISR:   gb.Interrupts.InISR,
 	}
 	size := instSize[cpu.Regs.IR]
 	if size == 0 {
@@ -129,44 +110,18 @@ func (cpu *CPU) instructionFetch(clk *ClockRT, gb *Gameboy) {
 	}
 
 	// Update rewind buffer
-	cpu.Rewind.Curr().BranchResult = cpu.LastBranchResult
-	cpu.LastBranchResult = 0
-	entry := cpu.Rewind.Push()
-	entry.Instruction = di
+	curr := cpu.Rewind.Curr()
+	curr.BranchResult = cpu.LastBranchResult
+	if curr.Instruction.Opcode == OpcodeNop && di.Opcode == OpcodeNop {
+		curr.Instruction.NopCount++
+	} else {
+		cpu.LastBranchResult = 0
+		entry := cpu.Rewind.Push()
+		entry.Instruction = di
+	}
 
 	// Set PC
-	gb.Debug.SetPC(cpu.Regs.PC, clk)
-}
+	gb.Debug.SetPC(gb, cpu.Regs.PC, clk)
 
-func (cpu *CPU) execTransferToISR(clk *ClockRT, gb *Gameboy) bool {
-	switch cpu.MachineCycle {
-	// wait states
-	case 1, 2:
-	// push MSB of PC to stack
-	case 3:
-		cpu.SetSP(cpu.Regs.SP - 1)
-		gb.WriteAddress(cpu.Regs.SP)
-		gb.WriteData(cpu.Regs.PC.MSB())
-		// push LSB of PC to stack
-	case 4:
-		cpu.SetSP(cpu.Regs.SP - 1)
-		gb.WriteAddress(cpu.Regs.SP)
-		gb.WriteData(cpu.Regs.PC.LSB())
-	case 5:
-		isr := gb.Interrupts.PendingInterrupt.ISR()
-		cpu.SetPC(isr)
-		gb.Debug.SetPC(isr, clk)
-		gb.Interrupts.PendingInterrupt = 0
-		return true
-	default:
-		panicv(cpu.MachineCycle)
-	}
-	return false
-}
-
-func (gb *Gameboy) applyPendingIME() {
-	if gb.Interrupts.SetIMENextCycle {
-		gb.Interrupts.SetIMENextCycle = false
-		gb.SetIME(true)
-	}
+	cpu.IncPC()
 }

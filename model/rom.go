@@ -14,7 +14,7 @@ func LoadROM(
 	if err != nil {
 		return err
 	}
-
+	fmt.Printf("LEN=%d\n", len(gb.Cartridge.ROM))
 	// Check ROM size
 	if len(rom)%ROMBankSize != 0 {
 		return fmt.Errorf("ROM size %d is not a multiple of %d", len(rom), ROMBankSize)

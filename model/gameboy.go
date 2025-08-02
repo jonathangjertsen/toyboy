@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"sync/atomic"
 
 	"github.com/jonathangjertsen/toyboy/assets"
@@ -20,6 +21,15 @@ type Gameboy struct {
 	Interrupts  Interrupts
 	Timer       Timer
 	BootROMLock BootROMLock
+	TCycle      uint
+	MCycle      uint
+	PureRAM     bool
+}
+
+func (gb *Gameboy) Print(format string, args ...any) {
+	fmt.Printf("M=%8d+%d | PC=%s | ", gb.MCycle, gb.TCycle-(gb.MCycle<<2), gb.CPU.Regs.PC.Hex())
+	fmt.Printf(format, args...)
+	fmt.Printf("\n")
 }
 
 func Start(clk *ClockRT, runFlag *atomic.Bool) {
@@ -36,48 +46,74 @@ func Pause(clk *ClockRT, runFlag *atomic.Bool) {
 	}
 }
 
-func NewGameboy(config *Config, clk *ClockRT) *Gameboy {
-	var gb Gameboy
-	gb.Mem = NewAddressSpace()
+func (gb *Gameboy) AllocMem() {
+	gb.Mem = make([]Data8, 65536)
+	gb.Cartridge.ROM = make([][ROMBankSize]Data8, 512)
+	gb.Cartridge.RAM = make([][RAMBankSize]Data8, 4)
+}
+
+func (gb *Gameboy) Init(config *Config, clk *ClockRT) {
+	save.MustTriviallySerialize(gb)
+
+	gb.initMemory()
+	gb.initDebug(config)
+	gb.loadBootROM(config)
+	gb.initCartridge()
+	gb.initJoypad()
+	gb.initCPU(config, clk)
+	gb.initPPU()
+}
+
+func (gb *Gameboy) initMemory() {
+	clear(gb.Mem)
+}
+
+func (gb *Gameboy) loadBootROM(config *Config) {
+	if config.BootROM.Variant == "DMGBoot" {
+		bootROM := Data8Slice(assets.DMGBoot)
+		copy(gb.Mem[:SizeBootROM], bootROM)
+		gb.Debug.SetProgram(bootROM)
+	} else if config.BootROM.Variant == "None" {
+	} else {
+		panicf("unknown bootROM variant '%s'", config.BootROM.Variant)
+	}
+}
+func (gb *Gameboy) initDebug(config *Config) {
 	gb.Debug = Debug{
 		Debugger:     NewDebugger(),
 		Disassembler: NewDisassembler(&config.Debug.Disassembler),
 		Warnings:     map[string]UserMessage{},
 	}
-	gb.Debug.Init()
-
-	if config.BootROM.Variant == "DMGBoot" {
-		bootROM := Data8Slice(assets.DMGBoot)
-		copy(gb.Mem[:SizeBootROM], bootROM)
-		gb.Debug.SetProgram(bootROM)
-		gb.Debug.SetPC(0, clk)
-	} else {
-		panic("unknown boot ROM")
-	}
 	gb.Debug.HRAM.Source = gb.Mem[AddrHRAMBegin : AddrHRAMEnd+1]
 	gb.Debug.WRAM.Source = gb.Mem[AddrWRAMBegin : AddrWRAMEnd+1]
+}
 
-	gb.Cartridge = Cartridge{
-		BankNo1:         1,
-		SelectedROMBank: 1,
-	}
+func (gb *Gameboy) initCartridge() {
+	gb.Cartridge.BankNo1 = 1
+	gb.Cartridge.SelectedROMBank = 1
+}
+
+func (gb *Gameboy) initJoypad() {
 	gb.Joypad.Action = 0xf
 	gb.Joypad.Direction = 0xf
 	gb.Mem[AddrP1] = 0x1f
+}
 
+func (gb *Gameboy) initCPU(config *Config, clk *ClockRT) {
 	gb.CPU = CPU{
-		Rewind: NewRewind(8192),
+		Rewind: NewRewind(config.Debug.RewindSize),
 	}
+	gb.WriteAddress(gb.CPU.Regs.PC)
+	gb.instructionFetch(clk)
+	gb.CPU.IncPC()
+	gb.CPU.UOpCycle++
+	clk.Onpanic = gb.CPU.Dump
+}
 
+func (gb *Gameboy) initPPU() {
 	gb.PPU.SpriteFetcher.Suspended = true
 	gb.PPU.SpriteFetcher.DoneX = 0xff
 	gb.beginFrame()
-
-	clk.Onpanic = gb.CPU.Dump
-
-	save.MustTriviallySerialize(&gb)
-
-	return &gb
 }
 
 func (gb *Gameboy) WriteAddress(addr Addr) {
@@ -85,7 +121,13 @@ func (gb *Gameboy) WriteAddress(addr Addr) {
 	gb.Data = gb.ProbeAddress(addr)
 }
 
+const LowestSpecialAddress = AddrP1
+
 func (gb *Gameboy) ProbeAddress(addr Addr) Data8 {
+	if addr < LowestSpecialAddress || gb.PureRAM {
+		return gb.Mem[addr]
+	}
+
 	if addr >= AddrAPUBegin && addr <= AddrAPUEnd {
 		return gb.APU.Read(addr)
 	}
@@ -99,6 +141,11 @@ func (gb *Gameboy) ProbeAddress(addr Addr) Data8 {
 }
 
 func (gb *Gameboy) WriteData(v Data8) {
+	if gb.PureRAM {
+		gb.Mem[gb.Address] = v
+		return
+	}
+
 	gb.Data = v
 	addr := gb.Address
 

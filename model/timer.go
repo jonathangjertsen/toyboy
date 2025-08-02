@@ -11,7 +11,7 @@ func (t *Timer) tickDIV(gb *Gameboy) {
 	// https://gbdev.io/pandocs/Audio_details.html#div-apu
 	// A “DIV-APU” counter is increased every time DIV’s bit 4 (5 in double-speed mode) goes from 1 to 0
 	div := t.DIV
-	if (div&Bit4 == Bit4) && ((div+1)&Bit4 == 0) { // bit 4 set, bit 3 clear => next time bit 4 will go low
+	if (div&Bit12 == Bit12) && ((div+1)&Bit12 == 0) { // bit 4 set, bit 3 clear => next time bit 4 will go low
 		gb.APU.incDIVAPU()
 	}
 	div++

@@ -13,17 +13,12 @@ type Debugger struct {
 }
 
 func NewDebugger() Debugger {
-	return Debugger{}
-}
-
-func (dbg *Debugger) Init() {
-	if dbg == nil {
-		return
+	return Debugger{
+		BreakX:  -1,
+		BreakY:  -1,
+		BreakPC: -1,
+		BreakIR: -1,
 	}
-	dbg.BreakX = -1
-	dbg.BreakY = -1
-	dbg.BreakPC = -1
-	dbg.BreakIR = -1
 }
 
 func (dbg *Debugger) Break(clk *ClockRT) {
@@ -51,23 +46,15 @@ func (dbg *Debugger) SetX(x Data8, clk *ClockRT) {
 	}
 }
 
-func (dbg *Debugger) SetIR(ir Opcode, clk *ClockRT) {
+func (dbg *Debugger) SetIR(gb *Gameboy, ir Opcode, clk *ClockRT) {
 	if dbg == nil {
 		return
 	}
-	bpc := dbg.BreakIR
-	if bpc == int64(ir) {
+	if dbg.BreakIR == int64(ir) {
 		dbg.Break(clk)
 		fmt.Printf("IR breakpoint\n")
 	}
-}
-
-func (dbg *Debugger) SetPC(pc Addr, clk *ClockRT) {
-	if dbg == nil {
-		return
-	}
-	bpc := dbg.BreakPC
-	if bpc == int64(pc) {
+	if dbg.BreakPC >= int64(gb.CPU.Regs.PC) && dbg.BreakPC < int64(gb.CPU.Regs.PC+Addr(instSize[ir])) {
 		dbg.Break(clk)
 		fmt.Printf("PC breakpoint\n")
 	}

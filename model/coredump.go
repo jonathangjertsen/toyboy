@@ -226,36 +226,46 @@ func (cpu *CPU) GetCoreDump(gb *Gameboy) CoreDump {
 }
 
 func (cpu *CPU) Dump(gb *Gameboy) {
-	cd := cpu.GetCoreDump(gb)
 	f := os.Stdout
-	fmt.Fprintf(f, "\n--------\nCore dump:\n")
-	PrintRegs(f, cd.Regs)
-	fmt.Fprintf(f, "--------\n")
-	fmt.Fprintf(f, "Code (PC highlighted)\n")
-	cd.PrintProgram(f)
-	fmt.Fprintf(f, "--------\n")
-	fmt.Fprintf(f, "HRAM (SP highlighted):\n")
-	cd.PrintHRAM(f)
-	fmt.Fprintf(f, "--------\n")
-	fmt.Fprintf(f, "OAM:\n")
-	cd.PrintOAM(f)
-	fmt.Fprintf(f, "--------\n")
+	/*
+		fmt.Fprintf(f, "\n--------\nCore dump:\n")
+		PrintRegs(f, cd.Regs)
+		fmt.Fprintf(f, "--------\n")
+		fmt.Fprintf(f, "Code (PC highlighted)\n")
+		cd.PrintProgram(f)
+		fmt.Fprintf(f, "--------\n")
+		fmt.Fprintf(f, "HRAM (SP highlighted):\n")
+		cd.PrintHRAM(f)
+		fmt.Fprintf(f, "--------\n")
+		fmt.Fprintf(f, "OAM:\n")
+		cd.PrintOAM(f)
+		fmt.Fprintf(f, "--------\n")
+	*/
 	fmt.Printf("Last executed instructions:\n")
-	cd.PrintRewindBuffer(f)
+	gb.PrintRewindBuffer(f)
 	fmt.Fprintf(f, "--------\n")
 }
 
-func (cd *CoreDump) PrintRewindBuffer(f io.Writer) {
-	for i := cd.Rewind.Start(); i != cd.Rewind.End(); i = cd.Rewind.Next(i) {
-		entry := cd.Rewind.At(i)
+func (gb *Gameboy) PrintRewindBuffer(f io.Writer) {
+	for i := gb.CPU.Rewind.Start(); i != gb.CPU.Rewind.End(); i = gb.CPU.Rewind.Next(i) {
+		entry := gb.CPU.Rewind.At(i)
 		extra := ""
 		if entry.BranchResult == +1 {
-			extra = "(taken)"
+			extra += " (taken)"
 		} else if entry.BranchResult == -1 {
-			extra = "(not taken)"
+			extra += " (not taken)"
 		}
-		fmt.Fprintf(f, "[PC=%s] %s %s\n", entry.Instruction.Address.Hex(), entry.Instruction.Asm(), extra)
+		if entry.Instruction.InISR {
+			extra += " (in ISR)"
+		}
+		if entry.Instruction.NopCount > 0 {
+			extra += fmt.Sprintf(" (x%d)", entry.Instruction.NopCount+1)
+		}
+		fmt.Fprintf(f, "[PC=%s] %s%s\n", entry.Instruction.Address.Hex(), entry.Instruction.Asm(), extra)
 	}
+	curr := gb.CPU.Rewind.Curr()
+	fmt.Printf("Current: ")
+	fmt.Fprintf(f, "[PC=%s] %s (%d)\n", curr.Instruction.Address.Hex(), curr.Instruction.Asm(), gb.CPU.UOpCycle)
 }
 
 func (cd *CoreDump) PrintDisassembly(f io.Writer) {

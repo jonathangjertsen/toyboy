@@ -17,7 +17,7 @@ type UserMessage struct {
 	Warn    bool
 }
 
-func (d *Debug) SetPC(addr Addr, clk *ClockRT) {
+func (d *Debug) SetPC(gb *Gameboy, addr Addr, clk *ClockRT) {
 	if d == nil {
 		return
 	}
@@ -25,14 +25,13 @@ func (d *Debug) SetPC(addr Addr, clk *ClockRT) {
 		addr--
 	}
 	d.Disassembler.SetPC(addr)
-	d.Debugger.SetPC(addr, clk)
 }
 
-func (d *Debug) SetIR(op Opcode, clk *ClockRT) {
+func (d *Debug) SetIR(gb *Gameboy, op Opcode, clk *ClockRT) {
 	if d == nil {
 		return
 	}
-	d.Debugger.SetIR(op, clk)
+	d.Debugger.SetIR(gb, op, clk)
 }
 
 func (d *Debug) SetWarning(key string, message string) {

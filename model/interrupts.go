@@ -5,6 +5,8 @@ package model
 type Interrupts struct {
 	IME bool
 
+	InISR bool
+
 	// TODO: move IME pend handling out of CPU code
 	SetIMENextCycle bool
 
@@ -12,6 +14,7 @@ type Interrupts struct {
 }
 
 // ENUM(
+// None   = 0
 // VBlank = 1
 // LCD    = 2
 // Timer  = 3
@@ -48,10 +51,11 @@ func (gb *Gameboy) SetIME(v bool) {
 	}
 }
 
-func (ints *Interrupts) PendInterrupt(gb *Gameboy, in IntSource) {
-	ints.IME = false
+func (gb *Gameboy) PendInterrupt(in IntSource) {
+	gb.Interrupts.IME = false
 	gb.Mem[AddrIF] &= ^in.Mask()
-	ints.PendingInterrupt = in
+	gb.Interrupts.PendingInterrupt = in
+	gb.CPU.UOpCycle = 1
 }
 
 func (gb *Gameboy) IRQSet(in IntSource) {
@@ -63,15 +67,22 @@ func (gb *Gameboy) IRQSet(in IntSource) {
 }
 
 func (gb *Gameboy) IRQCheck() {
-	if !gb.Interrupts.IME {
-		return
-	}
 	regIF := gb.Mem[AddrIF]
 	regIE := gb.Mem[AddrIE]
 	for is := IntSource(0); is < 5; is++ {
 		if (regIF & regIE & is.Mask()) != 0 {
-			gb.Interrupts.PendInterrupt(gb, is)
+			if gb.Interrupts.IME {
+				gb.PendInterrupt(is)
+			}
+			gb.CPU.Halted = false
 			break
 		}
+	}
+}
+
+func (gb *Gameboy) applyPendingIME() {
+	if gb.Interrupts.SetIMENextCycle {
+		gb.Interrupts.SetIMENextCycle = false
+		gb.SetIME(true)
 	}
 }

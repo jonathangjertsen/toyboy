@@ -5,8 +5,8 @@ import (
 )
 
 type Cartridge struct {
-	ROM             [512][ROMBankSize]Data8
-	RAM             [4][RAMBankSize]Data8
+	ROM             [][ROMBankSize]Data8
+	RAM             [][RAMBankSize]Data8
 	MBCFeatures     MBCFeatures
 	ExtRAMEnabled   bool
 	BankNo1         Data8

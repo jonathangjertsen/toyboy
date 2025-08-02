@@ -1,5 +1,7 @@
 package blip
 
+import "fmt"
+
 // Public API
 
 func NewBuffer(config Config) *Buffer {
@@ -48,6 +50,7 @@ func (bb *Buffer) SetClockRate(cps int) bool {
 
 func (bb *Buffer) EndFrame(t int) {
 	bb.offset += uint(t) * bb.factor
+	fmt.Printf("offset=%d factor=%d\n", bb.offset, bb.factor)
 }
 
 func (bb *Buffer) SamplesAvailable() int {

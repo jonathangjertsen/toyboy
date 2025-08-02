@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -30,8 +32,8 @@ func (r *RAM) UnmarshalJSON(data []byte) error {
 }
 
 type Cycle struct {
-	Addr *uint16
-	Val  *uint8
+	Addr uint16
+	Val  uint8
 	RW   string
 }
 
@@ -48,13 +50,13 @@ func (c *Cycles) UnmarshalJSON(data []byte) error {
 		if len(step) > 0 && step[0] != nil {
 			if a, ok := step[0].(float64); ok {
 				addr := uint16(a)
-				cy.Addr = &addr
+				cy.Addr = addr
 			}
 		}
 		if len(step) > 1 && step[1] != nil {
 			if v, ok := step[1].(float64); ok {
 				val := uint8(v)
-				cy.Val = &val
+				cy.Val = val
 			}
 		}
 		if len(step) > 2 && step[2] != nil {
@@ -66,6 +68,14 @@ func (c *Cycles) UnmarshalJSON(data []byte) error {
 	}
 	*c = result
 	return nil
+}
+
+func (cs Cycles) String() string {
+	out := ""
+	for _, c := range cs {
+		out += fmt.Sprintf("@%04x %02x %s\n", c.Addr, c.Val, c.RW)
+	}
+	return out
 }
 
 type CPUState struct {
@@ -127,111 +137,65 @@ type TestCase struct {
 
 func (tc *TestCase) String(gb *model.Gameboy) string {
 	return fmt.Sprintf(
-		"%s\n---------\nInitial expect:\n%s---<%d cycles>---\nFinal expect:\n%s-----\nFinal actual:\n%s",
+		"%s\n---------\nInitial:\n%s---\n%s---\nFinal expect:\n%s-----\nFinal actual:\n%s",
 		tc.Name,
 		tc.Initial.String(),
-		len(tc.Cycles),
+		tc.Cycles.String(),
 		tc.Final.String(),
 		TestCaseStateFromCPU(gb).String(),
 	)
 }
 
 func MustReadFile(name string) []TestCase {
+	var tcs []TestCase
+
+	gobfname := fmt.Sprintf("sm83/v1/%s.gob", name)
+	gobf, err := os.Open(gobfname)
+	if err == nil {
+		defer gobf.Close()
+		dec := gob.NewDecoder(gobf)
+		if err := dec.Decode(&tcs); err == nil {
+			return tcs
+		}
+	}
 	content, err := os.ReadFile(fmt.Sprintf("sm83/v1/%s.json", name))
 	if err != nil {
 		panic(err)
 	}
-	var tcs []TestCase
 	err = json.Unmarshal(content, &tcs)
 	if err != nil {
 		panic(err)
 	}
+	buf := bytes.Buffer{}
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(&tcs); err == nil {
+		os.WriteFile(gobfname, buf.Bytes(), 0o666)
+	}
 	return tcs
 }
 
-type TestBus struct {
-	RAM  [1 << 16]model.Data8
-	addr model.Addr
-	data model.Data8
-}
-
-func (tb *TestBus) BeginCoreDump() func() {
-	return func() {}
-}
-
-func (tb *TestBus) PushState() (model.Addr, model.Data8) {
-	return tb.addr, tb.data
-}
-
-func (tb *TestBus) PopState(addr model.Addr, data model.Data8) {
-	tb.addr, tb.data = addr, data
-}
-
-func (tb *TestBus) Reset() {
-	tb.addr = 0
-	tb.data = 0
-}
-
-func (tb *TestBus) InCoreDump() bool {
-	return false
-}
-
-func (tb *TestBus) WriteAddress(addr model.Addr) {
-	tb.addr = addr
-	tb.data = tb.RAM[tb.addr]
-}
-
-func (tb *TestBus) ProbeAddress(addr model.Addr) model.Data8 {
-	return tb.RAM[addr]
-}
-
-func (tb *TestBus) ProbeRange(begin, end model.Addr) []model.Data8 {
-	return tb.RAM[begin : end+1]
-}
-
-func (tb *TestBus) WriteData(data model.Data8) {
-	tb.data = data
-	tb.RAM[tb.addr] = data
-}
-
-func (tb *TestBus) GetAddress() model.Addr {
-	return tb.addr
-}
-
-func (tb *TestBus) GetData() model.Data8 {
-	return tb.data
-}
-
-func (tb *TestBus) GetCounters(model.Addr) (uint64, uint64) {
-	return 0, 0
-}
-
-func (tb *TestBus) GetPeripheral(any) {
-	panic("getPeripheral not implemented")
-}
-
-func Run(t *testing.T, tcs []TestCase, opcode model.Opcode) {
+func Run(t *testing.T, tcs []TestCase, opcode model.Opcode, gb *model.Gameboy, audio model.Audio) {
 	t.Helper()
 	for i, tc := range tcs {
-		RunOne(t, i, tc, opcode)
+		RunOne(t, i, tc, opcode, gb, audio)
 		if t.Failed() {
 			break
 		}
 	}
 }
 
-func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
+func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode, gb *model.Gameboy, audio model.Audio) {
 	t.Helper()
 
 	clock := model.NewClock()
-	defer func() { clock.Stop() }()
-
-	audio, devnull := model.AudioStub()
-	defer func() { close(devnull) }()
 
 	fs := model.FrameSync{Ch: make(chan func(*model.ViewPort), 1)}
 
-	gb := model.NewGameboy(&model.DefaultConfig, clock)
+	config := model.DefaultConfig
+	config.Debug.Disassembler.Enable = false
+	config.BootROM.Variant = "None"
+	config.Debug.RewindSize = 16
+	gb.Init(&config, clock)
 
 	gb.CPU.Regs.A = tc.Initial.A
 	gb.CPU.Regs.B = tc.Initial.B
@@ -246,9 +210,19 @@ func RunOne(t *testing.T, i int, tc TestCase, opcode model.Opcode) {
 	for _, entry := range tc.Initial.RAM {
 		gb.Mem[entry.Addr] = model.Data8(entry.Val)
 	}
-	gb.CPU.Regs.IR = model.Opcode(gb.Mem[gb.CPU.Regs.PC])
+	gb.PureRAM = true
 
-	clock.MCycle(len(tc.Cycles)+1, gb, audio, &fs)
+	// Emulate a fetch
+	gb.CPU.Regs.IR = model.Opcode(gb.Mem[tc.Initial.PC])
+	gb.CPU.Regs.PC++
+
+	clock.MCycle(len(tc.Cycles), gb, audio, &fs)
+
+	defer func() {
+		if t.Failed() {
+			gb.CPU.Dump(gb)
+		}
+	}()
 
 	if have, want := gb.CPU.Regs.A, tc.Final.A; have != want {
 		t.Fatalf("Test %d Register A have %s want %s. Full test: %s", i, have.Hex(), want.Hex(), tc.String(gb))

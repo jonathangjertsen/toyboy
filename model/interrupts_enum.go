@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	IntSourceVBlank IntSource = iota + 1
+	IntSourceNone IntSource = iota
+	IntSourceVBlank
 	IntSourceLCD
 	IntSourceTimer
 	IntSourceSerial
@@ -21,11 +22,12 @@ const (
 
 var ErrInvalidIntSource = errors.New("not a valid IntSource")
 
-const _IntSourceName = "VBlankLCDTimerSerialJoypad"
+const _IntSourceName = "NoneVBlankLCDTimerSerialJoypad"
 
 // IntSourceValues returns a list of the values for IntSource
 func IntSourceValues() []IntSource {
 	return []IntSource{
+		IntSourceNone,
 		IntSourceVBlank,
 		IntSourceLCD,
 		IntSourceTimer,
@@ -35,11 +37,12 @@ func IntSourceValues() []IntSource {
 }
 
 var _IntSourceMap = map[IntSource]string{
-	IntSourceVBlank: _IntSourceName[0:6],
-	IntSourceLCD:    _IntSourceName[6:9],
-	IntSourceTimer:  _IntSourceName[9:14],
-	IntSourceSerial: _IntSourceName[14:20],
-	IntSourceJoypad: _IntSourceName[20:26],
+	IntSourceNone:   _IntSourceName[0:4],
+	IntSourceVBlank: _IntSourceName[4:10],
+	IntSourceLCD:    _IntSourceName[10:13],
+	IntSourceTimer:  _IntSourceName[13:18],
+	IntSourceSerial: _IntSourceName[18:24],
+	IntSourceJoypad: _IntSourceName[24:30],
 }
 
 // String implements the Stringer interface.
@@ -58,11 +61,12 @@ func (x IntSource) IsValid() bool {
 }
 
 var _IntSourceValue = map[string]IntSource{
-	_IntSourceName[0:6]:   IntSourceVBlank,
-	_IntSourceName[6:9]:   IntSourceLCD,
-	_IntSourceName[9:14]:  IntSourceTimer,
-	_IntSourceName[14:20]: IntSourceSerial,
-	_IntSourceName[20:26]: IntSourceJoypad,
+	_IntSourceName[0:4]:   IntSourceNone,
+	_IntSourceName[4:10]:  IntSourceVBlank,
+	_IntSourceName[10:13]: IntSourceLCD,
+	_IntSourceName[13:18]: IntSourceTimer,
+	_IntSourceName[18:24]: IntSourceSerial,
+	_IntSourceName[24:30]: IntSourceJoypad,
 }
 
 // ParseIntSource attempts to convert a string to a IntSource.

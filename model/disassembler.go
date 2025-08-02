@@ -6,7 +6,8 @@ import (
 )
 
 type Disassembler struct {
-	Trace bool
+	Enabled bool
+	Trace   bool
 
 	Program Block
 	HRAM    Block
@@ -27,10 +28,12 @@ type Block struct {
 }
 
 type DisInstruction struct {
-	Raw     [3]Data8
-	Address Addr
-	Opcode  Opcode
-	Visited bool
+	Raw      [3]Data8
+	Address  Addr
+	Opcode   Opcode
+	Visited  bool
+	InISR    bool
+	NopCount int
 }
 
 func (di *DisInstruction) Size() Size16 {
@@ -337,7 +340,12 @@ func splitSections(sections []DataSection) []DataSection {
 }
 
 func NewDisassembler(config *ConfigDisassembler) Disassembler {
+	if !config.Enable {
+		return Disassembler{}
+	}
+
 	dis := Disassembler{
+		Enabled: true,
 		Trace:   config.Trace,
 		Program: Block{Name: "Program", Begin: 0},
 		HRAM:    Block{Name: "HRAM", Begin: AddrHRAMBegin, Decoded: make([]DisInstruction, SizeHRAM)},
@@ -347,12 +355,19 @@ func NewDisassembler(config *ConfigDisassembler) Disassembler {
 }
 
 func (dis *Disassembler) SetProgram(program []Data8) {
+	if !dis.Enabled {
+		return
+	}
+
 	dis.Program.CanExplore = true
 	dis.Program.Source = program
 	dis.Program.Decoded = make([]DisInstruction, len(program))
 }
 
 func (dis *Disassembler) print(msg string) {
+	if !dis.Enabled {
+		return
+	}
 	if !dis.Trace {
 		return
 	}
@@ -366,6 +381,9 @@ func (dis *Disassembler) print(msg string) {
 }
 
 func (dis *Disassembler) SetPC(address Addr) {
+	if !dis.Enabled {
+		return
+	}
 	if address >= AddrHRAMBegin && address <= AddrHRAMEnd {
 		dis.HRAM.CanExplore = true
 	}
@@ -377,6 +395,9 @@ func (dis *Disassembler) SetPC(address Addr) {
 }
 
 func (dis *Disassembler) ExploreFrom(address Addr) {
+	if !dis.Enabled {
+		return
+	}
 	dis.Stack = append(dis.Stack, address)
 	dis.StackIdx++
 
@@ -452,14 +473,15 @@ func (dis *Disassembler) exploreFromInner(address Addr) {
 }
 
 func (dis *Disassembler) Disassembly(start, end Addr) *Disassembly {
+	if !dis.Enabled {
+		return nil
+	}
 	var out Disassembly
 	for _, block := range []*Block{&dis.Program, &dis.HRAM, &dis.WRAM} {
 		if block.Source == nil {
-			fmt.Printf("%s source is nil\n", block.Name)
 			continue
 		}
 		if block.Begin > end {
-			fmt.Printf("%s block.Begin=%s > end=%s\n", block.Name, block.Begin.Hex(), end.Hex())
 			continue
 		}
 		if block.Begin > start {
@@ -467,7 +489,6 @@ func (dis *Disassembler) Disassembly(start, end Addr) *Disassembly {
 		}
 		blockEnd := block.Begin + Addr(len(block.Source))
 		if blockEnd < start {
-			fmt.Printf("%s blockEnd=%s < start=%s\n", block.Name, blockEnd.Hex(), start.Hex())
 			continue
 		}
 		if blockEnd < end {
@@ -475,7 +496,6 @@ func (dis *Disassembler) Disassembly(start, end Addr) *Disassembly {
 		}
 
 		if start >= end {
-			fmt.Printf("%s start=%s >= end=%s\n", block.Name, start.Hex(), end.Hex())
 			continue
 		}
 
@@ -487,7 +507,6 @@ func (dis *Disassembler) Disassembly(start, end Addr) *Disassembly {
 
 		currCodeSection := CodeSection{}
 		currDataSection := DataSection{}
-		fmt.Printf("%s slurp start=%s end=%s\n", block.Name, start.Hex(), end.Hex())
 		for offs := beginOffs; offs < endOffs; {
 			di := block.Decoded[offs]
 			if di.Size() > 0 {
@@ -623,6 +642,7 @@ func (dis *Disassembler) checkBranches(di DisInstruction, block *Block) bool {
 		OpcodeLDEA, OpcodeLDEB, OpcodeLDEC, OpcodeLDED, OpcodeLDEE, OpcodeLDEL, OpcodeLDEH, OpcodeLDEHL,
 		OpcodeLDHA, OpcodeLDHB, OpcodeLDHC, OpcodeLDHD, OpcodeLDHE, OpcodeLDHL, OpcodeLDHH, OpcodeLDHHL,
 		OpcodeLDLA, OpcodeLDLB, OpcodeLDLC, OpcodeLDLD, OpcodeLDLE, OpcodeLDLL, OpcodeLDLH, OpcodeLDLHL,
+		OpcodeLDHAC,
 		OpcodeLDSPHL,
 		OpcodeADDHLBC, OpcodeADDHLDE, OpcodeADDHLHL, OpcodeADDHLSP,
 		OpcodeLDBCA, OpcodeLDDEA,

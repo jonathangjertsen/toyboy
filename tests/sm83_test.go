@@ -5,21 +5,33 @@ import (
 	"slices"
 	"testing"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/jonathangjertsen/toyboy/model"
 	"github.com/jonathangjertsen/toyboy/tests"
 )
 
 func Test(t *testing.T) {
+	go func() {
+		http.ListenAndServe(":6060", nil)
+	}()
+
+	audio, devnull := model.AudioStub()
+	defer func() { close(devnull) }()
+
+	var gb model.Gameboy
+	gb.AllocMem()
 	for i := range 256 {
 		if i == 0xcb {
 			for j := range 256 {
-				testCB(t, uint8(j))
+				testCB(t, uint8(j), &gb, audio)
 				if t.Failed() {
 					return
 				}
 			}
 		} else {
-			testOpcode(t, uint8(i))
+			testOpcode(t, uint8(i), &gb, audio)
 			if t.Failed() {
 				return
 			}
@@ -27,7 +39,7 @@ func Test(t *testing.T) {
 	}
 }
 
-func testOpcode(t *testing.T, opcodeRaw uint8) {
+func testOpcode(t *testing.T, opcodeRaw uint8, gb *model.Gameboy, audio model.Audio) {
 	t.Helper()
 	opcode := model.Opcode(opcodeRaw)
 
@@ -52,18 +64,18 @@ func testOpcode(t *testing.T, opcodeRaw uint8) {
 
 	if !t.Run(opcode.String(), func(t *testing.T) {
 		tcs := tests.MustReadFile(fmt.Sprintf("%02x", uint8(opcode)))
-		tests.Run(t, tcs, opcode)
+		tests.Run(t, tcs, opcode, gb, audio)
 	}) {
 		return
 	}
 }
 
-func testCB(t *testing.T, cb uint8) {
+func testCB(t *testing.T, cb uint8, gb *model.Gameboy, audio model.Audio) {
 	t.Helper()
 	opcode := model.NewCBOp(model.Data8(cb))
 	if !t.Run("CB"+opcode.String(), func(t *testing.T) {
 		tcs := tests.MustReadFile(fmt.Sprintf("cb %02x", uint8(cb)))
-		tests.Run(t, tcs, model.OpcodeCB)
+		tests.Run(t, tcs, model.OpcodeCB, gb, audio)
 	}) {
 		return
 	}

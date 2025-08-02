@@ -40,7 +40,7 @@ type App struct {
 	config    *Config
 	reqChan   chan MachineStateRequest
 	Audio     *AudioInterface
-	GBAudio   *model.Audio
+	GBAudio   model.Audio
 	FrameSync *model.FrameSync
 
 	needStateUpdate chan struct{}
@@ -76,19 +76,25 @@ func NewApp(config *Config) *App {
 		CLK:             model.NewClock(),
 	}
 	app.ClockMeasurement.SetCounter(&app.CLK.Cycle)
-	app.GBAudio = &model.Audio{
+	app.GBAudio = &model.AudioNN{
 		SampleInterval: time.Second / 44100,
 		SampleBuffers:  model.NewSampleBuffers(1024),
 		SubSampling:    1024,
 		Out:            app.Audio.In,
 	}
+
+	//app.GBAudio = model.NewAudioBLIP(1024, app.Audio.In)
 	return app
 }
 
 func (app *App) startup(ctx context.Context) {
 	app.ctx = ctx
 
-	app.startGB(model.NewGameboy(&app.config.Model, app.CLK))
+	var gb model.Gameboy
+	gb.AllocMem()
+	gb.Init(&app.config.Model, app.CLK)
+
+	app.startGB(&gb)
 	app.startWebSocketServer()
 }
 
@@ -139,6 +145,11 @@ func (app *App) MachineStateRequest(req MachineStateRequest) {
 		app.CLK.SetSpeedPercent(req.Numbers["TargetSpeed"], app.GBAudio)
 		fmt.Printf("Updated speed to %f\n", req.Numbers["TargetSpeed"])
 	}
+	if req.ClickedNumber == "pc-breakpoint" {
+		app.GB.Debug.Debugger.BreakPC = int64(req.Numbers["pc-breakpoint"])
+		fmt.Printf("Updated BreakPC to %f\n", req.Numbers["pc-breakpoint"])
+	}
+
 	app.reqChan <- req
 }
 
@@ -223,6 +234,13 @@ func (app *App) startWebSocketServer() {
 					}
 					if buf := buffers[DataIDCPURegisters]; buf != nil {
 						model.PrintRegs(buf, app.GB.CPU.Regs)
+						if app.GB.CPU.Halted {
+							fmt.Fprintf(buf, "HALTED\n")
+						} else {
+							fmt.Fprintf(buf, "      \n")
+						}
+						fmt.Fprintf(buf, "IF=%s IE=%s IME=%v\n", app.GB.Mem[model.AddrIF].Hex(), app.GB.Mem[model.AddrIE].Hex(), app.GB.Interrupts.IME)
+						fmt.Fprintf(buf, "Pended: %s\n", app.GB.Interrupts.PendingInterrupt)
 						di, cycle := app.GB.CPU.CurrInstruction()
 						fmt.Fprintf(buf, "\n%s\n   cycle=%d", di.Asm(), cycle)
 						fmt.Fprintf(buf, "                                     ")

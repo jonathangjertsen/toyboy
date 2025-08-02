@@ -16,12 +16,14 @@ type ConfigClock struct {
 }
 
 type ConfigDebug struct {
+	RewindSize            int
 	PanicOnStackUnderflow bool
 	Disassembler          ConfigDisassembler
 }
 
 type ConfigDisassembler struct {
-	Trace bool
+	Trace  bool
+	Enable bool
 }
 
 var DefaultConfig = Config{
@@ -35,7 +37,8 @@ var DefaultConfig = Config{
 	Debug: ConfigDebug{
 		PanicOnStackUnderflow: true,
 		Disassembler: ConfigDisassembler{
-			Trace: false,
+			Trace:  false,
+			Enable: true,
 		},
 	},
 }

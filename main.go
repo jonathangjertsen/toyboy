@@ -37,9 +37,11 @@ func main() {
 
 	if len(os.Args) == 2 && os.Args[1] == "debug" {
 		clk := model.NewClock()
-		gb := model.NewGameboy(&config.Model, clk)
+		var gb model.Gameboy
+		gb.AllocMem()
+		gb.Init(&config.Model, clk)
 
-		if err := model.LoadROM("assets/cartridges/unbricked.gb", gb); err != nil {
+		if err := model.LoadROM("assets/cartridges/unbricked.gb", &gb); err != nil {
 			panic(err)
 		}
 

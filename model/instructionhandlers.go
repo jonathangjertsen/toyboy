@@ -5,11 +5,12 @@ import (
 	"slices"
 )
 
-type InstructionHandling func(gb *Gameboy) bool
+type InstructionHandler [6]UOpHandler
+type UOpHandler func(gb *Gameboy) bool
 
 const MaxOpcodesPerInsr = 6
 
-type HandlerArray [256][6]InstructionHandling
+type HandlerArray [256]InstructionHandler
 
 type CBOp struct {
 	Op     cb
@@ -31,6 +32,14 @@ func (cbv cb) Is3Cycles() bool {
 
 func (cb CBOp) String() string {
 	return fmt.Sprintf("%s %s", cb.Op, cb.Target)
+}
+
+var IRQHandler = InstructionHandler{
+	uIntermediateNop,
+	uIntermediateNop,
+	uPushPCMSB,
+	uPushPCLSB,
+	uSetPCISR,
 }
 
 var Handlers = HandlerArray{
@@ -204,7 +213,7 @@ var Handlers = HandlerArray{
 	OpcodeDECDE:    {DECDE_1, iduOp_2},
 	OpcodeDECHL:    {DECHL_1, iduOp_2},
 	OpcodeDECSP:    {DECSP_1, iduOp_2},
-	OpcodeCALLnn:   {callnn_1, callnn_2, callnn_3, callnn_4, callnn_5, callnn_6},
+	OpcodeCALLnn:   {uFetchZ, uFetchW, uIntermediateNop, uPushPCMSB, uPushPCLSB, uSetPCWZ},
 	OpcodeCALLNZnn: {callccnn_1, callccnn_2, callNZnn_3, callccnn_4, callccnn_5, callccnn_6},
 	OpcodeCALLZnn:  {callccnn_1, callccnn_2, callZnn_3, callccnn_4, callccnn_5, callccnn_6},
 	OpcodeCALLNCnn: {callccnn_1, callccnn_2, callNCnn_3, callccnn_4, callccnn_5, callccnn_6},
@@ -278,17 +287,17 @@ var Handlers = HandlerArray{
 	OpcodeRST0x28:  {rst_1, rst_2, rst_3_28, rst_4},
 	OpcodeRST0x30:  {rst_1, rst_2, rst_3_30, rst_4},
 	OpcodeRST0x38:  {rst_1, rst_2, rst_3_38, rst_4},
-	OpcodeUndefD3:  {notImplemented},
-	OpcodeUndefDB:  {notImplemented},
-	OpcodeUndefDD:  {notImplemented},
-	OpcodeUndefE3:  {notImplemented},
-	OpcodeUndefE4:  {notImplemented},
-	OpcodeUndefEB:  {notImplemented},
-	OpcodeUndefEC:  {notImplemented},
-	OpcodeUndefED:  {notImplemented},
-	OpcodeUndefF4:  {notImplemented},
-	OpcodeUndefFC:  {notImplemented},
-	OpcodeUndefFD:  {notImplemented},
+	OpcodeUndefD3:  {endNoop},
+	OpcodeUndefDB:  {endNoop},
+	OpcodeUndefDD:  {endNoop},
+	OpcodeUndefE3:  {endNoop},
+	OpcodeUndefE4:  {endNoop},
+	OpcodeUndefEB:  {endNoop},
+	OpcodeUndefEC:  {endNoop},
+	OpcodeUndefED:  {endNoop},
+	OpcodeUndefF4:  {endNoop},
+	OpcodeUndefFC:  {endNoop},
+	OpcodeUndefFD:  {endNoop},
 }
 
 func noop(gb *Gameboy) bool {
@@ -300,12 +309,12 @@ func endNoop(gb *Gameboy) bool {
 }
 
 func rra(gb *Gameboy) bool {
-	gb.CPU.Regs.SetFlagsAndA(RRA(gb.CPU.Regs.A, gb.CPU.Regs.GetFlagC()))
+	gb.CPU.Regs.SetFlagsAndA(RRA(gb.CPU.Regs.A, gb.CPU.Regs.F&(1<<FlagBitC) != 0))
 	return true
 }
 
 func rla(gb *Gameboy) bool {
-	gb.CPU.Regs.SetFlagsAndA(RLA(gb.CPU.Regs.A, gb.CPU.Regs.GetFlagC()))
+	gb.CPU.Regs.SetFlagsAndA(RLA(gb.CPU.Regs.A, gb.CPU.Regs.F&(1<<FlagBitC) != 0))
 	return true
 }
 
@@ -371,16 +380,15 @@ func jpnn_4(gb *Gameboy) bool {
 }
 
 func jrcce_1(gb *Gameboy) bool {
-	gb.WriteAddress(gb.CPU.Regs.PC)
+	gb.CPU.Regs.TempZ = gb.ProbeAddress(gb.CPU.Regs.PC)
 	gb.CPU.IncPC()
-	gb.CPU.Regs.TempZ = gb.Data
 	return false
 }
 
-func jrZe_2(gb *Gameboy) bool  { return jrcce_2(gb, gb.CPU.Regs.GetFlagZ()) }
-func jrNZe_2(gb *Gameboy) bool { return jrcce_2(gb, !gb.CPU.Regs.GetFlagZ()) }
-func jrCe_2(gb *Gameboy) bool  { return jrcce_2(gb, gb.CPU.Regs.GetFlagC()) }
-func jrNCe_2(gb *Gameboy) bool { return jrcce_2(gb, !gb.CPU.Regs.GetFlagC()) }
+func jrZe_2(gb *Gameboy) bool  { return jrcce_2(gb, gb.CPU.Regs.F&(1<<FlagBitZ) != 0) }
+func jrNZe_2(gb *Gameboy) bool { return jrcce_2(gb, gb.CPU.Regs.F&(1<<FlagBitZ) == 0) }
+func jrCe_2(gb *Gameboy) bool  { return jrcce_2(gb, gb.CPU.Regs.F&(1<<FlagBitC) != 0) }
+func jrNCe_2(gb *Gameboy) bool { return jrcce_2(gb, gb.CPU.Regs.F&(1<<FlagBitC) == 0) }
 
 func jrcce_2(gb *Gameboy, cond bool) bool {
 	if cond {
@@ -413,10 +421,10 @@ func jpccnn_2(gb *Gameboy) bool {
 	return false
 }
 
-func jpZnn_3(gb *Gameboy) bool  { return jpccnn_3(gb, gb.CPU.Regs.GetFlagZ()) }
-func jpNZnn_3(gb *Gameboy) bool { return jpccnn_3(gb, !gb.CPU.Regs.GetFlagZ()) }
-func jpCnn_3(gb *Gameboy) bool  { return jpccnn_3(gb, gb.CPU.Regs.GetFlagC()) }
-func jpNCnn_3(gb *Gameboy) bool { return jpccnn_3(gb, !gb.CPU.Regs.GetFlagC()) }
+func jpZnn_3(gb *Gameboy) bool  { return jpccnn_3(gb, gb.CPU.Regs.F&(1<<FlagBitZ) != 0) }
+func jpNZnn_3(gb *Gameboy) bool { return jpccnn_3(gb, gb.CPU.Regs.F&(1<<FlagBitZ) == 0) }
+func jpCnn_3(gb *Gameboy) bool  { return jpccnn_3(gb, gb.CPU.Regs.F&(1<<FlagBitC) != 0) }
+func jpNCnn_3(gb *Gameboy) bool { return jpccnn_3(gb, gb.CPU.Regs.F&(1<<FlagBitC) == 0) }
 
 func jpccnn_3(gb *Gameboy, cond bool) bool {
 	if cond {
@@ -527,43 +535,6 @@ func popHL_3(gb *Gameboy) bool {
 	return true
 }
 
-func callnn_1(gb *Gameboy) bool {
-	gb.WriteAddress(gb.CPU.Regs.PC)
-	gb.CPU.IncPC()
-	gb.CPU.Regs.TempZ = gb.Data
-	return false
-}
-
-func callnn_2(gb *Gameboy) bool {
-	gb.WriteAddress(gb.CPU.Regs.PC)
-	gb.CPU.IncPC()
-	gb.CPU.Regs.TempW = gb.Data
-	return false
-}
-
-func callnn_3(gb *Gameboy) bool {
-	gb.CPU.SetSP(gb.CPU.Regs.SP - 1)
-	return false
-}
-
-func callnn_4(gb *Gameboy) bool {
-	gb.WriteAddress(gb.CPU.Regs.SP)
-	gb.CPU.SetSP(gb.CPU.Regs.SP - 1)
-	gb.WriteData(gb.CPU.Regs.PC.MSB())
-	return false
-}
-
-func callnn_5(gb *Gameboy) bool {
-	gb.WriteAddress(gb.CPU.Regs.SP)
-	gb.WriteData(gb.CPU.Regs.PC.LSB())
-	return false
-}
-
-func callnn_6(gb *Gameboy) bool {
-	gb.CPU.SetPC(Addr(gb.CPU.Regs.GetWZ()))
-	return true
-}
-
 func callccnn_1(gb *Gameboy) bool {
 	gb.WriteAddress(gb.CPU.Regs.PC)
 	gb.CPU.IncPC()
@@ -579,16 +550,16 @@ func callccnn_2(gb *Gameboy) bool {
 }
 
 func callZnn_3(gb *Gameboy) bool {
-	return callccnn_3(gb, gb.CPU.Regs.GetFlagZ())
+	return callccnn_3(gb, gb.CPU.Regs.F&(1<<FlagBitZ) != 0)
 }
 func callNZnn_3(gb *Gameboy) bool {
-	return callccnn_3(gb, !gb.CPU.Regs.GetFlagZ())
+	return callccnn_3(gb, gb.CPU.Regs.F&(1<<FlagBitZ) == 0)
 }
 func callCnn_3(gb *Gameboy) bool {
-	return callccnn_3(gb, gb.CPU.Regs.GetFlagC())
+	return callccnn_3(gb, gb.CPU.Regs.F&(1<<FlagBitC) != 0)
 }
 func callNCnn_3(gb *Gameboy) bool {
-	return callccnn_3(gb, !gb.CPU.Regs.GetFlagC())
+	return callccnn_3(gb, gb.CPU.Regs.F&(1<<FlagBitC) == 0)
 }
 
 func callccnn_3(gb *Gameboy, cond bool) bool {
@@ -659,6 +630,7 @@ func reti_3(gb *Gameboy) bool {
 	gb.CPU.SetPC(Addr(gb.CPU.Regs.GetWZ()))
 	// TODO verify if this is the right cycle
 	gb.Interrupts.IME = true
+	gb.Interrupts.InISR = false
 	return false
 }
 
@@ -667,19 +639,19 @@ var reti_4 = endNoop
 var retcc_1 = noop
 
 func retZ_2(gb *Gameboy) bool {
-	return retcc_2(gb, gb.CPU.Regs.GetFlagZ())
+	return retcc_2(gb, gb.CPU.Regs.F&(1<<FlagBitZ) != 0)
 }
 
 func retNZ_2(gb *Gameboy) bool {
-	return retcc_2(gb, !gb.CPU.Regs.GetFlagZ())
+	return retcc_2(gb, gb.CPU.Regs.F&(1<<FlagBitZ) == 0)
 }
 
 func retC_2(gb *Gameboy) bool {
-	return retcc_2(gb, gb.CPU.Regs.GetFlagC())
+	return retcc_2(gb, gb.CPU.Regs.F&(1<<FlagBitC) != 0)
 }
 
 func retNC_2(gb *Gameboy) bool {
-	return retcc_2(gb, !gb.CPU.Regs.GetFlagC())
+	return retcc_2(gb, gb.CPU.Regs.F&(1<<FlagBitC) == 0)
 }
 
 func retcc_2(gb *Gameboy, cond bool) bool {
@@ -826,7 +798,7 @@ func adcreg_H(gb *Gameboy) bool { return adcreg(gb, gb.CPU.Regs.H) }
 func adcreg_L(gb *Gameboy) bool { return adcreg(gb, gb.CPU.Regs.L) }
 
 func adcreg(gb *Gameboy, reg Data8) bool {
-	gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, reg, gb.CPU.Regs.GetFlagC()))
+	gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, reg, gb.CPU.Regs.F&(1<<FlagBitC) != 0))
 	return true
 }
 
@@ -910,7 +882,7 @@ func SUBHL_2(gb *Gameboy) bool {
 }
 
 func SBCHL_2(gb *Gameboy) bool {
-	gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.GetFlagC()))
+	gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.F&(1<<FlagBitC) != 0))
 	return true
 }
 
@@ -925,12 +897,12 @@ func ADDHL_2(gb *Gameboy) bool {
 }
 
 func ADCHL_2(gb *Gameboy) bool {
-	gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.GetFlagC()))
+	gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.F&(1<<FlagBitC) != 0))
 	return true
 }
 
 func daa(gb *Gameboy) bool {
-	gb.CPU.Regs.SetFlagsAndA(DAA(gb.CPU.Regs.A, gb.CPU.Regs.GetFlagC(), gb.CPU.Regs.GetFlagN(), gb.CPU.Regs.GetFlagH()))
+	gb.CPU.Regs.SetFlagsAndA(DAA(gb.CPU.Regs.A, gb.CPU.Regs.F&(1<<FlagBitC) != 0, gb.CPU.Regs.GetFlagN(), gb.CPU.Regs.GetFlagH()))
 	return true
 }
 
@@ -942,7 +914,7 @@ func cpl(gb *Gameboy) bool {
 }
 
 func ccf(gb *Gameboy) bool {
-	gb.CPU.Regs.SetFlagC(!gb.CPU.Regs.GetFlagC())
+	gb.CPU.Regs.SetFlagC(gb.CPU.Regs.F&(1<<FlagBitC) == 0)
 	gb.CPU.Regs.SetFlagN(false)
 	gb.CPU.Regs.SetFlagH(false)
 	return true
@@ -977,7 +949,7 @@ func sbcreg_H(gb *Gameboy) bool { return sbcreg(gb, gb.CPU.Regs.H) }
 func sbcreg_L(gb *Gameboy) bool { return sbcreg(gb, gb.CPU.Regs.L) }
 
 func sbcreg(gb *Gameboy, reg Data8) bool {
-	gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, reg, gb.CPU.Regs.GetFlagC()))
+	gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, reg, gb.CPU.Regs.F&(1<<FlagBitC) != 0))
 	return true
 }
 
@@ -1028,14 +1000,14 @@ func increg(gb *Gameboy, reg *Data8) bool {
 	return true
 }
 
-func INCBC_1(gb *Gameboy) bool { gb.CPU.SetBC(gb.CPU.GetBC() + 1); return true }
-func INCDE_1(gb *Gameboy) bool { gb.CPU.SetDE(gb.CPU.GetDE() + 1); return true }
-func INCHL_1(gb *Gameboy) bool { gb.CPU.SetHL(gb.CPU.GetHL() + 1); return true }
-func INCSP_1(gb *Gameboy) bool { gb.CPU.Regs.SP++; return true }
-func DECBC_1(gb *Gameboy) bool { gb.CPU.SetBC(gb.CPU.GetBC() - 1); return true }
-func DECDE_1(gb *Gameboy) bool { gb.CPU.SetDE(gb.CPU.GetDE() - 1); return true }
-func DECHL_1(gb *Gameboy) bool { gb.CPU.SetHL(gb.CPU.GetHL() - 1); return true }
-func DECSP_1(gb *Gameboy) bool { gb.CPU.Regs.SP--; return true }
+func INCBC_1(gb *Gameboy) bool { gb.CPU.SetBC(gb.CPU.GetBC() + 1); return false }
+func INCDE_1(gb *Gameboy) bool { gb.CPU.SetDE(gb.CPU.GetDE() + 1); return false }
+func INCHL_1(gb *Gameboy) bool { gb.CPU.SetHL(gb.CPU.GetHL() + 1); return false }
+func INCSP_1(gb *Gameboy) bool { gb.CPU.Regs.SP++; return false }
+func DECBC_1(gb *Gameboy) bool { gb.CPU.SetBC(gb.CPU.GetBC() - 1); return false }
+func DECDE_1(gb *Gameboy) bool { gb.CPU.SetDE(gb.CPU.GetDE() - 1); return false }
+func DECHL_1(gb *Gameboy) bool { gb.CPU.SetHL(gb.CPU.GetHL() - 1); return false }
+func DECSP_1(gb *Gameboy) bool { gb.CPU.Regs.SP--; return false }
 
 var iduOp_2 = endNoop
 
@@ -1067,7 +1039,7 @@ func SUBn_2(gb *Gameboy) bool {
 }
 
 func SBCn_2(gb *Gameboy) bool {
-	gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.GetFlagC()))
+	gb.CPU.Regs.SetFlagsAndA(SUB(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.F&(1<<FlagBitC) != 0))
 	return true
 }
 
@@ -1082,7 +1054,7 @@ func ADDn_2(gb *Gameboy) bool {
 }
 
 func ADCn_2(gb *Gameboy) bool {
-	gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.GetFlagC()))
+	gb.CPU.Regs.SetFlagsAndA(ADD(gb.CPU.Regs.A, gb.CPU.Regs.TempZ, gb.CPU.Regs.F&(1<<FlagBitC) != 0))
 	return true
 }
 
@@ -1342,7 +1314,7 @@ func addhlDE_2(gb *Gameboy) bool { return addhlrr_2(gb, gb.CPU.Regs.D) }
 func addhlHL_2(gb *Gameboy) bool { return addhlrr_2(gb, gb.CPU.Regs.H) }
 
 func addhlrr_2(gb *Gameboy, hi Data8) bool {
-	result := ADD(gb.CPU.Regs.H, hi, gb.CPU.Regs.GetFlagC())
+	result := ADD(gb.CPU.Regs.H, hi, gb.CPU.Regs.F&(1<<FlagBitC) != 0)
 	gb.CPU.Regs.H = result.Value
 	gb.CPU.Regs.SetFlagC(result.C)
 	gb.CPU.Regs.SetFlagH(result.H)
@@ -1360,7 +1332,7 @@ func addhlsp_1(gb *Gameboy) bool {
 }
 
 func addhlsp_2(gb *Gameboy) bool {
-	result := ADD(gb.CPU.Regs.H, gb.CPU.Regs.SP.MSB(), gb.CPU.Regs.GetFlagC())
+	result := ADD(gb.CPU.Regs.H, gb.CPU.Regs.SP.MSB(), gb.CPU.Regs.F&(1<<FlagBitC) != 0)
 	gb.CPU.Regs.H = result.Value
 	gb.CPU.Regs.SetFlagC(result.C)
 	gb.CPU.Regs.SetFlagH(result.H)
@@ -1382,7 +1354,7 @@ func addspe_2(gb *Gameboy) bool {
 	gb.CPU.Regs.TempW = 0
 	gb.CPU.Regs.SetFlags(result)
 	gb.CPU.Regs.SetFlagZ(false)
-	if c := gb.CPU.Regs.GetFlagC(); c && !zSign {
+	if c := gb.CPU.Regs.F&(1<<FlagBitC) != 0; c && !zSign {
 		gb.CPU.Regs.TempW = 1
 	} else if !c && zSign {
 		gb.CPU.Regs.TempW = 0xff
@@ -1482,7 +1454,7 @@ func ldhlspe_3(gb *Gameboy) bool {
 	if gb.CPU.Regs.TempZ&Bit7 != 0 {
 		adj = 0xff
 	}
-	res := ADD(gb.CPU.Regs.SP.MSB(), adj, gb.CPU.Regs.GetFlagC())
+	res := ADD(gb.CPU.Regs.SP.MSB(), adj, gb.CPU.Regs.F&(1<<FlagBitC) != 0)
 	gb.CPU.Regs.H = res.Value
 	return true
 }
@@ -1622,7 +1594,7 @@ func runCB_4(gb *Gameboy) bool {
 func doCBOp(gb *Gameboy, val Data8) Data8 {
 	switch gb.CPU.CBOp.Op {
 	case CbRL:
-		res := RL(val, gb.CPU.Regs.GetFlagC())
+		res := RL(val, gb.CPU.Regs.F&(1<<FlagBitC) != 0)
 		val = res.Value
 		gb.CPU.Regs.SetFlags(res)
 	case CbRLC:
@@ -1630,7 +1602,7 @@ func doCBOp(gb *Gameboy, val Data8) Data8 {
 		val = res.Value
 		gb.CPU.Regs.SetFlags(res)
 	case CbRR:
-		res := RR(val, gb.CPU.Regs.GetFlagC())
+		res := RR(val, gb.CPU.Regs.F&(1<<FlagBitC) != 0)
 		val = res.Value
 		gb.CPU.Regs.SetFlags(res)
 	case CbRRC:
@@ -1708,8 +1680,59 @@ func doCBOp(gb *Gameboy, val Data8) Data8 {
 	return val
 }
 
+// Helpers
+
 func cbbit(gb *Gameboy, val, mask Data8) {
 	gb.CPU.Regs.SetFlagZ(val&mask == 0)
 	gb.CPU.Regs.SetFlagN(false)
 	gb.CPU.Regs.SetFlagH(true)
+}
+
+func (gb *Gameboy) push(v Data8) {
+	gb.CPU.SetSP(gb.CPU.Regs.SP - 1)
+	gb.WriteAddress(gb.CPU.Regs.SP)
+	gb.WriteData(v)
+}
+
+// Common microops
+
+func uIntermediateNop(gb *Gameboy) bool {
+	return false
+}
+
+func uFetchZ(gb *Gameboy) bool {
+	gb.WriteAddress(gb.CPU.Regs.PC)
+	gb.CPU.IncPC()
+	gb.CPU.Regs.TempZ = gb.Data
+	return false
+}
+
+func uFetchW(gb *Gameboy) bool {
+	gb.WriteAddress(gb.CPU.Regs.PC)
+	gb.CPU.IncPC()
+	gb.CPU.Regs.TempW = gb.Data
+	return false
+}
+
+func uPushPCMSB(gb *Gameboy) bool {
+	gb.push(gb.CPU.Regs.PC.MSB())
+	return false
+}
+
+func uPushPCLSB(gb *Gameboy) bool {
+	gb.push(gb.CPU.Regs.PC.LSB())
+	return false
+}
+
+func uSetPCWZ(gb *Gameboy) bool {
+	gb.CPU.SetPC(Addr(gb.CPU.Regs.GetWZ()))
+	return true
+}
+
+func uSetPCISR(gb *Gameboy) bool {
+	isr := gb.Interrupts.PendingInterrupt.ISR()
+	gb.CPU.SetPC(isr)
+	gb.Interrupts.PendingInterrupt = 0
+	gb.Interrupts.InISR = true
+	return true
 }

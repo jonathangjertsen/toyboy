@@ -879,6 +879,7 @@ export namespace model {
 	
 	export class ConfigDisassembler {
 	    Trace: boolean;
+	    Enable: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConfigDisassembler(source);
@@ -887,9 +888,11 @@ export namespace model {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Trace = source["Trace"];
+	        this.Enable = source["Enable"];
 	    }
 	}
 	export class ConfigDebug {
+	    RewindSize: number;
 	    PanicOnStackUnderflow: boolean;
 	    Disassembler: ConfigDisassembler;
 	
@@ -899,6 +902,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.RewindSize = source["RewindSize"];
 	        this.PanicOnStackUnderflow = source["PanicOnStackUnderflow"];
 	        this.Disassembler = this.convertValues(source["Disassembler"], ConfigDisassembler);
 	    }

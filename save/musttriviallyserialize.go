@@ -25,7 +25,14 @@ func (st *stackT) join() string {
 	return strings.Join(st.buf, ".")[1:]
 }
 
+var seen = make(map[any]struct{})
+
 func MustTriviallySerialize(v any) {
+	if _, ok := seen[v]; ok {
+		return
+	}
+	seen[v] = struct{}{}
+
 	t := reflect.TypeOf(v)
 	var stack stackT
 	stack.buf = make([]string, 0, 10)
