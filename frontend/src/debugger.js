@@ -3,6 +3,7 @@ const PauseBtn = document.getElementById("pause-btn");
 const StepBtn = document.getElementById("step-btn");
 const LoadBtn = document.getElementById("load-btn");
 const SaveBtn = document.getElementById("save-btn");
+const ExecLogBtn = document.getElementById("execlog-btn");
 
 RunBtn.addEventListener('click', () => {
     runBtn()

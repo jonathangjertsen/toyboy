@@ -242,30 +242,44 @@ func (cpu *CPU) Dump(gb *Gameboy) {
 		fmt.Fprintf(f, "--------\n")
 	*/
 	fmt.Printf("Last executed instructions:\n")
-	gb.PrintRewindBuffer(f)
+	gb.PrintRewindBuffer(f, false)
 	fmt.Fprintf(f, "--------\n")
 }
 
-func (gb *Gameboy) PrintRewindBuffer(f io.Writer) {
-	for i := gb.CPU.Rewind.Start(); i != gb.CPU.Rewind.End(); i = gb.CPU.Rewind.Next(i) {
-		entry := gb.CPU.Rewind.At(i)
-		extra := ""
-		if entry.BranchResult == +1 {
-			extra += " (taken)"
-		} else if entry.BranchResult == -1 {
-			extra += " (not taken)"
+func (gb *Gameboy) PrintRewindBuffer(f io.Writer, reverse bool) {
+	rw := &gb.CPU.Rewind
+	curr := rw.Curr()
+	currTxt := fmt.Sprintf("Current: [PC=%s] %s (%d)\n", curr.Instruction.Address.Hex(), curr.Instruction.Asm(), gb.CPU.UOpCycle)
+
+	if reverse {
+		fmt.Fprint(f, currTxt)
+		for i := rw.Prev(rw.End()); i != rw.Prev(rw.Start()); i = rw.Prev(i) {
+			gb.printRewindEntry(f, i)
 		}
-		if entry.Instruction.InISR {
-			extra += " (in ISR)"
+	} else {
+		for i := rw.Start(); i != rw.End(); i = rw.Next(i) {
+			gb.printRewindEntry(f, i)
 		}
-		if entry.Instruction.NopCount > 0 {
-			extra += fmt.Sprintf(" (x%d)", entry.Instruction.NopCount+1)
-		}
-		fmt.Fprintf(f, "[PC=%s] %s%s\n", entry.Instruction.Address.Hex(), entry.Instruction.Asm(), extra)
+		fmt.Fprint(f, currTxt)
 	}
-	curr := gb.CPU.Rewind.Curr()
-	fmt.Printf("Current: ")
-	fmt.Fprintf(f, "[PC=%s] %s (%d)\n", curr.Instruction.Address.Hex(), curr.Instruction.Asm(), gb.CPU.UOpCycle)
+	fmt.Fprintf(f, "                                \n")
+}
+
+func (gb *Gameboy) printRewindEntry(f io.Writer, i int) {
+	entry := gb.CPU.Rewind.At(i)
+	extra := ""
+	if entry.BranchResult == +1 {
+		extra += " (taken)"
+	} else if entry.BranchResult == -1 {
+		extra += " (not taken)"
+	}
+	if entry.Instruction.InISR {
+		extra += " (in ISR)"
+	}
+	if entry.Instruction.NopCount > 0 {
+		extra += fmt.Sprintf(" (x%d)", entry.Instruction.NopCount+1)
+	}
+	fmt.Fprintf(f, "[PC=%s] %s%s\n", entry.Instruction.Address.Hex(), entry.Instruction.Asm(), extra)
 }
 
 func (cd *CoreDump) PrintDisassembly(f io.Writer) {

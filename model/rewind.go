@@ -37,6 +37,14 @@ func (rb *Rewind) Next(i int) int {
 	return i
 }
 
+func (rb *Rewind) Prev(i int) int {
+	i--
+	if i == -1 {
+		i = len(rb.Buffer) - 1
+	}
+	return i
+}
+
 func (rb *Rewind) At(i int) *ExecLogEntry {
 	return &rb.Buffer[i]
 }

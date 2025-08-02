@@ -89,8 +89,8 @@ func (gb *Gameboy) initDebug(config *Config) {
 }
 
 func (gb *Gameboy) initCartridge() {
-	gb.Cartridge.BankNo1 = 1
-	gb.Cartridge.SelectedROMBank = 1
+	gb.Cartridge.RegLow = 1
+	gb.Cartridge.SelectedROMBank0 = 1
 }
 
 func (gb *Gameboy) initJoypad() {

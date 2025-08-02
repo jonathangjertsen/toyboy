@@ -201,7 +201,7 @@ func (clockRT *ClockRT) MCycle(
 		// 99.99% of the time, both PPU and APU are on, so we clock everything
 		if gb.PPU.RegLCDC&gb.APU.MasterCtl&Bit7 != 0 {
 			// T0
-			gb.Timer.tickDIV(gb)
+			gb.tickDIV()
 			gb.APU.Wave.clock(gb.Mem)
 			if m&0x1 == 0 {
 				gb.APU.Pulse1.clock()
@@ -211,20 +211,16 @@ func (clockRT *ClockRT) MCycle(
 				gb.APU.Noise.clock()
 			}
 			gb.PPU.fsm(gb, clockRT, fs)
-			gb.TCycle++
 
 			// T1
-			gb.Timer.tickDIV(gb)
-			gb.TCycle++
+			gb.tickDIV()
 
 			// T2
 			gb.PPU.fsm(gb, clockRT, fs)
-			gb.Timer.tickDIV(gb)
-			gb.TCycle++
+			gb.tickDIV()
 
 			// T3
-			gb.Timer.tickDIV(gb)
-			gb.TCycle++
+			gb.tickDIV()
 		} else {
 			clockRT.mCycleSlowPath(m, gb, fs)
 		}
@@ -233,7 +229,7 @@ func (clockRT *ClockRT) MCycle(
 
 func (clockRT *ClockRT) mCycleSlowPath(m uint, gb *Gameboy, fs *FrameSync) {
 	// T0
-	gb.TCycle++
+	gb.tickDIV()
 	if gb.PPU.RegLCDC&Bit7 != 0 {
 		gb.PPU.fsm(gb, clockRT, fs)
 	}
@@ -249,14 +245,14 @@ func (clockRT *ClockRT) mCycleSlowPath(m uint, gb *Gameboy, fs *FrameSync) {
 	}
 
 	// T1
-	gb.TCycle++
+	gb.tickDIV()
 
 	// T2
-	gb.TCycle++
+	gb.tickDIV()
 	if gb.PPU.RegLCDC&Bit7 != 0 {
 		gb.PPU.fsm(gb, clockRT, fs)
 	}
 
 	// T3
-	gb.TCycle++
+	gb.tickDIV()
 }

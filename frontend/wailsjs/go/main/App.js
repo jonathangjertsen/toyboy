@@ -18,6 +18,10 @@ export function Pause() {
   return window['go']['main']['App']['Pause']();
 }
 
+export function RequestExecutionLog() {
+  return window['go']['main']['App']['RequestExecutionLog']();
+}
+
 export function Save() {
   return window['go']['main']['App']['Save']();
 }

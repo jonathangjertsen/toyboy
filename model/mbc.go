@@ -1,5 +1,7 @@
 package model
 
+import "strings"
+
 //go:generate go-enum --flag --nocomments
 
 // ENUM(None, 1, 2, 3, MMM01, 5, 6, 7, PocketCamera, BandaiTAMA5, HuC3, HuC1)
@@ -18,6 +20,26 @@ type MBCFeatures struct {
 	Rumble    bool
 	NROMBanks int
 	NRAMBanks int
+}
+
+func (mbc *MBCFeatures) Features() string {
+	feat := []string{}
+	if mbc.RAM {
+		feat = append(feat, "RAM")
+	}
+	if mbc.Battery {
+		feat = append(feat, "Battery")
+	}
+	if mbc.RTC {
+		feat = append(feat, "RTC")
+	}
+	if mbc.Rumble {
+		feat = append(feat, "Rumble")
+	}
+	if len(feat) == 0 {
+		return "ROM only"
+	}
+	return strings.Join(feat, ", ")
 }
 
 func (mbcf *MBCFeatures) TotalROMSize() int {
@@ -124,7 +146,7 @@ func GetMBCFeatures(code, romsiz, ramsiz uint8) MBCFeatures {
 	}
 
 	if romsiz <= 0x08 {
-		mbc.NROMBanks = 1 << romsiz
+		mbc.NROMBanks = 1 << (romsiz + 1)
 	} else {
 		panicf("rom size byte 0x%02x not supported", romsiz)
 	}

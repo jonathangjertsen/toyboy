@@ -22,6 +22,7 @@ func LoadROM(
 
 	// Load into ROM banks
 	for i := range len(rom) / ROMBankSize {
+		fmt.Printf("Creating ROM Bank %d\n", i)
 		copy(gb.Cartridge.ROM[i][:], Data8Slice(rom[i*ROMBankSize:(i+1)*ROMBankSize]))
 	}
 
@@ -33,15 +34,19 @@ func LoadROM(
 		copy(gb.Mem[SizeBootROM:AddrCartridgeBank0End], gb.Cartridge.ROM[0][SizeBootROM:])
 	}
 
-	// Map in initial Bank 1
-	gb.SetROMBank(1)
-
 	// Configure cartridge MCB features
 	gb.Cartridge.MBCFeatures = GetMBCFeatures(
 		rom[AddrCartridgeType],
 		rom[AddrROMSize],
 		rom[AddrRAMSize],
 	)
+	if r := gb.Cartridge.MBCFeatures.TotalROMSize(); r != len(rom) {
+		gb.PrintCartridgeInfo(os.Stdout)
+		panicf("expected ROM size=%d got %d (header=%v)", len(rom), r, rom[AddrCartridgeType:AddrRAMSize+1])
+	}
+
+	// Map in initial Bank 1
+	gb.SetROMBank1(1)
 
 	return nil
 }

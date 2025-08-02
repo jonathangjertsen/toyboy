@@ -126,7 +126,7 @@
                     <div class="box-title">Execution log</div>
                 </div>
                 <div class="box-content">
-                    <p>Execution log</p>
+                    <pre id="executionlog-text">Execution log</p>
                 </div>
             </div>
 
@@ -136,11 +136,12 @@
                 </div>
                 <div class="box-content">
                     <div class="box-container">
-                        <div class="box" data-box-id="Clock">
-                            <div class="box-header">
-                                <div class="collapse-button"></div>
-                                <div class="box-title">Clock</div>
-                            </div>
+                        <div>
+                            <div class="box" data-box-id="Clock">
+                                <div class="box-header">
+                                    <div class="collapse-button"></div>
+                                    <div class="box-title">Clock</div>
+                                </div>
                                 <div class="breakpoint-container">
                                     <div class="input-label">Target speed %</div>
                                     <div class="numeric-input float-input" data-input-id="TargetSpeed" data-input-type="float" data-min="0" data-max="10000">
@@ -149,7 +150,17 @@
                                     </div>
                                 </div>
                                 <div class="box-content">
-                                <pre id="clock-text">Clock</pre>
+                                    <pre id="clock-text">Clock</pre>
+                                </div>
+                            </div>
+                            <div class="box" data-box-id="Cartridge">
+                                <div class="box-header">
+                                    <div class="collapse-button"></div>
+                                    <div class="box-title">Cartridge</div>
+                                </div>
+                                <div class="box-content">
+                                    <pre id="cartridge-text">Cartridge info</pre>
+                                </div>
                             </div>
                         </div>
                         <div class="box" data-box-id="CPURegisters">

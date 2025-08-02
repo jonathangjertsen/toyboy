@@ -7,7 +7,11 @@ type Timer struct {
 }
 
 // Tick the DIV timer
-func (t *Timer) tickDIV(gb *Gameboy) {
+func (gb *Gameboy) tickDIV() {
+	gb.TCycle++
+
+	t := &gb.Timer
+
 	// https://gbdev.io/pandocs/Audio_details.html#div-apu
 	// A “DIV-APU” counter is increased every time DIV’s bit 4 (5 in double-speed mode) goes from 1 to 0
 	div := t.DIV

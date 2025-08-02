@@ -23,11 +23,13 @@ const (
 	DataIDOAM
 	DataIDCPUState
 	DataIDClock
+	DataIDExecutionLog
+	DataIDCartridge
 )
 
 var ErrInvalidDataID = errors.New("not a valid DataID")
 
-const _DataIDName = "NoneViewportCPURegistersPPURegistersAPURegistersDisassemblyHRAMWRAMOAMCPUStateClock"
+const _DataIDName = "NoneViewportCPURegistersPPURegistersAPURegistersDisassemblyHRAMWRAMOAMCPUStateClockExecutionLogCartridge"
 
 // DataIDValues returns a list of the values for DataID
 func DataIDValues() []DataID {
@@ -43,6 +45,8 @@ func DataIDValues() []DataID {
 		DataIDOAM,
 		DataIDCPUState,
 		DataIDClock,
+		DataIDExecutionLog,
+		DataIDCartridge,
 	}
 }
 
@@ -58,6 +62,8 @@ var _DataIDMap = map[DataID]string{
 	DataIDOAM:          _DataIDName[67:70],
 	DataIDCPUState:     _DataIDName[70:78],
 	DataIDClock:        _DataIDName[78:83],
+	DataIDExecutionLog: _DataIDName[83:95],
+	DataIDCartridge:    _DataIDName[95:104],
 }
 
 // String implements the Stringer interface.
@@ -76,17 +82,19 @@ func (x DataID) IsValid() bool {
 }
 
 var _DataIDValue = map[string]DataID{
-	_DataIDName[0:4]:   DataIDNone,
-	_DataIDName[4:12]:  DataIDViewport,
-	_DataIDName[12:24]: DataIDCPURegisters,
-	_DataIDName[24:36]: DataIDPPURegisters,
-	_DataIDName[36:48]: DataIDAPURegisters,
-	_DataIDName[48:59]: DataIDDisassembly,
-	_DataIDName[59:63]: DataIDHRAM,
-	_DataIDName[63:67]: DataIDWRAM,
-	_DataIDName[67:70]: DataIDOAM,
-	_DataIDName[70:78]: DataIDCPUState,
-	_DataIDName[78:83]: DataIDClock,
+	_DataIDName[0:4]:    DataIDNone,
+	_DataIDName[4:12]:   DataIDViewport,
+	_DataIDName[12:24]:  DataIDCPURegisters,
+	_DataIDName[24:36]:  DataIDPPURegisters,
+	_DataIDName[36:48]:  DataIDAPURegisters,
+	_DataIDName[48:59]:  DataIDDisassembly,
+	_DataIDName[59:63]:  DataIDHRAM,
+	_DataIDName[63:67]:  DataIDWRAM,
+	_DataIDName[67:70]:  DataIDOAM,
+	_DataIDName[70:78]:  DataIDCPUState,
+	_DataIDName[78:83]:  DataIDClock,
+	_DataIDName[83:95]:  DataIDExecutionLog,
+	_DataIDName[95:104]: DataIDCartridge,
 }
 
 // ParseDataID attempts to convert a string to a DataID.

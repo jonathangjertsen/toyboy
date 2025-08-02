@@ -32,6 +32,8 @@ import (
 // OAM = 8
 // CPUState = 9
 // Clock = 10
+// ExecutionLog = 11
+// Cartridge = 12
 // )
 type DataID uint8
 
@@ -93,6 +95,9 @@ func (app *App) startup(ctx context.Context) {
 	var gb model.Gameboy
 	gb.AllocMem()
 	gb.Init(&app.config.Model, app.CLK)
+	if err := model.LoadROM(app.config.ROMLocation, &gb); err != nil {
+		panic(err)
+	}
 
 	app.startGB(&gb)
 	app.startWebSocketServer()
@@ -113,10 +118,6 @@ func (app *App) startGB(gb *model.Gameboy) {
 	app.GB = gb
 	go app.CLK.Run(app.GB, &app.config.Model, app.GBAudio, app.FrameSync)
 	app.GBFPSMeasurement.SetCounter(&app.GB.PPU.FrameCount)
-
-	if err := model.LoadROM(app.config.ROMLocation, app.GB); err != nil {
-		panic(err)
-	}
 
 	app.Start()
 }
@@ -154,8 +155,9 @@ func (app *App) MachineStateRequest(req MachineStateRequest) {
 }
 
 type TimeoutState struct {
-	Interval time.Duration
-	Next     time.Time
+	Interval   time.Duration
+	Next       time.Time
+	PausedOnly bool
 }
 
 func (ts *TimeoutState) Update() {
@@ -180,11 +182,12 @@ func (app *App) startWebSocketServer() {
 			DataIDCPURegisters: {Interval: time.Millisecond * 100},
 			DataIDPPURegisters: {Interval: time.Millisecond * 100},
 			DataIDAPURegisters: {Interval: time.Millisecond * 100},
-			DataIDDisassembly:  {Interval: time.Millisecond * 1000},
+			DataIDDisassembly:  {Interval: time.Millisecond * 500, PausedOnly: true},
 			DataIDHRAM:         {Interval: time.Millisecond * 100},
 			DataIDWRAM:         {Interval: time.Millisecond * 500},
 			DataIDOAM:          {Interval: time.Millisecond * 100},
-			DataIDCPUState:     {Interval: time.Millisecond * 1000},
+			DataIDCPUState:     {Interval: time.Millisecond * 500},
+			DataIDExecutionLog: {Interval: time.Millisecond * 500, PausedOnly: true},
 		}
 		var req MachineStateRequest
 		mu := &sync.Mutex{}
@@ -220,7 +223,7 @@ func (app *App) startWebSocketServer() {
 
 				buffers := map[DataID]*bytes.Buffer{}
 				for _, id := range DataIDValues() {
-					if force || rateLimit(id, &req, timeouts) {
+					if force || rateLimit(id, &req, timeouts, app.CLK) {
 						buffers[id] = &bytes.Buffer{}
 					}
 				}
@@ -268,6 +271,12 @@ func (app *App) startWebSocketServer() {
 							model.AddrOAMEnd,
 							0,
 						)
+					}
+					if buf := buffers[DataIDExecutionLog]; buf != nil {
+						app.GB.PrintRewindBuffer(buf, true)
+					}
+					if buf := buffers[DataIDCartridge]; buf != nil {
+						app.GB.PrintCartridgeInfo(buf)
 					}
 					if buf := buffers[DataIDDisassembly]; buf != nil {
 						rng := req.Ranges[DataIDDisassembly.String()]
@@ -328,14 +337,22 @@ func (app *App) startWebSocketServer() {
 	}()
 }
 
-func rateLimit(id DataID, req *MachineStateRequest, timeouts map[DataID]TimeoutState) bool {
-	if time.Now().Before(timeouts[id].Next) {
+func rateLimit(
+	id DataID,
+	req *MachineStateRequest,
+	timeouts map[DataID]TimeoutState,
+	clk *model.ClockRT,
+) bool {
+	ts := timeouts[id]
+	if ts.PausedOnly && clk.Running.Load() {
+		return false
+	}
+	if time.Now().Before(ts.Next) {
 		return false
 	}
 	if !req.OpenBoxes[id.String()] {
 		return false
 	}
-	ts := timeouts[id]
 	ts.Update()
 	timeouts[id] = ts
 	return true
@@ -407,6 +424,15 @@ func (app *App) Start() {
 }
 
 func (app *App) Step() {
+	app.CLK.PauseAfterCycle.Add(1)
+	app.Start()
+	select {
+	case <-app.needStateUpdate:
+	default:
+	}
+}
+
+func (app *App) RequestExecutionLog() {
 	app.CLK.PauseAfterCycle.Add(1)
 	app.Start()
 	select {

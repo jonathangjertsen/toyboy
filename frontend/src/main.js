@@ -24,6 +24,8 @@ const HRAMText = document.getElementById("hram-text");
 const OAMText = document.getElementById("oam-text");
 const ClockText = document.getElementById("clock-text");
 const DisassemblyText = document.getElementById("disassembly-text");
+const ExecutionLogText = document.getElementById("executionlog-text");
+const CartridgeText = document.getElementById("cartridge-text");
 
 async function run() {
     config = await window.go.main.App.GetConfig();
@@ -72,6 +74,14 @@ async function run() {
             }
             case "OAM": {
                 OAMText.innerText = decoder.decode(data);
+                break;
+            }
+            case "ExecutionLog": {
+                ExecutionLogText.innerText = decoder.decode(data);
+                break;
+            }
+            case "Cartridge": {
+                CartridgeText.innerText = decoder.decode(data);
                 break;
             }
             case "CPUState": {
